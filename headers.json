@@ -1,0 +1,31 @@
+{
+  "headerRowIndex": 17,
+  "headers": [
+    "Fecha",
+    "",
+    "Sucursal",
+    "",
+    "",
+    "Descripción",
+    "",
+    "N° Documento",
+    "",
+    "Cheques y otros cargos",
+    "Depósitos y Abono",
+    "Saldo diario"
+  ],
+  "firstDataRow": [
+    "01/12/2025",
+    "",
+    "UGCA AUT",
+    "",
+    "",
+    "SumUp * Luxvision 754816",
+    "",
+    "754816",
+    "",
+    "139.900",
+    "",
+    "225.497"
+  ]
+}

@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Numia v1.0
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper function to validate image file
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+             && request.resource.size < 2 * 1024 * 1024; // Max 2MB
+    }
+
+    // Entity logos: entities/{userId}/{entityId}/logo.{ext}
+    match /entities/{userId}/{entityId}/{filename} {
+      // Allow read if authenticated (can view entities you have access to)
+      allow read: if isAuthenticated();
+
+      // Allow write only if:
+      // 1. User is authenticated
+      // 2. User is the owner of the entity
+      // 3. File is a valid image
+      allow write: if isOwner(userId) && isValidImage();
+
+      // Allow delete only if user is the owner
+      allow delete: if isOwner(userId);
+    }
+
+    // Default: deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
