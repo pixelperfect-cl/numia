@@ -12,25 +12,38 @@ import { useData } from '@/contexts/DataContext';
 import { formatCurrency, getTodayLocalDateString } from '@/lib/utils';
 import type { MovementType } from '@/types';
 import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IconComponent } from '@/components/IconPicker';
 
 interface ProjectionsProps {
   openDialog?: boolean;
   onDialogClose?: () => void;
+  entityId?: string;
 }
 
-export function Projections({ openDialog = false, onDialogClose }: ProjectionsProps = {}) {
+export function Projections({ openDialog = false, onDialogClose, entityId }: ProjectionsProps = {}) {
   const { entities, categories, projections, createProjection, updateProjection, deleteProjection, createMovement, loading } = useData();
   const [isOpen, setIsOpen] = useState(false);
   const [editingProjection, setEditingProjection] = useState<any>(null);
   const [itemType, setItemType] = useState<MovementType>('income');
   const [formData, setFormData] = useState({
-    entityId: '',
+    entityId: entityId || '',
     categoryId: '',
     description: '',
     amount: '',
   });
+
+  // Update formData when entityId changes
+  useEffect(() => {
+    if (entityId) {
+      setFormData(prev => ({ ...prev, entityId }));
+    }
+  }, [entityId]);
+
+  // Filter projections by entity
+  const filteredProjections = entityId
+    ? projections.filter(p => p.entityId === entityId)
+    : projections;
 
   // Handle loading state
   if (loading) {
@@ -166,8 +179,8 @@ export function Projections({ openDialog = false, onDialogClose }: ProjectionsPr
   };
 
   // Calculate totals from all projections (with safety check)
-  const allIncome = (projections || []).reduce((sum, p) => sum + p.totals.totalIncome, 0);
-  const allExpenses = (projections || []).reduce((sum, p) => sum + p.totals.totalExpenses, 0);
+  const allIncome = (filteredProjections || []).reduce((sum, p) => sum + p.totals.totalIncome, 0);
+  const allExpenses = (filteredProjections || []).reduce((sum, p) => sum + p.totals.totalExpenses, 0);
   const balance = allIncome - allExpenses;
 
   // Helper function to get income items (compatible with old and new structure)
@@ -223,7 +236,7 @@ export function Projections({ openDialog = false, onDialogClose }: ProjectionsPr
   };
 
   // Group projections by entity
-  const projectionsGroupedByEntity = (projections || []).reduce((acc: Record<string, any[]>, projection) => {
+  const projectionsGroupedByEntity = (filteredProjections || []).reduce((acc: Record<string, any[]>, projection) => {
     const entityId = projection.entityId;
     if (!acc[entityId]) {
       acc[entityId] = [];
@@ -280,7 +293,7 @@ export function Projections({ openDialog = false, onDialogClose }: ProjectionsPr
       </div>
 
       {/* Total Summary Bar - All Entities Combined */}
-      {projections && projections.length > 0 && (
+      {filteredProjections && filteredProjections.length > 0 && (
         <Card className="border-2 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -374,7 +387,7 @@ export function Projections({ openDialog = false, onDialogClose }: ProjectionsPr
       </div>
 
       {/* Projections List - Grouped by Entity */}
-      {!projections || projections.length === 0 ? (
+      {!filteredProjections || filteredProjections.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-6xl mb-4">📈</div>
@@ -598,21 +611,23 @@ export function Projections({ openDialog = false, onDialogClose }: ProjectionsPr
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="entity">Entidad</Label>
-              <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una entidad" />
-                </SelectTrigger>
-                <SelectContent>
-                  {entities.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id}>
-                      {entity.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!entityId && (
+              <div>
+                <Label htmlFor="entity">Entidad</Label>
+                <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una entidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id}>
+                        {entity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="category">Categoría</Label>

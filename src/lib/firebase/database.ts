@@ -15,9 +15,12 @@ import {
   Timestamp,
   QueryConstraint,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
+
+// ========== ENTITIES ==========
 import { db } from './config';
-import type { Entity, Movement, Loan, Projection, Category } from '@/types';
+import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, Project } from '@/types';
 
 // Helper to convert Firestore timestamps to Date
 const convertTimestamps = (data: any) => {
@@ -44,8 +47,18 @@ export const getEntities = async (userId: string): Promise<Entity[]> => {
 
 export const createEntity = async (userId: string, data: Omit<Entity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   const now = Timestamp.now();
+
+  // Remove undefined fields to prevent Firestore errors
+  const cleanData: any = {};
+  Object.keys(data).forEach(key => {
+    const value = (data as any)[key];
+    if (value !== undefined) {
+      cleanData[key] = value;
+    }
+  });
+
   const docRef = await addDoc(collection(db, 'entities'), {
-    ...data,
+    ...cleanData,
     userId,
     createdAt: now,
     updatedAt: now,
@@ -374,4 +387,326 @@ export const initializeDefaultCategories = async (userId: string, defaultCategor
   }
 
   await Promise.all(batch);
+};
+// ========== CLIENTS ==========
+
+export const getClients = async (userId: string): Promise<Client[]> => {
+  const q = query(collection(db, 'clients'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as Client[];
+};
+
+export const createClient = async (userId: string, data: Omit<Client, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'clients'), {
+    ...data,
+    userId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return docRef.id;
+};
+
+export const updateClient = async (clientId: string, data: Partial<Client>): Promise<void> => {
+  const docRef = doc(db, 'clients', clientId);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteClient = async (clientId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'clients', clientId));
+};
+
+// ========== SUBSCRIPTIONS ==========
+
+export const getSubscriptions = async (clientId: string): Promise<Subscription[]> => {
+  const q = query(collection(db, 'subscriptions'), where('clientId', '==', clientId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as Subscription[];
+};
+
+export const createSubscription = async (userId: string, clientId: string, data: Omit<Subscription, 'id' | 'clientId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'subscriptions'), {
+    ...data,
+    userId, // Add userId for security rules
+    clientId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return docRef.id;
+};
+
+export const updateSubscription = async (subscriptionId: string, data: Partial<Subscription>): Promise<void> => {
+  const docRef = doc(db, 'subscriptions', subscriptionId);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteSubscription = async (subscriptionId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'subscriptions', subscriptionId));
+};
+
+// ========== PROJECTS ==========
+
+export const getProjects = async (userId: string): Promise<Project[]> => {
+  const q = query(collection(db, 'projects'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as Project[];
+};
+
+export const createProject = async (userId: string, data: Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'projects'), {
+    ...data,
+    userId,
+    status: 'incoming', // Default status
+    progress: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return docRef.id;
+};
+
+export const updateProject = async (projectId: string, data: Partial<Project>): Promise<void> => {
+  const docRef = doc(db, 'projects', projectId);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'projects', projectId));
+};
+
+// ========== CATEGORY HELPERS ==========
+
+export const getCategoryMovementCount = async (userId: string, categoryId: string): Promise<number> => {
+  const q = query(
+    collection(db, 'movements'),
+    where('userId', '==', userId),
+    where('categoryId', '==', categoryId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.size;
+};
+
+export const reassignCategoryMovements = async (
+  userId: string,
+  oldCategoryId: string,
+  newCategoryId: string
+): Promise<void> => {
+  const q = query(
+    collection(db, 'movements'),
+    where('userId', '==', userId),
+    where('categoryId', '==', oldCategoryId)
+  );
+  const snapshot = await getDocs(q);
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((document) => {
+    batch.update(document.ref, { categoryId: newCategoryId, updatedAt: Timestamp.now() });
+  });
+
+  await batch.commit();
+};
+
+export const renameSubcategoryInMovements = async (
+  userId: string,
+  categoryId: string,
+  oldName: string,
+  newName: string
+): Promise<void> => {
+  const q = query(
+    collection(db, 'movements'),
+    where('userId', '==', userId),
+    where('categoryId', '==', categoryId),
+    where('subcategory', '==', oldName)
+  );
+
+  const snapshot = await getDocs(q);
+  const CHUNK_SIZE = 500;
+
+  // Handle batching if we have many movements
+  const chunks = [];
+  for (let i = 0; i < snapshot.docs.length; i += CHUNK_SIZE) {
+    chunks.push(snapshot.docs.slice(i, i + CHUNK_SIZE));
+  }
+
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+    chunk.forEach(doc => {
+      batch.update(doc.ref, {
+        subcategory: newName,
+        updatedAt: Timestamp.now()
+      });
+    });
+    await batch.commit();
+  }
+};
+
+export const reassignSubcategoryInMovements = renameSubcategoryInMovements;
+
+export const removeSubcategoryFromMovements = async (
+  userId: string,
+  categoryId: string,
+  subName: string
+): Promise<void> => {
+  const q = query(
+    collection(db, 'movements'),
+    where('userId', '==', userId),
+    where('categoryId', '==', categoryId),
+    where('subcategory', '==', subName)
+  );
+
+  const snapshot = await getDocs(q);
+  const CHUNK_SIZE = 500;
+
+  const chunks = [];
+  for (let i = 0; i < snapshot.docs.length; i += CHUNK_SIZE) {
+    chunks.push(snapshot.docs.slice(i, i + CHUNK_SIZE));
+  }
+
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+    chunk.forEach(doc => {
+      batch.update(doc.ref, {
+        subcategory: deleteField(), // This will need deleteField imported
+        updatedAt: Timestamp.now()
+      });
+    });
+    await batch.commit();
+  }
+};
+
+// ========== BOX HELPERS ==========
+
+export const deleteBox = async (entityId: string, boxKey: string): Promise<void> => {
+  const entityRef = doc(db, 'entities', entityId);
+  const entityDoc = await getDocs(query(collection(db, 'entities'), where('__name__', '==', entityId)));
+
+  if (!entityDoc.empty) {
+    const entityData = entityDoc.docs[0].data();
+    const boxes = { ...entityData.boxes };
+    delete boxes[boxKey];
+
+    await updateDoc(entityRef, {
+      boxes,
+      updatedAt: Timestamp.now()
+    });
+  }
+};
+
+export const updateBox = async (
+  entityId: string,
+  boxKey: string,
+  updates: { order?: number; isDefault?: boolean; currency?: string }
+): Promise<void> => {
+  const entityRef = doc(db, 'entities', entityId);
+  const entityDoc = await getDocs(query(collection(db, 'entities'), where('__name__', '==', entityId)));
+
+  if (!entityDoc.empty) {
+    const entityData = entityDoc.docs[0].data();
+    const boxes = { ...entityData.boxes };
+
+    // If setting as default, unset all others
+    if (updates.isDefault) {
+      Object.keys(boxes).forEach(key => {
+        boxes[key] = { ...boxes[key], isDefault: false };
+      });
+    }
+
+    boxes[boxKey] = { ...boxes[boxKey], ...updates };
+
+    await updateDoc(entityRef, {
+      boxes,
+      updatedAt: Timestamp.now()
+    });
+  }
+};
+
+// ========== ENTITY CASCADE DELETE ==========
+
+export const deleteEntityCascade = async (userId: string, entityId: string): Promise<void> => {
+  // Delete all movements for this entity
+  const movementsQuery = query(
+    collection(db, 'movements'),
+    where('userId', '==', userId),
+    where('entityId', '==', entityId)
+  );
+  const movementsSnapshot = await getDocs(movementsQuery);
+  const movementsBatch = writeBatch(db);
+  movementsSnapshot.docs.forEach((doc) => {
+    movementsBatch.delete(doc.ref);
+  });
+  await movementsBatch.commit();
+
+  // Delete all loans for this entity
+  const loansQuery = query(
+    collection(db, 'loans'),
+    where('userId', '==', userId),
+    where('entityId', '==', entityId)
+  );
+  const loansSnapshot = await getDocs(loansQuery);
+  const loansBatch = writeBatch(db);
+  loansSnapshot.docs.forEach((doc) => {
+    loansBatch.delete(doc.ref);
+  });
+  await loansBatch.commit();
+
+  // Delete all projections for this entity
+  const projectionsQuery = query(
+    collection(db, 'projections'),
+    where('userId', '==', userId),
+    where('entityId', '==', entityId)
+  );
+  const projectionsSnapshot = await getDocs(projectionsQuery);
+  const projectionsBatch = writeBatch(db);
+  projectionsSnapshot.docs.forEach((doc) => {
+    projectionsBatch.delete(doc.ref);
+  });
+  await projectionsBatch.commit();
+
+  // Delete all clients for this entity
+  const clientsQuery = query(
+    collection(db, 'clients'),
+    where('userId', '==', userId),
+    where('entityId', '==', entityId)
+  );
+  const clientsSnapshot = await getDocs(clientsQuery);
+  const clientsBatch = writeBatch(db);
+  clientsSnapshot.docs.forEach((doc) => {
+    clientsBatch.delete(doc.ref);
+  });
+  await clientsBatch.commit();
+
+  // Delete all projects for this entity
+  const projectsQuery = query(
+    collection(db, 'projects'),
+    where('userId', '==', userId),
+    where('entityId', '==', entityId)
+  );
+  const projectsSnapshot = await getDocs(projectsQuery);
+  const projectsBatch = writeBatch(db);
+  projectsSnapshot.docs.forEach((doc) => {
+    projectsBatch.delete(doc.ref);
+  });
+  await projectsBatch.commit();
+
+  // Finally, delete the entity itself
+  await deleteDoc(doc(db, 'entities', entityId));
 };

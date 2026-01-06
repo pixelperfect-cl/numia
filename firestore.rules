@@ -59,5 +59,26 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
+
+    // ERP: Clients collection
+    match /clients/{clientId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // ERP: Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // ERP: Projects collection
+    match /projects/{projectId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
   }
 }

@@ -20,6 +20,10 @@ export interface Entity {
   color?: string; // Hex color for charts and visual identification
   logoUrl?: string; // URL of uploaded horizontal logo image
   boxes: Record<string, Box>;
+  settings?: {
+    erpEnabled: boolean;
+    smtpEnabled?: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +64,8 @@ export interface Movement {
   category?: string; // DEPRECATED: kept for backwards compatibility
   box: string;
   date: string; // ISO date string
+  status?: 'paid' | 'pending';
+  clientId?: string; // Link to ERP Client
   history?: MovementHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
@@ -205,6 +211,53 @@ export interface AIConversation {
   userId: string;
   title: string;
   messages: AIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ERP Types
+
+export interface Subscription {
+  id: string;
+  clientId: string;
+  name: string;
+  amount: number;
+  frequency: 'monthly' | 'yearly';
+  startDate: string; // ISO date
+  nextBillingDate: string; // ISO date
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Client {
+  id: string;
+  userId: string;
+  entityId: string;
+  name: string;
+  email?: string; // Primary email (backward compatibility)
+  phone?: string; // Primary phone (backward compatibility)
+  emails?: string[]; // Additional emails for notifications
+  phones?: string[]; // Additional phones for notifications
+  rut?: string; // RUT de facturación
+  status: 'active' | 'inactive';
+  subscriptions?: Subscription[]; // Optional, populated on fetch if needed
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ProjectStatus = 'incoming' | 'design' | 'development' | 'review' | 'completed';
+
+export interface Project {
+  id: string;
+  userId: string;
+  entityId: string;
+  clientId: string;
+  name: string;
+  status: ProjectStatus;
+  description?: string;
+  dueDate?: string; // ISO date
+  progress: number; // 0-100
   createdAt: Date;
   updatedAt: Date;
 }

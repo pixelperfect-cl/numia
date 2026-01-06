@@ -20,19 +20,11 @@ service firebase.storage {
              && request.resource.size < 2 * 1024 * 1024; // Max 2MB
     }
 
-    // Entity logos: entities/{userId}/{entityId}/logo.{ext}
-    match /entities/{userId}/{entityId}/{filename} {
-      // Allow read if authenticated (can view entities you have access to)
+    // Entity logos: entities/{allPaths=**}
+    // This allows uploads to entities/temp_... as well as entities/userId/...
+    match /entities/{allPaths=**} {
       allow read: if isAuthenticated();
-
-      // Allow write only if:
-      // 1. User is authenticated
-      // 2. User is the owner of the entity
-      // 3. File is a valid image
-      allow write: if isOwner(userId) && isValidImage();
-
-      // Allow delete only if user is the owner
-      allow delete: if isOwner(userId);
+      allow write: if isAuthenticated() && isValidImage();
     }
 
     // Default: deny all other paths

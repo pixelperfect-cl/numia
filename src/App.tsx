@@ -2,7 +2,7 @@
  * Numia v1.0 - Main App Component
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import numiaLogo from '@/assets/numialogo.png';
 import { Login } from '@/pages/Login';
@@ -14,9 +14,16 @@ import { Loans } from '@/pages/Loans';
 import { Projections } from '@/pages/Projections';
 import { Configuration } from '@/pages/Configuration';
 import { MassUpload } from '@/pages/MassUpload';
+import { Services } from '@/pages/erp/Services';
+import { Clients } from '@/pages/erp/Clients';
+import { Projects } from '@/pages/erp/Projects';
+import { ERPDashboard } from '@/pages/erp/ERPDashboard';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { Button } from '@/components/ui/button';
-import { Sidebar, MobileMenu } from '@/components/layout/Sidebar';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
+import { EntitySelection } from '@/pages/EntitySelection';
+import { EntityConfiguration } from '@/pages/EntityConfiguration';
 import { useTheme } from '@/components/theme-provider';
 import {
   DropdownMenu,
@@ -33,17 +40,30 @@ import { AIAssistant } from '@/components/ai/AIAssistant';
 import { AIAssistantButton } from '@/components/ai/AIAssistantButton';
 import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Upload } from 'lucide-react';
 
+// ... (keep intervening code if possible, but replace_file_content works on contiguous blocks. 
+// Since imports and renderPage are far apart, I should split this into two calls or use multi_replace.
+// checking tool definitions... using multi_replace_file_content is better.)
+
 function App() {
   const { user, loading, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  // Main State
+  const [currentPage, setCurrentPage] = useState('entity-panel'); // Default to panel
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => localStorage.getItem('numia-entity-id'));
+
+  // Dialog Open States
   const [openMovementDialog, setOpenMovementDialog] = useState(false);
   const [openLoanDialog, setOpenLoanDialog] = useState(false);
   const [openProjectionDialog, setOpenProjectionDialog] = useState(false);
   const [openEntityMovementDialog, setOpenEntityMovementDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
   const [openTransferDialog, setOpenTransferDialog] = useState(false);
+
+  // Persist entity selection
+  useEffect(() => {
+    if (selectedEntityId) localStorage.setItem('numia-entity-id', selectedEntityId);
+    else localStorage.removeItem('numia-entity-id');
+  }, [selectedEntityId]);
 
   if (loading) {
     return (
@@ -57,30 +77,18 @@ function App() {
     return <Login />;
   }
 
-  const handleEntitySelect = (entityId: string) => {
-    setSelectedEntityId(entityId);
-    setCurrentPage('entity-panel');
-  };
+  // New: If logged in but no entity selected, show selection screen
+  if (!selectedEntityId) {
+    return <EntitySelection onSelect={setSelectedEntityId} />;
+  }
 
-  const handleBackToEntities = () => {
-    setSelectedEntityId(null);
-    setCurrentPage('entities');
-  };
-
-  const handleQuickAction = (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload') => {
+  const handleQuickAction = (action: string) => {
     switch (action) {
       case 'movement':
-        // Si estamos en el panel de entidad, abrir el dialog ahí mismo
-        if (currentPage === 'entity-panel' && selectedEntityId) {
-          setOpenEntityMovementDialog(true);
-        } else {
-          setCurrentPage('movements');
-          setOpenMovementDialog(true);
-        }
+        setCurrentPage('movements');
+        setOpenMovementDialog(true);
         break;
       case 'mass-upload':
-        // For mass upload we want to navigate to the page. 
-        // If we have an entity selected, pass it along via state if we could, but here we set page.
         setCurrentPage('mass-upload');
         break;
       case 'loan':
@@ -99,156 +107,76 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'entities':
-        return <Entities onEntitySelect={handleEntitySelect} />;
       case 'entity-panel':
-        return selectedEntityId ? (
-          <EntityPanel
-            entityId={selectedEntityId}
-            onBack={handleBackToEntities}
-            openMovementDialog={openEntityMovementDialog}
-            onMovementDialogClose={() => setOpenEntityMovementDialog(false)}
-          />
-        ) : (
-          <Entities onEntitySelect={handleEntitySelect} />
-        );
+        return <EntityPanel entityId={selectedEntityId} onBack={() => { }} openMovementDialog={openEntityMovementDialog} onMovementDialogClose={() => setOpenEntityMovementDialog(false)} />;
       case 'movements':
-        return <Movements openDialog={openMovementDialog} onDialogClose={() => setOpenMovementDialog(false)} />;
+        return <Movements openDialog={openMovementDialog} onDialogClose={() => setOpenMovementDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'loans':
-        return <Loans openDialog={openLoanDialog} onDialogClose={() => setOpenLoanDialog(false)} />;
+        return <Loans openDialog={openLoanDialog} onDialogClose={() => setOpenLoanDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'projections':
-        return <Projections openDialog={openProjectionDialog} onDialogClose={() => setOpenProjectionDialog(false)} />;
+        return <Projections openDialog={openProjectionDialog} onDialogClose={() => setOpenProjectionDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'configuration':
-        return <Configuration />;
+        return <EntityConfiguration entityId={selectedEntityId} />;
+      case 'entity-configuration':
+        return <EntityConfiguration entityId={selectedEntityId} />;
+      case 'entity-selection':
+        return (
+          <EntitySelection
+            onSelect={(id) => {
+              setSelectedEntityId(id);
+              setCurrentPage('entity-panel');
+            }}
+          />
+        );
       case 'mass-upload':
-        return <MassUpload onBack={() => setCurrentPage(selectedEntityId ? 'entity-panel' : 'dashboard')} initialEntityId={selectedEntityId} />;
+        return <MassUpload onBack={() => setCurrentPage(selectedEntityId ? 'entity-panel' : 'entity-selection')} initialEntityId={selectedEntityId || undefined} />;
+      case 'account-settings':
+        return <AccountSettings />;
+
+      // ERP Pages
+      case 'erp-dashboard':
+        return <ERPDashboard />;
+
+      case 'erp-services':
+        return <Services entityId={selectedEntityId || undefined} />;
+      case 'erp-clients':
+        return <Clients entityId={selectedEntityId || undefined} />;
+      case 'erp-projects':
+        return <Projects entityId={selectedEntityId || undefined} />;
+
       default:
-        return <Dashboard />;
+        return <EntityPanel entityId={selectedEntityId} onBack={() => { }} />;
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <Sidebar
-        currentPage={currentPage}
+    <div className="h-screen bg-background font-sans antialiased flex flex-col overflow-hidden">
+      {/* New Header */}
+      <Header
+        selectedEntityId={selectedEntityId}
+        onEntityChange={(id) => { setSelectedEntityId(id); setCurrentPage('entity-panel'); }}
         onNavigate={setCurrentPage}
-        onEntitySelect={handleEntitySelect}
+        onQuickAction={handleQuickAction}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="sticky top-0 z-10 border-b bg-card">
-          <div className="flex h-16 items-center justify-between px-4">
-            <div className="flex items-center space-x-2">
-              <MobileMenu
-                currentPage={currentPage}
-                onNavigate={setCurrentPage}
-                onEntitySelect={handleEntitySelect}
-              />
-              <div className="flex items-center gap-3">
-                <img
-                  src={numiaLogo}
-                  alt="Numia"
-                  className="h-4 sm:h-6 w-auto cursor-pointer"
-                  onClick={() => setCurrentPage('dashboard')}
-                />
-                {/* Quick Action Button */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg border-border/40 hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">Crear nuevo</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer gap-3" onClick={() => handleQuickAction('movement')}>
-                      <ArrowLeftRight className="h-4 w-4" />
-                      <span>Movimiento</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer gap-3" onClick={() => handleQuickAction('transfer')}>
-                      <ArrowRightLeft className="h-4 w-4" />
-                      <span>Transferencia</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer gap-3" onClick={() => handleQuickAction('loan')}>
-                      <Wallet className="h-4 w-4" />
-                      <span>Préstamo</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer gap-3" onClick={() => handleQuickAction('projection')}>
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Proyección</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer gap-3" onClick={() => handleQuickAction('mass-upload')}>
-                      <Upload className="h-4 w-4" />
-                      <span>Carga Masiva</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
+      <div className="flex flex-1 h-[calc(100vh-4rem)]">
+        <Sidebar
+          currentPage={currentPage}
+          onNavigate={setCurrentPage}
+          selectedEntityId={selectedEntityId}
+        />
 
-              <NotificationDropdown onOpenSettings={() => setCurrentPage('configuration')} />
+        <main className="flex-1 overflow-y-auto bg-muted/10 p-4 md:p-6 lg:p-8 no-scrollbar">
+          <div className="mx-auto max-w-7xl space-y-6">
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    {user.photoURL && (
-                      <img src={user.photoURL} alt={user.displayName || 'User'} className="h-6 w-6 rounded-full" />
-                    )}
-                    <span className="hidden sm:inline text-sm">{user.displayName}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => setOpenAccountDialog(true)}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Configuración de Cuenta</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => setCurrentPage('configuration')}>
-                    <SettingsIcon className="mr-2 h-4 w-4" />
-                    <span>Configuración</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="cursor-pointer text-red-600 dark:text-red-400" onClick={signOut}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Cerrar sesión</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {/* Page Content */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {renderPage()}
             </div>
           </div>
-        </header>
-
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
-          {renderPage()}
         </main>
       </div>
 
-      {/* Account Settings Dialog */}
       <Dialog open={openAccountDialog} onOpenChange={setOpenAccountDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -258,14 +186,13 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Transfer Dialog */}
       <TransferDialog open={openTransferDialog} onOpenChange={setOpenTransferDialog} />
 
-
-
       {/* AI Assistant */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <AIAssistantButton />
+      </div>
       <AIAssistant />
-      <AIAssistantButton />
     </div>
   );
 }

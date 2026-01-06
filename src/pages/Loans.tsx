@@ -21,9 +21,10 @@ import type { LoanType, MovementType } from '@/types';
 interface LoansProps {
   openDialog?: boolean;
   onDialogClose?: () => void;
+  entityId?: string;
 }
 
-export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
+export function Loans({ openDialog = false, onDialogClose, entityId }: LoansProps = {}) {
   const { loans, entities, categories, createLoan, createMovement, updateLoan, deleteLoan, loading } = useData();
   const [isOpen, setIsOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -42,11 +43,24 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
     personName: '',
     amount: '',
     description: '',
-    entityId: '',
+    entityId: entityId || '',
     date: getTodayLocalDateString(),
     registerAsMovement: false,
     box: '',
   });
+
+  // Update formData when entityId changes
+  useEffect(() => {
+    if (entityId) {
+      setFormData(prev => ({ ...prev, entityId }));
+    }
+  }, [entityId]);
+
+  // Filter loans by entity if provided
+  const filteredLoans = entityId
+    ? loans.filter(l => l.entityId === entityId)
+    : loans;
+
   const [paymentFormData, setPaymentFormData] = useState({
     amount: '',
     note: '',
@@ -278,8 +292,8 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
   };
 
   // Calculate totals
-  const lentLoans = loans.filter(l => l.type === 'lent');
-  const oweLoans = loans.filter(l => l.type === 'owe');
+  const lentLoans = filteredLoans.filter(l => l.type === 'lent');
+  const oweLoans = filteredLoans.filter(l => l.type === 'owe');
 
   const activeLentLoans = lentLoans.filter(l => !l.isPaid);
   const activeOweLoans = oweLoans.filter(l => !l.isPaid);
@@ -290,8 +304,8 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
   const totalOwe = oweLoans.reduce((sum, l) => sum + (l.amount - (l.amountPaid || 0)), 0);
 
   // Calculate overall progress
-  const totalAmount = loans.reduce((sum, l) => sum + l.amount, 0);
-  const totalPaid = loans.reduce((sum, l) => sum + (l.amountPaid || 0), 0);
+  const totalAmount = filteredLoans.reduce((sum, l) => sum + l.amount, 0);
+  const totalPaid = filteredLoans.reduce((sum, l) => sum + (l.amountPaid || 0), 0);
   const overallProgress = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
 
   // Calculate progress for lent and owe
@@ -409,21 +423,23 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="entity">Entidad</Label>
-                <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una entidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entities.map((entity) => (
-                      <SelectItem key={entity.id} value={entity.id}>
-                        {entity.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!entityId && (
+                <div>
+                  <Label htmlFor="entity">Entidad</Label>
+                  <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una entidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="type">Tipo</Label>
                 <Select value={formData.type} onValueChange={(value: LoanType) => setFormData({ ...formData, type: value })}>
@@ -597,7 +613,7 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
 
       {loading ? (
         <div>Cargando...</div>
-      ) : loans.length === 0 ? (
+      ) : filteredLoans.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-6xl mb-4">🤝</div>
@@ -613,14 +629,14 @@ export function Loans({ openDialog = false, onDialogClose }: LoansProps = {}) {
       ) : (
         <Tabs defaultValue="todos" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="todos">Todos ({loans.length})</TabsTrigger>
+            <TabsTrigger value="todos">Todos ({filteredLoans.length})</TabsTrigger>
             <TabsTrigger value="activos">Activos ({activeLoans.length})</TabsTrigger>
             <TabsTrigger value="completados">Completados ({completedLoans.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="todos" className="mt-4">
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {loans.map(renderLoanCard)}
+              {filteredLoans.map(renderLoanCard)}
             </div>
           </TabsContent>
 

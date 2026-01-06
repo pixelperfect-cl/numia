@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import {
+  CreditCard,
   LayoutGrid,
   Building2,
   ArrowLeftRight,
@@ -20,6 +21,10 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Briefcase,
+  Users,
+  LayoutDashboard,
+  SquareKanban,
   type LucideIcon
 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
@@ -28,155 +33,117 @@ import { IconComponent } from '@/components/IconPicker';
 interface SidebarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
-  onEntitySelect?: (entityId: string) => void;
+  selectedEntityId: string;
 }
 
 interface MenuItem {
   id: string;
   label: string;
   icon: LucideIcon;
+  erpRequired?: boolean;
 }
 
 export const menuItems: MenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { id: 'entities', label: 'Entidades', icon: Building2 },
+  { id: 'entity-panel', label: 'Panel General', icon: LayoutDashboard },
   { id: 'movements', label: 'Movimientos', icon: ArrowLeftRight },
   { id: 'loans', label: 'Préstamos', icon: Wallet },
   { id: 'projections', label: 'Proyecciones', icon: TrendingUp },
-  { id: 'configuration', label: 'Configuración', icon: Settings },
+  // ERP Group
+  { id: 'erp-dashboard', label: 'ERP: Control', icon: LayoutGrid, erpRequired: true },
+  { id: 'erp-clients', label: 'Clientes', icon: Users, erpRequired: true },
+  { id: 'erp-services', label: 'Servicios', icon: Briefcase, erpRequired: true },
+  { id: 'erp-projects', label: 'Proyectos', icon: SquareKanban, erpRequired: true },
+  // Configuration at the end
+  { id: 'entity-configuration', label: 'Configuración', icon: Settings },
 ];
 
-export function Sidebar({ currentPage, onNavigate, onEntitySelect }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarProps) {
   const { entities } = useData();
-  const [entitiesOpen, setEntitiesOpen] = useState(true);
+  const [erpOpen, setErpOpen] = useState(true);
+
+  const entity = entities.find(e => e.id === selectedEntityId);
+  if (!entity) return null;
+
+  const erpEnabled = entity.settings?.erpEnabled;
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card h-screen sticky top-0">
-      <div className="flex-1 py-4 overflow-y-auto">
-        <nav className="space-y-1 px-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isEntities = item.id === 'entities';
+    <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card h-full overflow-y-auto py-4">
+      {/* Sidebar content */}
+      <div className="px-4 mb-4">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          Gestionando
+        </h2>
+        <div className="font-bold truncate text-lg">{entity.name}</div>
+      </div>
 
+      <nav className="space-y-1 px-2">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+
+          // Skip ERP items if not enabled
+          if (item.erpRequired && !erpEnabled) return null;
+
+          // Optional: Group ERP items visually
+          if (item.id === 'erp-dashboard' && erpEnabled) {
             return (
-              <div key={item.id}>
+              <div key="erp-section" className="pt-4 pb-1">
+                <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <Briefcase className="h-3 w-3" />
+                  ERP Agencia
+                </h3>
                 <button
-                  onClick={() => {
-                    if (isEntities) {
-                      setEntitiesOpen(!entitiesOpen);
-                    }
-                    onNavigate(item.id);
-                  }}
+                  onClick={() => onNavigate(item.id)}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer mb-1',
                     currentPage === item.id
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {isEntities && (
-                    entitiesOpen ?
-                      <ChevronDown className="h-4 w-4" /> :
-                      <ChevronRight className="h-4 w-4" />
-                  )}
+                  <span className="flex-1 text-left">{item.label.replace('ERP: ', '')}</span>
                 </button>
-
-                {/* Entities dropdown */}
-                {isEntities && entitiesOpen && entities.length > 0 && (
-                  <div className="mt-1 ml-4 space-y-1">
-                    {entities.map((entity) => {
-                      return (
-                        <button
-                          key={entity.id}
-                          onClick={() => onEntitySelect?.(entity.id)}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                        >
-                          <div
-                            className="p-1 rounded flex items-center justify-center"
-                            style={{
-                              backgroundColor: `${entity.color}20`,
-                              color: entity.color || '#3b82f6'
-                            }}
-                          >
-                            <IconComponent iconKey={entity.icon} className="h-3 w-3" />
-                          </div>
-                          <span className="truncate">{entity.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* Render other ERP items immediately after */}
+                {menuItems.filter(i => i.erpRequired && i.id !== 'erp-dashboard').map(subItem => (
+                  <button
+                    key={subItem.id}
+                    onClick={() => onNavigate(subItem.id)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer mb-1',
+                      currentPage === subItem.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <subItem.icon className="h-4 w-4" />
+                    <span className="flex-1 text-left">{subItem.label.replace('ERP: ', '')}</span>
+                  </button>
+                ))}
               </div>
             );
-          })}
-        </nav>
-      </div>
+          }
+          // Skip other ERP items as they are rendered in the group above
+          if (item.erpRequired) return null;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
+                currentPage === item.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="flex-1 text-left">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </aside>
   );
 }
 
-// Mobile menu dropdown component (for use in header)
-export function MobileMenu({ currentPage, onNavigate, onEntitySelect }: SidebarProps) {
-  const { entities } = useData();
-  const currentItem = menuItems.find(item => item.id === currentPage);
-  const CurrentIcon = currentItem?.icon || LayoutGrid;
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden">
-          <CurrentIcon className="h-5 w-5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isEntities = item.id === 'entities';
-
-          return (
-            <div key={item.id}>
-              <DropdownMenuItem
-                onClick={() => onNavigate(item.id)}
-                className={cn(
-                  'flex items-center gap-3 cursor-pointer',
-                  currentPage === item.id && 'bg-accent'
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </DropdownMenuItem>
-
-              {/* Entities submenu in mobile */}
-              {isEntities && entities.length > 0 && (
-                <div className="ml-6 border-l pl-2 my-1">
-                  {entities.map((entity) => {
-                    return (
-                      <DropdownMenuItem
-                        key={entity.id}
-                        onClick={() => onEntitySelect?.(entity.id)}
-                        className="flex items-center gap-2 cursor-pointer text-sm py-1.5"
-                      >
-                        <div
-                          className="p-1 rounded flex items-center justify-center"
-                          style={{
-                            backgroundColor: `${entity.color}20`,
-                            color: entity.color || '#3b82f6'
-                          }}
-                        >
-                          <IconComponent iconKey={entity.icon} className="h-3 w-3" />
-                        </div>
-                        <span className="truncate">{entity.name}</span>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}

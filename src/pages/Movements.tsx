@@ -17,16 +17,18 @@ import { formatCurrency, getTodayLocalDateString, parseLocalDate } from '@/lib/u
 import { Edit, History, Trash2, Search, Download, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 import type { MovementType, Movement, MovementHistoryEntry } from '@/types';
 import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
+import { CategorySelect } from '@/components/CategorySelect';
 
 interface MovementsProps {
   openDialog?: boolean;
   onDialogClose?: () => void;
+  entityId?: string;
 }
 
 type SortField = 'date' | 'amount' | 'description' | 'category';
 type SortDirection = 'asc' | 'desc';
 
-export function Movements({ openDialog = false, onDialogClose }: MovementsProps = {}) {
+export function Movements({ openDialog = false, onDialogClose, entityId }: MovementsProps = {}) {
   const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -47,16 +49,26 @@ export function Movements({ openDialog = false, onDialogClose }: MovementsProps 
     description: '',
     categoryValue: '', // Format: "categoryId" or "categoryId:subcategory"
     box: '',
-    entityId: '',
+    entityId: entityId || '',
     date: getTodayLocalDateString(),
   });
 
   // Filters state
   const [searchText, setSearchText] = useState('');
-  const [filterEntity, setFilterEntity] = useState<string>('all');
+  const [filterEntity, setFilterEntity] = useState<string>(entityId || 'all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterBox, setFilterBox] = useState<string>('all');
+
+  // Update effect for entityId changes
+  useEffect(() => {
+    if (entityId) {
+      setFilterEntity(entityId);
+      setFormData(prev => ({ ...prev, entityId }));
+    } else {
+      setFilterEntity('all');
+    }
+  }, [entityId]);
   const [showFilters, setShowFilters] = useState(false);
 
   // Sorting state
@@ -444,21 +456,23 @@ export function Movements({ openDialog = false, onDialogClose }: MovementsProps 
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="entity">Entidad</Label>
-                <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una entidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entities.map((entity) => (
-                      <SelectItem key={entity.id} value={entity.id}>
-                        {entity.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!entityId && (
+                <div>
+                  <Label htmlFor="entity">Entidad</Label>
+                  <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una entidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="type">Tipo</Label>
                 <Select value={formData.type} onValueChange={(value: MovementType) => handleTypeChange(value)}>
@@ -493,32 +507,12 @@ export function Movements({ openDialog = false, onDialogClose }: MovementsProps 
               </div>
               <div>
                 <Label htmlFor="category">Categoría</Label>
-                <Select
+                <CategorySelect
                   value={formData.categoryValue}
                   onValueChange={(value) => setFormData({ ...formData, categoryValue: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableCategories(formData.type).map((category) => (
-                      <React.Fragment key={category.id}>
-                        <SelectItem value={category.id}>
-                          <span className="font-semibold">{category.name}</span>
-                        </SelectItem>
-                        {category.subcategories && category.subcategories.map((sub) => (
-                          <SelectItem
-                            key={`${category.id}:${sub}`}
-                            value={`${category.id}:${sub}`}
-                            className="pl-6"
-                          >
-                            <span className="text-sm">↳ {sub}</span>
-                          </SelectItem>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  categories={categories}
+                  type={formData.type}
+                />
               </div>
               <div>
                 <Label htmlFor="box">Caja *</Label>
@@ -634,22 +628,24 @@ export function Movements({ openDialog = false, onDialogClose }: MovementsProps 
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="filter-entity">Entidad</Label>
-                <Select value={filterEntity} onValueChange={setFilterEntity}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {entities.map((entity) => (
-                      <SelectItem key={entity.id} value={entity.id}>
-                        {entity.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!entityId && (
+                <div>
+                  <Label htmlFor="filter-entity">Entidad</Label>
+                  <Select value={filterEntity} onValueChange={setFilterEntity}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {entities.map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="filter-type">Tipo</Label>
                 <Select value={filterType} onValueChange={setFilterType}>
