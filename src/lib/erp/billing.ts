@@ -33,7 +33,7 @@ export async function checkAndGenerateSubscriptionMovements(userId: string) {
         for (const client of clients) {
             if (client.status !== 'active') continue;
 
-            const subscriptions = await getSubscriptions(client.id);
+            const subscriptions = await getSubscriptions(client.id, userId);
 
             for (const sub of subscriptions) {
                 if (sub.status !== 'active' || !sub.nextBillingDate) continue;

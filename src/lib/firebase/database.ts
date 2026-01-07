@@ -20,7 +20,7 @@ import {
 
 // ========== ENTITIES ==========
 import { db } from './config';
-import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, Project } from '@/types';
+import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, EntitySubscription, Project, ServiceDefinition } from '@/types';
 
 // Helper to convert Firestore timestamps to Date
 const convertTimestamps = (data: any) => {
@@ -422,10 +422,14 @@ export const deleteClient = async (clientId: string): Promise<void> => {
   await deleteDoc(doc(db, 'clients', clientId));
 };
 
-// ========== SUBSCRIPTIONS ==========
+// ========== SUBSCRIPTIONS (ERP CLIENTS) ==========
 
-export const getSubscriptions = async (clientId: string): Promise<Subscription[]> => {
-  const q = query(collection(db, 'subscriptions'), where('clientId', '==', clientId));
+export const getSubscriptions = async (clientId: string, userId: string): Promise<Subscription[]> => {
+  const q = query(
+    collection(db, 'subscriptions'),
+    where('clientId', '==', clientId),
+    where('userId', '==', userId)
+  );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({
     id: doc.id,
@@ -455,6 +459,88 @@ export const updateSubscription = async (subscriptionId: string, data: Partial<S
 
 export const deleteSubscription = async (subscriptionId: string): Promise<void> => {
   await deleteDoc(doc(db, 'subscriptions', subscriptionId));
+};
+
+// ========== SERVICE DEFINITIONS (CATALOG) ==========
+
+export const getServiceDefinitions = async (userId: string): Promise<ServiceDefinition[]> => {
+  const q = query(
+    collection(db, 'service_definitions'),
+    where('userId', '==', userId),
+    orderBy('name', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as ServiceDefinition[];
+};
+
+export const createServiceDefinition = async (userId: string, data: Omit<ServiceDefinition, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'service_definitions'), {
+    ...data,
+    userId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return docRef.id;
+};
+
+export const updateServiceDefinition = async (id: string, data: Partial<ServiceDefinition>): Promise<void> => {
+  const docRef = doc(db, 'service_definitions', id);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteServiceDefinition = async (id: string): Promise<void> => {
+  await deleteDoc(doc(db, 'service_definitions', id));
+};
+
+// ========== ENTITY SUBSCRIPTIONS (EXPENSES) ==========
+
+export const getUserEntitySubscriptions = async (userId: string): Promise<EntitySubscription[]> => {
+  const q = query(collection(db, 'entity_subscriptions'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as EntitySubscription[];
+};
+
+export const getEntitySubscriptions = async (entityId: string): Promise<EntitySubscription[]> => {
+  const q = query(collection(db, 'entity_subscriptions'), where('entityId', '==', entityId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as EntitySubscription[];
+};
+
+export const createEntitySubscription = async (userId: string, entityId: string, data: Omit<EntitySubscription, 'id' | 'userId' | 'entityId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'entity_subscriptions'), {
+    ...data,
+    userId,
+    entityId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return docRef.id;
+};
+
+export const updateEntitySubscription = async (subscriptionId: string, data: Partial<EntitySubscription>): Promise<void> => {
+  const docRef = doc(db, 'entity_subscriptions', subscriptionId);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteEntitySubscription = async (subscriptionId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'entity_subscriptions', subscriptionId));
 };
 
 // ========== PROJECTS ==========

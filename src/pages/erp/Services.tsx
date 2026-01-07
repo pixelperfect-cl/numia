@@ -21,6 +21,9 @@ interface EnhancedSubscription extends Subscription {
     clientId: string;
 }
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ServiceCatalogPanel } from '@/components/erp/ServiceCatalogPanel';
+
 export function Services({ entityId }: ServicesProps = {}) {
     const { user } = useAuth();
     const [subscriptions, setSubscriptions] = useState<EnhancedSubscription[]>([]);
@@ -49,7 +52,7 @@ export function Services({ entityId }: ServicesProps = {}) {
 
             // 2. Fetch Subscriptions for each filtered client
             const subsPromises = filteredClients.map(async (client) => {
-                const clientSubs = await getSubscriptions(client.id);
+                const clientSubs = await getSubscriptions(client.id, user.uid);
                 return clientSubs.map(sub => ({
                     ...sub,
                     clientName: client.name,
@@ -85,8 +88,6 @@ export function Services({ entityId }: ServicesProps = {}) {
     const handleDelete = async (subscriptionId: string) => {
         if (!confirm('¿Estás seguro de cancelar este servicio?')) return;
         try {
-            // We need a deleteSubscription function in database.ts
-            // For now assuming it exists or I'll add it.
             await deleteSubscription(subscriptionId);
             loadData();
         } catch (error) {
@@ -135,82 +136,100 @@ export function Services({ entityId }: ServicesProps = {}) {
                 </div>
             </div>
 
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Servicios Activos</CardTitle>
-                        <div className="relative w-64">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar servicio o cliente..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-8"
-                            />
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Servicio / Plan</TableHead>
-                                    <TableHead>Cliente</TableHead>
-                                    <TableHead>Monto</TableHead>
-                                    <TableHead>Frecuencia</TableHead>
-                                    <TableHead>Próx. Cobro</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                    <TableHead className="text-right">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell>
-                                    </TableRow>
-                                ) : filteredSubscriptions.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                            No se encontraron servicios activos.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredSubscriptions.map((sub) => (
-                                        <TableRow key={sub.id}>
-                                            <TableCell className="font-medium">{sub.name}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Briefcase className="h-3 w-3 text-muted-foreground" />
-                                                    {sub.clientName}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>${sub.amount.toLocaleString()}</TableCell>
-                                            <TableCell className="capitalize">{sub.frequency === 'monthly' ? 'Mensual' : 'Anual'}</TableCell>
-                                            <TableCell>{format(new Date(sub.nextBillingDate), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={sub.status === 'active' ? 'default' : 'secondary'}>
-                                                    {sub.status === 'active' ? 'Activo' : 'Inactivo'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" size="icon" onClick={() => handleEdit(sub)}>
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(sub.id)} className="text-red-500 hover:text-red-700">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+            <Tabs defaultValue="active" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="active">Servicios Activos</TabsTrigger>
+                    <TabsTrigger value="catalog">Catálogo de Servicios</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="active" className="space-y-4">
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle>Servicios Activos</CardTitle>
+                                <div className="relative w-64">
+                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Buscar servicio o cliente..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-8"
+                                    />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Servicio / Plan</TableHead>
+                                            <TableHead>Cliente</TableHead>
+                                            <TableHead>Monto</TableHead>
+                                            <TableHead>Frecuencia</TableHead>
+                                            <TableHead>Próx. Cobro</TableHead>
+                                            <TableHead>Estado</TableHead>
+                                            <TableHead className="text-right">Acciones</TableHead>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell>
+                                            </TableRow>
+                                        ) : filteredSubscriptions.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                    No se encontraron servicios activos.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            filteredSubscriptions.map((sub) => (
+                                                <TableRow key={sub.id}>
+                                                    <TableCell className="font-medium">
+                                                        {sub.name}
+                                                        {sub.currency === 'UF' && <Badge variant="outline" className="ml-2 text-[10px]">UF</Badge>}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                                            {sub.clientName}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
+                                                    </TableCell>
+                                                    <TableCell className="capitalize">{sub.frequency === 'monthly' ? 'Mensual' : 'Anual'}</TableCell>
+                                                    <TableCell>{format(new Date(sub.nextBillingDate), 'dd/MM/yyyy')}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={sub.status === 'active' ? 'default' : 'secondary'}>
+                                                            {sub.status === 'active' ? 'Activo' : 'Inactivo'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(sub)}>
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(sub.id)} className="text-red-500 hover:text-red-700">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="catalog">
+                    <ServiceCatalogPanel />
+                </TabsContent>
+            </Tabs>
 
             <ServiceDialog
                 open={dialogOpen}

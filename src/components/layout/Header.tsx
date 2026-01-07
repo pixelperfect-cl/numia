@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/theme-provider';
-import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, X, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft } from 'lucide-react';
+import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, X, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Repeat, Bot } from 'lucide-react';
+import { useAI } from '@/contexts/AIContext';
 import { useData } from '@/contexts/DataContext';
 import { IconComponent } from '@/components/IconPicker';
 import { cn } from '@/lib/utils';
@@ -25,7 +26,7 @@ interface HeaderProps {
     selectedEntityId: string;
     onEntityChange: (entityId: string) => void;
     onNavigate: (page: string) => void;
-    onQuickAction: (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload') => void;
+    onQuickAction: (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload' | 'subscription') => void;
 }
 
 function QuickActionsDropdown({ onAction, isMobile = false }: { onAction: HeaderProps['onQuickAction'], isMobile?: boolean }) {
@@ -93,6 +94,12 @@ function QuickActionsDropdown({ onAction, isMobile = false }: { onAction: Header
                     >
                         <TrendingUp className="mr-2 h-4 w-4" /> Proyección
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => onAction('subscription')}
+                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
+                    >
+                        <Repeat className="mr-2 h-4 w-4" /> Suscripción
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </InteractionWrapper>
         </DropdownMenu>
@@ -105,6 +112,15 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
     const { entities } = useData();
     const [openCreate, setOpenCreate] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
+    const { isOpen, openAssistant, closeAssistant } = useAI();
+
+    const handleAssistantToggle = () => {
+        if (isOpen) {
+            closeAssistant();
+        } else {
+            openAssistant();
+        }
+    };
 
     const activeEntity = entities.find(e => e.id === selectedEntityId);
     const erpEnabled = activeEntity?.settings?.erpEnabled;
@@ -134,12 +150,16 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                 >
                     {activeEntity ? (
                         <div className="flex items-center gap-2 truncate">
-                            <div
-                                className="p-0.5 rounded flex items-center justify-center"
-                                style={{ backgroundColor: `${activeEntity.color}20`, color: activeEntity.color || '#3b82f6' }}
-                            >
-                                <IconComponent iconKey={activeEntity.icon} className="h-4 w-4" />
-                            </div>
+                            {activeEntity.logoUrl ? (
+                                <img src={activeEntity.logoUrl} alt={activeEntity.name} className="h-5 w-auto object-contain" />
+                            ) : (
+                                <div
+                                    className="p-0.5 rounded flex items-center justify-center"
+                                    style={{ backgroundColor: `${activeEntity.color}20`, color: activeEntity.color || '#3b82f6' }}
+                                >
+                                    <IconComponent iconKey={activeEntity.icon} className="h-4 w-4" />
+                                </div>
+                            )}
                             <span className="truncate">{activeEntity.name}</span>
                         </div>
                     ) : (
@@ -160,12 +180,16 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                             className="flex items-center justify-between px-3 py-2 cursor-pointer"
                         >
                             <div className="flex items-center gap-2 truncate">
-                                <div
-                                    className="p-1 rounded flex items-center justify-center"
-                                    style={{ backgroundColor: `${entity.color}20`, color: entity.color || '#3b82f6' }}
-                                >
-                                    <IconComponent iconKey={entity.icon} className="h-3 w-3" />
-                                </div>
+                                {entity.logoUrl ? (
+                                    <img src={entity.logoUrl} alt={entity.name} className="h-4 w-auto object-contain" />
+                                ) : (
+                                    <div
+                                        className="p-1 rounded flex items-center justify-center"
+                                        style={{ backgroundColor: `${entity.color}20`, color: entity.color || '#3b82f6' }}
+                                    >
+                                        <IconComponent iconKey={entity.icon} className="h-3 w-3" />
+                                    </div>
+                                )}
                                 <span className={cn("truncate", entity.id === selectedEntityId && "font-medium")}>
                                     {entity.name}
                                 </span>
@@ -296,8 +320,16 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                 onClick={() => onNavigate(selectedEntityId ? 'entity-panel' : 'entity-selection')}
             >
                 <img src={numiaLogo} alt="Numia" className="h-8" />
-                <div className="md:hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="md:hidden flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <QuickActionsDropdown onAction={onQuickAction} isMobile={true} />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-muted-foreground hover:text-primary ${isOpen ? 'text-primary bg-primary/10' : ''}`}
+                        onClick={handleAssistantToggle}
+                    >
+                        <Bot className="h-5 w-5" />
+                    </Button>
                 </div>
             </div>
 
@@ -305,6 +337,15 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
             <div className="hidden md:flex items-center gap-2 ml-4">
                 <EntitySelector />
                 <QuickActionsDropdown onAction={onQuickAction} />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`text-muted-foreground hover:text-primary ${isOpen ? 'text-primary bg-primary/10' : ''}`}
+                    onClick={handleAssistantToggle}
+                    title="Asistente AI"
+                >
+                    <Bot className="h-5 w-5" />
+                </Button>
             </div>
 
             <div className="flex-1" />

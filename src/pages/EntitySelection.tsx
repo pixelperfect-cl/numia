@@ -1,30 +1,84 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { IconComponent } from '@/components/IconPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { EntityForm } from '@/components/EntityForm';
+import numiaLogo from '@/assets/numialogo.png';
 
 interface EntitySelectionProps {
     onSelect: (entityId: string) => void;
 }
 
+interface EntityIconProps {
+    entity: any;
+}
+
+function EntityIcon({ entity }: EntityIconProps) {
+    const [imgError, setImgError] = useState(false);
+
+    if (entity.logoUrl && !imgError) {
+        return (
+            <img
+                src={entity.logoUrl}
+                alt={entity.name}
+                className="h-16 object-contain"
+                onError={() => setImgError(true)}
+            />
+        );
+    }
+
+    // Default "dot" style for all entities without a logo
+    return (
+        <div
+            className="h-16 w-16 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: `${entity.color || '#3b82f6'}20` }}
+        >
+            <div
+                className="h-6 w-6 rounded-full"
+                style={{ backgroundColor: entity.color || '#3b82f6' }}
+            />
+        </div>
+    );
+}
+
 export function EntitySelection({ onSelect }: EntitySelectionProps) {
-    const { entities } = useData();
+    const { entities, loading, error } = useData();
     const { user } = useAuth();
     const [openCreate, setOpenCreate] = useState(false);
 
-    // If loading or just no entities (handled by empty state below)
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="mt-4 text-muted-foreground animate-pulse">Cargando tus entidades...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center space-y-4">
+                <div className="bg-destructive/10 text-destructive p-4 rounded-lg max-w-md">
+                    <p className="font-bold">Error al cargar datos:</p>
+                    <p>{error}</p>
+                </div>
+                <Button variant="outline" onClick={() => window.location.reload()}>Reintentar</Button>
+                <p className="text-xs text-muted-foreground">User ID: {user?.uid}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+
             <div className="w-full max-w-4xl space-y-8">
                 <div className="text-center space-y-2">
-                    <img src="/numialogo.png" alt="Numia" className="h-12 mx-auto mb-6" />
-                    <h1 className="text-3xl font-bold tracking-tight">Bienvenido, {user?.displayName || 'Usuario'}</h1>
+                    <img src={numiaLogo} alt="Numia" className="h-16 mx-auto mb-6" />
+                    <h2 className="text-3xl font-bold tracking-tight">Bienvenido, {user?.displayName || 'Usuario'}</h2>
                     <p className="text-muted-foreground text-lg">Selecciona una entidad para comenzar a gestionar</p>
                 </div>
 
@@ -40,16 +94,7 @@ export function EntitySelection({ onSelect }: EntitySelectionProps) {
                                 style={{ backgroundColor: entity.color || '#3b82f6' }}
                             />
 
-                            {entity.logoUrl ? (
-                                <img src={entity.logoUrl} alt={entity.name} className="h-16 object-contain" />
-                            ) : (
-                                <div
-                                    className="p-4 rounded-xl"
-                                    style={{ backgroundColor: `${entity.color}20`, color: entity.color || '#3b82f6' }}
-                                >
-                                    <IconComponent iconKey={entity.icon} className="h-10 w-10" />
-                                </div>
-                            )}
+                            <EntityIcon entity={entity} />
 
                             <div className="text-center z-10">
                                 <h3 className="font-bold text-lg">{entity.name}</h3>

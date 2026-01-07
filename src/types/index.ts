@@ -222,10 +222,40 @@ export interface Subscription {
   clientId: string;
   name: string;
   amount: number;
+  currency?: 'CLP' | 'UF';
   frequency: 'monthly' | 'yearly';
   startDate: string; // ISO date
   nextBillingDate: string; // ISO date
   status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EntitySubscription {
+  id: string;
+  userId: string;
+  entityId: string;
+  name: string;
+  amount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'yearly';
+  nextPaymentDate: string; // ISO date
+  categoryId: string;
+  box: string;
+  status: 'active' | 'inactive';
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ServiceDefinition {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  currency: 'CLP' | 'UF';
+  amount: number;
+  frequency: 'monthly' | 'yearly';
   createdAt: Date;
   updatedAt: Date;
 }

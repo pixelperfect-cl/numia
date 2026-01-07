@@ -80,5 +80,18 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId);
       allow update, delete: if isOwner(resource.data.userId);
     }
+
+    // Entity Subscriptions (Expenses) collection
+    match /entity_subscriptions/{subscriptionId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+    // ERP: Service Definitions (Catalog)
+    match /service_definitions/{definitionId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
   }
 }

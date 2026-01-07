@@ -14,6 +14,7 @@ import { Loans } from '@/pages/Loans';
 import { Projections } from '@/pages/Projections';
 import { Configuration } from '@/pages/Configuration';
 import { MassUpload } from '@/pages/MassUpload';
+import { Subscriptions } from '@/pages/Subscriptions';
 import { Services } from '@/pages/erp/Services';
 import { Clients } from '@/pages/erp/Clients';
 import { Projects } from '@/pages/erp/Projects';
@@ -37,7 +38,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AccountSettings } from '@/components/configuration/AccountSettings';
 import { TransferDialog } from '@/components/TransferDialog';
 import { AIAssistant } from '@/components/ai/AIAssistant';
-import { AIAssistantButton } from '@/components/ai/AIAssistantButton';
+
 import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Upload } from 'lucide-react';
 
 // ... (keep intervening code if possible, but replace_file_content works on contiguous blocks. 
@@ -82,6 +83,7 @@ function App() {
     return <EntitySelection onSelect={setSelectedEntityId} />;
   }
 
+
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'movement':
@@ -99,6 +101,9 @@ function App() {
         setCurrentPage('projections');
         setOpenProjectionDialog(true);
         break;
+      case 'subscription':
+        setCurrentPage('subscriptions');
+        break;
       case 'transfer':
         setOpenTransferDialog(true);
         break;
@@ -108,13 +113,15 @@ function App() {
   const renderPage = () => {
     switch (currentPage) {
       case 'entity-panel':
-        return <EntityPanel entityId={selectedEntityId} onBack={() => { }} openMovementDialog={openEntityMovementDialog} onMovementDialogClose={() => setOpenEntityMovementDialog(false)} />;
+        return <EntityPanel entityId={selectedEntityId} onBack={() => setSelectedEntityId(null)} openMovementDialog={openEntityMovementDialog} onMovementDialogClose={() => setOpenEntityMovementDialog(false)} />;
       case 'movements':
         return <Movements openDialog={openMovementDialog} onDialogClose={() => setOpenMovementDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'loans':
         return <Loans openDialog={openLoanDialog} onDialogClose={() => setOpenLoanDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'projections':
         return <Projections openDialog={openProjectionDialog} onDialogClose={() => setOpenProjectionDialog(false)} entityId={selectedEntityId || undefined} />;
+      case 'subscriptions':
+        return <Subscriptions entityId={selectedEntityId || ''} />;
       case 'configuration':
         return <EntityConfiguration entityId={selectedEntityId} />;
       case 'entity-configuration':
@@ -145,7 +152,7 @@ function App() {
         return <Projects entityId={selectedEntityId || undefined} />;
 
       default:
-        return <EntityPanel entityId={selectedEntityId} onBack={() => { }} />;
+        return <EntityPanel entityId={selectedEntityId} onBack={() => setSelectedEntityId(null)} />;
     }
   };
 
@@ -189,9 +196,7 @@ function App() {
       <TransferDialog open={openTransferDialog} onOpenChange={setOpenTransferDialog} />
 
       {/* AI Assistant */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <AIAssistantButton />
-      </div>
+
       <AIAssistant />
     </div>
   );

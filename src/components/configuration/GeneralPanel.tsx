@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { updateEntity, deleteEntityCascade } from '@/lib/firebase/database';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
+
 import { Loader2, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -43,32 +42,37 @@ export function GeneralPanel({ entity }: GeneralPanelProps) {
             return;
         }
 
-        // Validate image dimensions
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = async () => {
-            if (img.width !== 200 || img.height !== 100) {
-                alert('El logo debe ser exactamente 200x100 píxeles');
-                return;
-            }
+        // Validate file size (max 500KB for Firestore safety)
+        if (file.size > 500 * 1024) {
+            alert('El archivo es demasiado grande. Máximo 500KB.');
+            return;
+        }
 
-            setUploadingLogo(true);
-            try {
-                // Get file extension
-                const extension = file.name.split('.').pop() || 'png';
-                const storageRef = ref(storage, `entities/${entity.id}/logo.${extension}`);
-                await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(storageRef);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            const img = new Image();
+            img.src = dataUrl;
+            img.onload = async () => {
+                if (img.width !== 200 || img.height !== 100) {
+                    alert('El logo debe ser exactamente 200x100 píxeles');
+                    return;
+                }
 
-                setFormData({ ...formData, logoUrl: downloadURL });
-                await updateEntity(entity.id, { logoUrl: downloadURL });
-            } catch (error) {
-                console.error('Error uploading logo:', error);
-                alert('Error al subir el logo');
-            } finally {
-                setUploadingLogo(false);
-            }
+                setUploadingLogo(true);
+                try {
+                    // Update entity directly with base64 string
+                    await updateEntity(entity.id, { logoUrl: dataUrl });
+                    setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
+                } catch (error) {
+                    console.error('Error saving logo:', error);
+                    alert('Error al guardar el logo');
+                } finally {
+                    setUploadingLogo(false);
+                }
+            };
         };
+        reader.readAsDataURL(file);
     };
 
     const handleSave = async () => {
@@ -155,7 +159,10 @@ export function GeneralPanel({ entity }: GeneralPanelProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Información Básica</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        {formData.logoUrl && <img src={formData.logoUrl} alt="Logo" className="h-6 w-auto object-contain" />}
+                        Información Básica
+                    </CardTitle>
                     <CardDescription>Detalles generales de la entidad</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

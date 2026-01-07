@@ -87,6 +87,7 @@ export function CategorySelect({
                             className="pl-8 h-9"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            autoFocus
                         />
                     </div>
                 </div>

@@ -4,7 +4,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import type { Entity, Movement, Loan, Projection, Category, DateFilter } from '@/types';
+import type { Entity, Movement, Loan, Projection, Category, DateFilter, EntitySubscription } from '@/types';
 import * as db from '@/lib/firebase/database';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -16,8 +16,10 @@ interface DataContextType {
   loans: Loan[];
   projections: Projection[];
   categories: Category[];
+  entitySubscriptions: EntitySubscription[];
   dateFilter: DateFilter;
   loading: boolean;
+  error: string | null;
   setDateFilter: (filter: DateFilter) => void;
   refreshData: () => Promise<void>;
   // Entity methods
@@ -51,6 +53,10 @@ interface DataContextType {
   createProjection: (data: Omit<Projection, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateProjection: (id: string, data: Partial<Projection>) => Promise<void>;
   deleteProjection: (id: string) => Promise<void>;
+  // Entity Subscription methods
+  createEntitySubscription: (data: Omit<EntitySubscription, 'id' | 'userId' | 'entityId' | 'createdAt' | 'updatedAt'>, entityId: string) => Promise<string>;
+  updateEntitySubscription: (id: string, data: Partial<EntitySubscription>) => Promise<void>;
+  deleteEntitySubscription: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -62,8 +68,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [projections, setProjections] = useState<Projection[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [entitySubscriptions, setEntitySubscriptions] = useState<EntitySubscription[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'THIS_MONTH' });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Helper function to create notifications
   const createNotification = async (title: string, message: string, type: 'info' | 'warning' | 'success' = 'info') => {
@@ -108,12 +116,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         db.getCategories(user.uid),
       ]);
 
+      let subscriptionsData: EntitySubscription[] = [];
+      try {
+        subscriptionsData = await db.getUserEntitySubscriptions(user.uid);
+      } catch (err) {
+        console.warn('Error fetching subscriptions (check permissions):', err);
+      }
+
       console.log('📊 Datos obtenidos:', {
         entidades: entitiesData.length,
         movimientos: movementsData.length,
         préstamos: loansData.length,
         proyecciones: projectionsData.length,
-        categorías: categoriesData.length
+        categorías: categoriesData.length,
+        suscripciones: subscriptionsData.length
       });
 
       if (movementsData.length > 0) {
@@ -140,10 +156,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setMovements(movementsData);
       setLoans(loansData);
       setProjections(projectionsData);
+      setEntitySubscriptions(subscriptionsData);
+      // Wait, Promise.all returns an array of results in order.
+      // 0: entities, 1: movements, 2: loans, 3: projections, 4: categories
+      // I added getUserEntitySubscriptions as the 6th element (index 5)
+
 
       console.log('✅ Estado actualizado exitosamente');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing data:', error);
+      setError(error instanceof Error ? error.message : 'Error desconocido al cargar datos');
+      // Keep loading false in finally
     } finally {
       setLoading(false);
     }
@@ -421,6 +444,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refreshData();
   };
 
+  // Entity Subscription methods
+  const createEntitySubscription = async (data: Omit<EntitySubscription, 'id' | 'userId' | 'entityId' | 'createdAt' | 'updatedAt'>, entityId: string) => {
+    if (!user) throw new Error('User not authenticated');
+    const id = await db.createEntitySubscription(user.uid, entityId, data);
+    await createNotification(
+      'Suscripción creada',
+      `Se ha creado la suscripción "${data.name}" exitosamente`,
+      'success'
+    );
+    await refreshData();
+    return id;
+  };
+
+  const updateEntitySubscription = async (id: string, data: Partial<EntitySubscription>) => {
+    await db.updateEntitySubscription(id, data);
+    await createNotification(
+      'Suscripción actualizada',
+      'Se ha actualizado una suscripción exitosamente',
+      'info'
+    );
+    await refreshData();
+  };
+
+  const deleteEntitySubscription = async (id: string) => {
+    await db.deleteEntitySubscription(id);
+    await createNotification(
+      'Suscripción eliminada',
+      'Se ha eliminado una suscripción',
+      'warning'
+    );
+    await refreshData();
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -429,8 +485,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         loans,
         projections,
         categories,
+        entitySubscriptions,
         dateFilter,
         loading,
+        error,
         setDateFilter,
         refreshData,
         createEntity,
@@ -450,6 +508,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createProjection,
         updateProjection,
         deleteProjection,
+        createEntitySubscription,
+        updateEntitySubscription,
+        deleteEntitySubscription,
       }}
     >
       {children}

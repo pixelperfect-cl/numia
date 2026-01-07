@@ -25,6 +25,7 @@ import {
   Users,
   LayoutDashboard,
   SquareKanban,
+  Repeat,
   type LucideIcon
 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
@@ -48,6 +49,7 @@ export const menuItems: MenuItem[] = [
   { id: 'movements', label: 'Movimientos', icon: ArrowLeftRight },
   { id: 'loans', label: 'Préstamos', icon: Wallet },
   { id: 'projections', label: 'Proyecciones', icon: TrendingUp },
+  { id: 'subscriptions', label: 'Suscripciones', icon: Repeat },
   // ERP Group
   { id: 'erp-dashboard', label: 'ERP: Control', icon: LayoutGrid, erpRequired: true },
   { id: 'erp-clients', label: 'Clientes', icon: Users, erpRequired: true },
