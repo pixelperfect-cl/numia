@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { updateCategory, removeSubcategoryFromMovements, reassignSubcategoryInMovements } from '@/lib/firebase/database';
+import { updateCategory as dbUpdateCategory, removeSubcategoryFromMovements, reassignSubcategoryInMovements } from '@/lib/firebase/database';
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import type { Category } from '@/types';
 
 interface SubcategoryDeleteDialogProps {
@@ -26,6 +27,7 @@ export function SubcategoryDeleteDialog({
     onSuccess
 }: SubcategoryDeleteDialogProps) {
     const { user } = useAuth();
+    const { updateCategory } = useData();
     const [loading, setLoading] = useState(false);
     const [targetSubcategory, setTargetSubcategory] = useState<string>('__remove__');
 

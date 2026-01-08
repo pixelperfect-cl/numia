@@ -9,36 +9,30 @@ import type { Entity } from '@/types';
 
 interface ModulesPanelProps {
     entity: Entity;
+    onUpdate?: () => void;
 }
 
-export function ModulesPanel({ entity }: ModulesPanelProps) {
+export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
     const [loading, setLoading] = useState(false);
     const [erpEnabled, setErpEnabled] = useState(entity.settings?.erpEnabled || false);
     const [smtpEnabled, setSmtpEnabled] = useState(entity.settings?.smtpEnabled || false);
 
-    const handleErpToggle = async (checked: boolean) => {
+    const handleSave = async () => {
         setLoading(true);
         try {
             await updateEntity(entity.id, {
-                settings: { ...entity.settings, erpEnabled: checked }
+                settings: {
+                    ...entity.settings,
+                    erpEnabled: erpEnabled,
+                    smtpEnabled: smtpEnabled
+                }
             });
-            setErpEnabled(checked);
+            if (onUpdate) {
+                onUpdate();
+            }
+            // Show success notification (optional, maybe toast later)
         } catch (error) {
-            console.error('Error updating module:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSmtpToggle = async (checked: boolean) => {
-        setLoading(true);
-        try {
-            await updateEntity(entity.id, {
-                settings: { ...entity.settings, smtpEnabled: checked }
-            });
-            setSmtpEnabled(checked);
-        } catch (error) {
-            console.error('Error updating SMTP:', error);
+            console.error('Error updating modules:', error);
         } finally {
             setLoading(false);
         }
@@ -61,7 +55,7 @@ export function ModulesPanel({ entity }: ModulesPanelProps) {
                         </div>
                         <Switch
                             checked={erpEnabled}
-                            onCheckedChange={handleErpToggle}
+                            onCheckedChange={setErpEnabled}
                             disabled={loading}
                         />
                     </div>
@@ -75,7 +69,7 @@ export function ModulesPanel({ entity }: ModulesPanelProps) {
                         </div>
                         <Switch
                             checked={smtpEnabled}
-                            onCheckedChange={handleSmtpToggle}
+                            onCheckedChange={setSmtpEnabled}
                             disabled={loading}
                         />
                     </div>
@@ -99,6 +93,13 @@ export function ModulesPanel({ entity }: ModulesPanelProps) {
                             </p>
                         </div>
                         <Switch disabled />
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                        <Button onClick={handleSave} disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {loading ? 'Guardando...' : 'Guardar Ajustes'}
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

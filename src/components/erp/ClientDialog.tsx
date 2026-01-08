@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ interface ClientDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     client?: Client;
-    onSuccess: () => void;
+    onSuccess: (client?: Client) => void;
     entityId?: string;
 }
 
@@ -115,7 +115,15 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
                 clientId = await createClient(user.uid, formData as any);
             }
 
-            onSuccess();
+            const savedClient: Client = {
+                id: clientId || '',
+                ...formData,
+                createdAt: client?.createdAt || new Date().toISOString(),
+                status: formData.status || 'active',
+                entityId: formData.entityId || '',
+            } as Client;
+
+            onSuccess(savedClient);
             onOpenChange(false);
         } catch (error: any) {
             console.error("Error saving client:", error);
@@ -130,6 +138,9 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{client ? 'Editar Cliente' : 'Nuevo Cliente'}</DialogTitle>
+                    <DialogDescription>
+                        {client ? 'Modifica los datos del cliente.' : 'Ingresa los datos para registrar un nuevo cliente.'}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6">

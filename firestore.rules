@@ -46,6 +46,7 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+
     // Notifications collection
     match /notifications/{notificationId} {
       allow read: if isOwner(resource.data.userId);
@@ -53,12 +54,7 @@ service cloud.firestore {
       allow update, delete: if isOwner(resource.data.userId);
     }
 
-    // Transfers collection
-    match /transfers/{transferId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
-    }
+
 
     // ERP: Clients collection
     match /clients/{clientId} {

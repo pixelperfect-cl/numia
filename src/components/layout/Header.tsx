@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/theme-provider';
-import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, X, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Repeat, Bot } from 'lucide-react';
+import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, X, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Repeat, Bot, Cloud, ChevronDown, ChevronRight, Briefcase } from 'lucide-react';
 import { useAI } from '@/contexts/AIContext';
 import { useData } from '@/contexts/DataContext';
 import { IconComponent } from '@/components/IconPicker';
@@ -21,6 +21,7 @@ import numiaLogo from '@/assets/numialogo.png';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { menuItems } from './Sidebar';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
+import { IndicatorsMarquee } from '@/components/common/IndicatorsMarquee';
 
 interface HeaderProps {
     selectedEntityId: string;
@@ -57,7 +58,7 @@ function QuickActionsDropdown({ onAction, isMobile = false }: { onAction: Header
                         variant="ghost"
                         size="icon"
                         title="Crear nuevo"
-                        className="bg-secondary/50 hover:bg-secondary data-[state=open]:bg-secondary transition-colors"
+                        className="bg-secondary/50 hover:bg-secondary data-[state=open]:bg-secondary transition-colors text-header-foreground"
                         onClick={() => { if (isMobile) setIsOpen(!isOpen) }}
                     >
                         <Plus className="h-5 w-5" />
@@ -113,6 +114,9 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
     const [openCreate, setOpenCreate] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
     const { isOpen, openAssistant, closeAssistant } = useAI();
+    // Mobile menu states
+    const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+    const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
 
     const handleAssistantToggle = () => {
         if (isOpen) {
@@ -136,6 +140,28 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
     const handleMobileNavigate = (page: string) => {
         onNavigate(page);
         setSheetOpen(false);
+    };
+
+    const cycleTheme = () => {
+        if (theme === 'light') {
+            setTheme('cloudy');
+        } else if (theme === 'cloudy') {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+    };
+
+    const getThemeIcon = () => {
+        if (theme === 'light') return <Cloud className="h-4 w-4 mr-2" />;
+        if (theme === 'cloudy') return <Moon className="h-4 w-4 mr-2" />;
+        return <Sun className="h-4 w-4 mr-2" />;
+    };
+
+    const getThemeLabel = () => {
+        if (theme === 'light') return 'Modo Nublado';
+        if (theme === 'cloudy') return 'Modo Oscuro';
+        return 'Modo Claro';
     };
 
 
@@ -231,9 +257,9 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                 <DropdownMenuLabel>{user?.displayName || 'Usuario'}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onNavigate('account-settings')}>Configuración Cuenta</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                    {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                    {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
+                <DropdownMenuItem onClick={cycleTheme}>
+                    {getThemeIcon()}
+                    {getThemeLabel()}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-500 hover:text-red-600">
@@ -244,130 +270,284 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
     );
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
-            {/* Mobile Menu (Hamburger) */}
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="md:hidden">
-                        <Menu className="h-6 w-6" />
-                        <span className="sr-only">Menu</span>
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] flex flex-col p-6">
-                    <SheetHeader className="mb-6">
-                        <SheetTitle className="flex items-center gap-2">
-                            <img src={numiaLogo} alt="Numia" className="h-8" />
-                        </SheetTitle>
-                    </SheetHeader>
+        <header className="sticky top-0 z-30 flex flex-col border-b bg-header-background shadow-sm">
+            {/* Top Bar with Marquee - Visible only on Desktop */}
+            <IndicatorsMarquee />
 
-                    <div className="flex-1 flex flex-col gap-6 overflow-y-auto">
-                        <div className="flex flex-col gap-2">
-                            <span className="text-sm font-medium text-muted-foreground">Entidad Actual</span>
-                            <EntitySelector className="w-full" />
-                        </div>
+            <div className="flex h-16 items-center gap-4 px-6">
+                {/* Mobile Menu (Hamburger) */}
+                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                    {/* ... (existing sheet content) */}
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon" className="md:hidden">
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Menu</span>
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-[300px] flex flex-col p-6">
+                        <SheetHeader className="mb-6">
+                            <SheetTitle className="flex items-center gap-2">
+                                <img src={numiaLogo} alt="Numia" className="h-8" />
+                            </SheetTitle>
+                        </SheetHeader>
 
-                        {/* Mobile Components Navigation */}
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Menú</span>
-                            {menuItems.map((item) => {
-                                const Icon = item.icon;
-                                // Skip if ERP not enabled
-                                if (item.erpRequired && !erpEnabled) return null;
+                        <div className="flex-1 flex flex-col gap-6 overflow-y-auto">
+                            <div className="flex flex-col gap-2">
+                                <span className="text-sm font-medium text-muted-foreground">Entidad Actual</span>
+                                <EntitySelector className="w-full" />
+                            </div>
 
-                                // Simple render logic for mobile (flattening groups for simplicity or keeping them simple)
-                                return (
-                                    <Button
-                                        key={item.id}
-                                        variant="ghost"
-                                        className="justify-start gap-3"
-                                        onClick={() => handleMobileNavigate(item.id)}
-                                    >
-                                        <Icon className="h-4 w-4" />
-                                        {item.label.replace('ERP: ', '')}
-                                    </Button>
-                                )
-                            })}
-                        </div>
-                    </div>
+                            {/* Mobile Components Navigation */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Menú</span>
+                                {menuItems.map((item) => {
+                                    const Icon = item.icon;
 
-                    <SheetFooter className="mt-auto pt-6 border-t flex flex-col gap-4">
-                        <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                                {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-                                {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
-                            </Button>
-                        </div>
-                        <div className="w-full flex items-center gap-3">
-                            {user?.photoURL ? (
-                                <img src={user.photoURL} alt="User" className="h-9 w-9 rounded-full" />
-                            ) : (
-                                <div className="h-9 w-9 bg-muted rounded-full flex items-center justify-center">
-                                    <User className="h-5 w-5" />
-                                </div>
-                            )}
-                            <div className="flex flex-col text-sm flex-1">
-                                <span className="font-medium">{user?.displayName?.split(' ')[0]}</span>
-                                <span className="text-xs text-muted-foreground cursor-pointer hover:underline" onClick={handleSignOut}>Cerrar Sesión</span>
+                                    // Skip ERP items if not enabled
+                                    if (item.erpRequired && !erpEnabled) return null;
+
+                                    // Render ERP Group Header and Items
+                                    if (item.id === 'erp-dashboard' && erpEnabled) {
+                                        return (
+                                            <div key="erp-section" className="pt-2 pb-1">
+                                                <h3 className="px-3 py-2 rounded-lg bg-zinc-800/10 dark:bg-zinc-800/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <Briefcase className="h-3 w-3" />
+                                                    ERP Agencia
+                                                </h3>
+
+                                                <div className="ml-2 pl-3 border-l border-border/50 space-y-1 my-1">
+                                                    {/* Render dashboard item (Control) */}
+                                                    <Button
+                                                        key={item.id}
+                                                        variant="ghost"
+                                                        className={cn(
+                                                            "w-full justify-start gap-3 mb-1",
+                                                            "active-page" === (item.id as string) && "bg-secondary"
+                                                        )}
+                                                        onClick={() => handleMobileNavigate(item.id)}
+                                                    >
+                                                        <Icon className="h-4 w-4" />
+                                                        {item.label.replace('ERP: ', '')}
+                                                    </Button>
+
+                                                    {/* Other ERP items */}
+                                                    {menuItems.filter(i => i.erpRequired && i.id !== 'erp-dashboard' && i.id !== 'entity-configuration').map(subItem => {
+                                                        const SubIcon = subItem.icon;
+
+                                                        // Handle subitems (e.g. Services)
+                                                        if (subItem.subItems) {
+                                                            return (
+                                                                <div key={subItem.id} className="space-y-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        className="w-full justify-between"
+                                                                        onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
+                                                                    >
+                                                                        <div className="flex items-center gap-3">
+                                                                            <SubIcon className="h-4 w-4" />
+                                                                            <span>{subItem.label}</span>
+                                                                        </div>
+                                                                        {mobileServicesOpen ?
+                                                                            <ChevronDown className="h-3 w-3" /> :
+                                                                            <ChevronRight className="h-3 w-3" />
+                                                                        }
+                                                                    </Button>
+
+                                                                    {mobileServicesOpen && (
+                                                                        <div className="ml-4 pl-3 border-l border-border/50 space-y-1">
+                                                                            {subItem.subItems.map(child => {
+                                                                                const ChildIcon = child.icon;
+                                                                                return (
+                                                                                    <Button
+                                                                                        key={child.id}
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="w-full justify-start gap-3"
+                                                                                        onClick={() => handleMobileNavigate(child.id)}
+                                                                                    >
+                                                                                        <ChildIcon className="h-3 w-3" />
+                                                                                        <span>{child.label}</span>
+                                                                                    </Button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        }
+
+                                                        return (
+                                                            <Button
+                                                                key={subItem.id}
+                                                                variant="ghost"
+                                                                className="w-full justify-start gap-3"
+                                                                onClick={() => handleMobileNavigate(subItem.id)}
+                                                            >
+                                                                <SubIcon className="h-4 w-4" />
+                                                                {subItem.label.replace('ERP: ', '')}
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Skip items already rendered in ERP section or Configuration
+                                    if (item.erpRequired || item.id === 'entity-configuration') return null;
+
+                                    return (
+                                        <Button
+                                            key={item.id}
+                                            variant="ghost"
+                                            className="justify-start gap-3"
+                                            onClick={() => handleMobileNavigate(item.id)}
+                                        >
+                                            <Icon className="h-4 w-4" />
+                                            {item.label}
+                                        </Button>
+                                    )
+                                })}
+
+                                {/* Configuration Section at bottom of menu list */}
+                                {menuItems.find(item => item.id === 'entity-configuration') && (
+                                    <div className="pt-2">
+                                        {(() => {
+                                            const configItem = menuItems.find(item => item.id === 'entity-configuration');
+                                            if (!configItem) return null;
+
+                                            return (
+                                                <div className="space-y-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="w-full justify-between"
+                                                        onClick={() => setMobileConfigOpen(!mobileConfigOpen)}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <configItem.icon className="h-4 w-4" />
+                                                            <span>{configItem.label}</span>
+                                                        </div>
+                                                        {mobileConfigOpen ?
+                                                            <ChevronDown className="h-3 w-3" /> :
+                                                            <ChevronRight className="h-3 w-3" />
+                                                        }
+                                                    </Button>
+
+                                                    {mobileConfigOpen && configItem.subItems && (
+                                                        <div className="ml-4 pl-3 border-l border-border/50 space-y-1">
+                                                            {configItem.subItems.filter(child => {
+                                                                if (child.id === 'config-smtp' && !activeEntity?.settings?.smtpEnabled) return false;
+                                                                return true;
+                                                            }).map(child => {
+                                                                const ChildIcon = child.icon;
+                                                                return (
+                                                                    <Button
+                                                                        key={child.id}
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="w-full justify-start gap-3"
+                                                                        onClick={() => handleMobileNavigate(child.id)}
+                                                                    >
+                                                                        <ChildIcon className="h-3 w-3" />
+                                                                        <span>{child.label}</span>
+                                                                    </Button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </SheetFooter>
-                </SheetContent>
-            </Sheet>
 
-            {/* Logo (Visible on Mobile & Desktop) */}
-            <div
-                className="flex items-center gap-2 font-semibold md:text-lg cursor-pointer"
-                onClick={() => onNavigate(selectedEntityId ? 'entity-panel' : 'entity-selection')}
-            >
-                <img src={numiaLogo} alt="Numia" className="h-8" />
-                <div className="md:hidden flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <QuickActionsDropdown onAction={onQuickAction} isMobile={true} />
+                        <SheetFooter className="mt-auto pt-6 border-t flex flex-col gap-4">
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" className="w-full justify-start" onClick={cycleTheme}>
+                                    {getThemeIcon()}
+                                    {getThemeLabel()}
+                                </Button>
+                            </div>
+                            <div className="w-full flex items-center gap-3">
+                                {user?.photoURL ? (
+                                    <img src={user.photoURL} alt="User" className="h-9 w-9 rounded-full" />
+                                ) : (
+                                    <div className="h-9 w-9 bg-muted rounded-full flex items-center justify-center">
+                                        <User className="h-5 w-5" />
+                                    </div>
+                                )}
+                                <div className="flex flex-col text-sm flex-1">
+                                    <span className="font-medium">{user?.displayName?.split(' ')[0]}</span>
+                                    <span className="text-xs text-muted-foreground cursor-pointer hover:underline" onClick={handleSignOut}>Cerrar Sesión</span>
+                                </div>
+                            </div>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
+
+                {/* Logo (Visible on Mobile & Desktop) */}
+                <div
+                    className="flex items-center gap-2 font-semibold md:text-lg cursor-pointer"
+                    onClick={() => onNavigate(selectedEntityId ? 'entity-panel' : 'entity-selection')}
+                >
+                    <img src={numiaLogo} alt="Numia" className="h-8" />
+                    <div className="md:hidden flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <QuickActionsDropdown onAction={onQuickAction} isMobile={true} />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                                "text-header-foreground hover:text-header-foreground hover:bg-slate-700/50",
+                                isOpen && "bg-secondary/50"
+                            )}
+                            onClick={handleAssistantToggle}
+                        >
+                            <Bot className="h-5 w-5" />
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Quick Actions & Entity Switcher (Desktop) */}
+                <div className="hidden md:flex items-center gap-2 ml-4">
+                    <EntitySelector />
+                    <QuickActionsDropdown onAction={onQuickAction} />
                     <Button
                         variant="ghost"
                         size="icon"
-                        className={`text-muted-foreground hover:text-primary ${isOpen ? 'text-primary bg-primary/10' : ''}`}
+                        className={cn(
+                            "text-header-foreground hover:text-header-foreground hover:bg-slate-700/50",
+                            isOpen && "bg-secondary/50"
+                        )}
                         onClick={handleAssistantToggle}
+                        title="Asistente AI"
                     >
                         <Bot className="h-5 w-5" />
                     </Button>
                 </div>
-            </div>
 
-            {/* Quick Actions & Entity Switcher (Desktop) */}
-            <div className="hidden md:flex items-center gap-2 ml-4">
-                <EntitySelector />
-                <QuickActionsDropdown onAction={onQuickAction} />
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`text-muted-foreground hover:text-primary ${isOpen ? 'text-primary bg-primary/10' : ''}`}
-                    onClick={handleAssistantToggle}
-                    title="Asistente AI"
-                >
-                    <Bot className="h-5 w-5" />
-                </Button>
-            </div>
+                <div className="flex-1" />
 
-            <div className="flex-1" />
+                {/* Creating Entity Dialog */}
+                <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Crear Nueva Entidad</DialogTitle>
+                        </DialogHeader>
+                        <EntityForm onSuccess={() => setOpenCreate(false)} />
+                    </DialogContent>
+                </Dialog>
 
-            {/* Creating Entity Dialog */}
-            <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Crear Nueva Entidad</DialogTitle>
-                    </DialogHeader>
-                    <EntityForm onSuccess={() => setOpenCreate(false)} />
-                </DialogContent>
-            </Dialog>
-
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                    <span className="sr-only">Toggle theme</span>
-                </Button>
-                <NotificationDropdown onOpenSettings={() => onNavigate('configuration')} />
-                <UserMenu />
+                {/* Right Side Actions */}
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="hidden md:flex text-header-foreground" onClick={cycleTheme}>
+                        {theme === 'light' ? <Cloud className="h-5 w-5" /> : theme === 'cloudy' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                        <span className="sr-only">Toggle theme</span>
+                    </Button>
+                    <NotificationDropdown onOpenSettings={() => onNavigate('configuration')} />
+                    <UserMenu />
+                </div>
             </div>
         </header>
     );

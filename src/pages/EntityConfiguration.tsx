@@ -1,20 +1,28 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useData } from '@/contexts/DataContext';
 import { GeneralPanel } from '@/components/configuration/GeneralPanel';
 import { BoxesPanel } from '@/components/configuration/BoxesPanel';
 import { CategoriesPanel } from '@/components/configuration/CategoriesPanel';
-import { ModulesPanel } from '@/components/configuration/ModulesPanel';
+
+import { AdvancedSettings } from '@/components/configuration/AdvancedSettings';
 
 interface EntityConfigurationProps {
     entityId: string;
+    defaultTab?: string;
+    onTabChange?: (tab: string) => void;
 }
 
-export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
+export function EntityConfiguration({ entityId, defaultTab = 'general', onTabChange }: EntityConfigurationProps) {
+    const [activeTab, setActiveTab] = useState(defaultTab);
     const { entities } = useData();
     const [refreshKey, setRefreshKey] = useState(0);
+
+    // Sync activeTab when defaultTab changes (from parent/sidebar)
+    useEffect(() => {
+        setActiveTab(defaultTab);
+    }, [defaultTab]);
 
     const entity = entities.find(e => e.id === entityId);
 
@@ -25,6 +33,13 @@ export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
         window.location.reload(); // Force reload to get fresh data
     };
 
+    const handleTabChange = (value: string) => {
+        setActiveTab(value);
+        if (onTabChange) {
+            onTabChange(value);
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
             <div>
@@ -32,14 +47,14 @@ export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
                 <p className="text-muted-foreground">Administra los detalles y configuración de {entity.name}</p>
             </div>
 
-            <Tabs defaultValue="general" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+                <TabsList className="w-full justify-start overflow-x-auto flex-nowrap no-scrollbar h-auto p-1">
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="boxes">Cajas</TabsTrigger>
                     <TabsTrigger value="categories">Categorías</TabsTrigger>
-                    <TabsTrigger value="modules">Módulos</TabsTrigger>
-                </TabsList>
 
+                    <TabsTrigger value="advanced">Avanzado</TabsTrigger>
+                </TabsList>
                 <TabsContent value="general">
                     <GeneralPanel entity={entity} />
                 </TabsContent>
@@ -52,8 +67,10 @@ export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
                     <CategoriesPanel entityId={entityId} />
                 </TabsContent>
 
-                <TabsContent value="modules">
-                    <ModulesPanel entity={entity} />
+
+
+                <TabsContent value="advanced">
+                    <AdvancedSettings entity={entity} onUpdate={handleUpdate} />
                 </TabsContent>
             </Tabs>
         </div>

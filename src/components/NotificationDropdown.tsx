@@ -39,7 +39,7 @@ export function NotificationDropdown({ onOpenSettings }: NotificationDropdownPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative text-header-foreground">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 h-2 w-2 bg-red-600 rounded-full"></span>
@@ -64,13 +64,12 @@ export function NotificationDropdown({ onOpenSettings }: NotificationDropdownPro
           </div>
         ) : (
           <>
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
               {recentNotifications.map((notification) => (
                 <DropdownMenuItem
                   key={notification.id}
-                  className={`flex items-start gap-3 p-3 cursor-pointer ${
-                    !notification.read ? 'bg-blue-500/5' : ''
-                  }`}
+                  className={`flex items-start gap-3 p-3 cursor-pointer ${!notification.read ? 'bg-blue-500/5' : ''
+                    }`}
                   onClick={() => {
                     if (!notification.read) {
                       markAsRead(notification.id);

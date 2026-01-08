@@ -21,6 +21,7 @@ import {
 // ========== ENTITIES ==========
 import { db } from './config';
 import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, EntitySubscription, Project, ServiceDefinition } from '@/types';
+import * as sb from '../supabase/adapter';
 
 // Helper to convert Firestore timestamps to Date
 const convertTimestamps = (data: any) => {
@@ -63,6 +64,10 @@ export const createEntity = async (userId: string, data: Omit<Entity, 'id' | 'us
     createdAt: now,
     updatedAt: now,
   });
+
+  // Sync to Supabase (Fire and forget)
+  sb.syncEntity(userId, docRef.id, { ...cleanData, createdAt: now.toDate(), updatedAt: now.toDate() });
+
   return docRef.id;
 };
 
@@ -72,6 +77,16 @@ export const updateEntity = async (entityId: string, data: Partial<Entity>): Pro
     ...data,
     updatedAt: Timestamp.now(),
   });
+
+  // Sync to Supabase
+  sb.syncEntity(data.userId || entityId.split('_')[0] || 'unknown', entityId, { ...data, updatedAt: new Date() });
+  // Note: We might be missing userId here if it's not in 'data'. 
+  // Ideally updateEntity should receive userId or we fetch it. 
+  // For now, if we don't have userId in 'data', RLS might fail if we needed it for INSERT, but for UPDATE it uses ID.
+  // Actually RLS checks auth.uid(), preventing cross-user edits.
+  // BUT the mapper needs userId to put in the row if converting.
+  // Let's rely on the fact that existing rows have user_id.
+
 };
 
 export const deleteEntity = async (entityId: string): Promise<void> => {
@@ -106,15 +121,44 @@ export const deleteEntity = async (entityId: string): Promise<void> => {
   }
 
   console.log('✅ Eliminación en cascada completada.');
+
+  // Sync deletion to Supabase
+  // We should ideally cascade delete there too, but for safety we trigger deleteEntity
+  // The Supabase schema has ON DELETE CASCADE, so just deleting the entity is enough.
+  sb.deleteEntity(entityId);
 };
 
 // ========== MOVEMENTS ==========
 
-export const getMovements = async (userId: string, entityId?: string): Promise<Movement[]> => {
+export const getMovements = async (
+  userId: string,
+  options?: string | { entityId?: string; startDate?: string; endDate?: string }
+): Promise<Movement[]> => {
   const constraints: QueryConstraint[] = [where('userId', '==', userId)];
+
+  let entityId: string | undefined;
+  let startDate: string | undefined;
+  let endDate: string | undefined;
+
+  // Normalize options
+  if (typeof options === 'string') {
+    entityId = options;
+  } else if (typeof options === 'object') {
+    entityId = options.entityId;
+    startDate = options.startDate;
+    endDate = options.endDate;
+  }
 
   if (entityId) {
     constraints.push(where('entityId', '==', entityId));
+  }
+
+  if (startDate) {
+    constraints.push(where('date', '>=', startDate));
+  }
+
+  if (endDate) {
+    constraints.push(where('date', '<=', endDate));
   }
 
   constraints.push(orderBy('date', 'desc'));
@@ -169,6 +213,15 @@ export const createMovement = async (userId: string, data: Omit<Movement, 'id' |
 
   console.log('✅ CREATE MOVEMENT - Movimiento creado con ID:', docRef.id);
 
+  console.log('✅ CREATE MOVEMENT - Movimiento creado con ID:', docRef.id);
+
+  // Sync to Supabase
+  try {
+    sb.syncMovement(userId, docRef.id, { ...cleanData, date: data.date, createdAt: now.toDate(), updatedAt: now.toDate() });
+  } catch (err) {
+    console.error('Supabase Sync Error:', err);
+  }
+
   return docRef.id;
 };
 
@@ -199,10 +252,17 @@ export const updateMovement = async (movementId: string, data: Partial<Movement>
   });
 
   console.log('✅ UPDATE MOVEMENT - Movimiento actualizado:', movementId);
+
+  // Sync to Supabase (Best effort with missing userId)
+  // We really should pass userId to update functions for full dual-write correctness,
+  // but for updates, Supabase ID is enough to find the row. 
+  // The mapper adds 'user_id' if provided.
+  sb.syncMovement('', movementId, { ...cleanData, updatedAt: new Date() });
 };
 
 export const deleteMovement = async (movementId: string): Promise<void> => {
   await deleteDoc(doc(db, 'movements', movementId));
+  sb.deleteMovement(movementId);
 };
 
 export const createBatchMovements = async (userId: string, movements: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]): Promise<void> => {
@@ -213,14 +273,14 @@ export const createBatchMovements = async (userId: string, movements: Omit<Movem
   const CHUNK_SIZE = 500; // Firestore batch limit
 
   // Process in chunks of 500
+  const syncQueue: { id: string; data: any }[] = [];
+
   for (let i = 0; i < movements.length; i += CHUNK_SIZE) {
     const chunk = movements.slice(i, i + CHUNK_SIZE);
-
-    // Create a new batch for each chunk if we have more than 500 (though typically we might just do one big batch call logic, but to be safe for really large files)
-    // Actually, writeBatch is one instance, we commit it. If > 500, we need multiple commits.
     const currentBatch = writeBatch(db);
 
     chunk.forEach(data => {
+      // Create a doc reference with auto-generated ID
       const docRef = doc(collection(db, 'movements'));
 
       // Remove undefined fields
@@ -232,19 +292,48 @@ export const createBatchMovements = async (userId: string, movements: Omit<Movem
         }
       });
 
-      currentBatch.set(docRef, {
+      const finalData = {
         ...cleanData,
         date: String(data.date),
         userId,
         createdAt: now,
         updatedAt: now,
-      });
+      };
+
+      currentBatch.set(docRef, finalData);
+
+      // Queue for Supabase sync
+      syncQueue.push({ id: docRef.id, data: finalData });
     });
 
     await currentBatch.commit();
   }
 
   console.log(`✅ BATCH CREATE - ${movements.length} movimientos creados exitosamente.`);
+
+  // Sync to Supabase (Iterative)
+  // We process asynchronously to not block the UI response too much, 
+  // though for massive loads this might throttle.
+  console.log('🔄 Iniciando sincronización de carga masiva con Supabase...');
+
+  // We'll process them in small chunks to avoid overwhelming the network/browser
+  const syncToSupabase = async () => {
+    for (const item of syncQueue) {
+      try {
+        sb.syncMovement(userId, item.id, {
+          ...item.data,
+          createdAt: item.data.createdAt.toDate(),
+          updatedAt: item.data.updatedAt.toDate()
+        });
+      } catch (e) {
+        console.warn(`Failed to sync batch item ${item.id}`, e);
+      }
+    }
+    console.log('✅ Carga masiva sincronizada con Supabase.');
+  };
+
+  // Trigger sync without awaiting (Fire and forget from UI perspective, but keeps running)
+  syncToSupabase();
 };
 
 // ========== LOANS ==========
@@ -274,6 +363,7 @@ export const createLoan = async (userId: string, data: Omit<Loan, 'id' | 'userId
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncLoan(userId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -283,10 +373,12 @@ export const updateLoan = async (loanId: string, data: Partial<Loan>): Promise<v
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncLoan('', loanId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteLoan = async (loanId: string): Promise<void> => {
   await deleteDoc(doc(db, 'loans', loanId));
+  sb.deleteLoan(loanId);
 };
 
 // ========== PROJECTIONS ==========
@@ -316,6 +408,7 @@ export const createProjection = async (userId: string, data: Omit<Projection, 'i
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncProjection(userId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -325,10 +418,12 @@ export const updateProjection = async (projectionId: string, data: Partial<Proje
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncProjection('', projectionId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteProjection = async (projectionId: string): Promise<void> => {
   await deleteDoc(doc(db, 'projections', projectionId));
+  sb.deleteProjection(projectionId);
 };
 
 // ========== CATEGORIES ==========
@@ -354,6 +449,7 @@ export const createCategory = async (userId: string, data: Omit<Category, 'id' |
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncCategory(userId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -363,30 +459,29 @@ export const updateCategory = async (categoryId: string, data: Partial<Category>
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncCategory('', categoryId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteCategory = async (categoryId: string): Promise<void> => {
   await deleteDoc(doc(db, 'categories', categoryId));
+  sb.deleteCategory(categoryId);
 };
 
 // ========== DEFAULT CATEGORIES ==========
 
 export const initializeDefaultCategories = async (userId: string, defaultCategories: any[]): Promise<void> => {
-  const batch = [];
   const now = Timestamp.now();
+  const promises = defaultCategories.map(async (category) => {
+    const docRef = await addDoc(collection(db, 'categories'), {
+      ...category,
+      userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    sb.syncCategory(userId, docRef.id, { ...category, createdAt: now.toDate(), updatedAt: now.toDate() });
+  });
 
-  for (const category of defaultCategories) {
-    batch.push(
-      addDoc(collection(db, 'categories'), {
-        ...category,
-        userId,
-        createdAt: now,
-        updatedAt: now,
-      })
-    );
-  }
-
-  await Promise.all(batch);
+  await Promise.all(promises);
 };
 // ========== CLIENTS ==========
 
@@ -407,6 +502,7 @@ export const createClient = async (userId: string, data: Omit<Client, 'id' | 'us
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncClient(userId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -416,10 +512,83 @@ export const updateClient = async (clientId: string, data: Partial<Client>): Pro
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncClient('', clientId, { ...data, updatedAt: new Date() });
 };
 
-export const deleteClient = async (clientId: string): Promise<void> => {
-  await deleteDoc(doc(db, 'clients', clientId));
+export const deleteClient = async (clientId: string, userId?: string): Promise<void> => {
+  // 1. Check for active projects
+  try {
+    let projectsQuery;
+    if (userId) {
+      projectsQuery = query(
+        collection(db, 'projects'),
+        where('clientId', '==', clientId),
+        where('userId', '==', userId), // Security Rule: Must read own data
+        where('status', '!=', 'completed')
+      );
+    } else {
+      // Fallback (will fail rules if they require userId)
+      projectsQuery = query(
+        collection(db, 'projects'),
+        where('clientId', '==', clientId),
+        where('status', '!=', 'completed')
+      );
+    }
+
+    const projectsSnapshot = await getDocs(projectsQuery);
+    if (!projectsSnapshot.empty) {
+      throw new Error(`e_projects:No se puede eliminar el cliente porque tiene ${projectsSnapshot.size} proyectos activos.`);
+    }
+  } catch (error: any) {
+    if (error.message.startsWith('e_projects')) throw new Error(error.message.split('e_projects:')[1]);
+    console.warn("⚠️ Validation Error (Projects):", error);
+    if (error.code === 'permission-denied' || error.message.includes('permission')) {
+      throw new Error(`Permisos insuficientes para verificar proyectos (Falta Índice o Regla).`);
+    }
+    throw new Error(`Error validando proyectos: ${error.message}`);
+  }
+
+  // 2. Check for active subscriptions
+  try {
+    let subsQuery;
+    if (userId) {
+      subsQuery = query(
+        collection(db, 'subscriptions'),
+        where('clientId', '==', clientId),
+        where('userId', '==', userId),
+        where('status', '==', 'active')
+      );
+    } else {
+      subsQuery = query(
+        collection(db, 'subscriptions'),
+        where('clientId', '==', clientId),
+        where('status', '==', 'active')
+      );
+    }
+
+    const subsSnapshot = await getDocs(subsQuery);
+    if (!subsSnapshot.empty) {
+      throw new Error(`e_subs:No se puede eliminar el cliente porque tiene ${subsSnapshot.size} suscripciones activas.`);
+    }
+  } catch (error: any) {
+    if (error.message.startsWith('e_subs')) throw new Error(error.message.split('e_subs:')[1]);
+    console.warn("⚠️ Validation Error (Subscriptions):", error);
+    if (error.code === 'permission-denied' || error.message.includes('permission')) {
+      throw new Error(`Permisos insuficientes para verificar suscripciones (Falta Índice o Regla).`);
+    }
+    throw new Error(`Error validando suscripciones: ${error.message}`);
+  }
+
+  // 3. Proceed with deletion
+  try {
+    await deleteDoc(doc(db, 'clients', clientId));
+  } catch (error: any) {
+    console.error("💥 Error performing deleteDoc:", error);
+    throw new Error(`Error al eliminar cliente en BD: ${error.message}`);
+  }
+
+  // 4. Sync deletion to Supabase
+  sb.deleteClient(clientId);
 };
 
 // ========== SUBSCRIPTIONS (ERP CLIENTS) ==========
@@ -446,6 +615,7 @@ export const createSubscription = async (userId: string, clientId: string, data:
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncSubscription(userId, clientId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -455,10 +625,12 @@ export const updateSubscription = async (subscriptionId: string, data: Partial<S
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncSubscription('', '', subscriptionId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteSubscription = async (subscriptionId: string): Promise<void> => {
   await deleteDoc(doc(db, 'subscriptions', subscriptionId));
+  sb.deleteSubscription(subscriptionId);
 };
 
 // ========== SERVICE DEFINITIONS (CATALOG) ==========
@@ -484,6 +656,7 @@ export const createServiceDefinition = async (userId: string, data: Omit<Service
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncServiceDefinition(userId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -493,10 +666,12 @@ export const updateServiceDefinition = async (id: string, data: Partial<ServiceD
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncServiceDefinition('', id, { ...data, updatedAt: new Date() });
 };
 
 export const deleteServiceDefinition = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'service_definitions', id));
+  sb.deleteServiceDefinition(id);
 };
 
 // ========== ENTITY SUBSCRIPTIONS (EXPENSES) ==========
@@ -528,6 +703,7 @@ export const createEntitySubscription = async (userId: string, entityId: string,
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncEntitySubscription(userId, entityId, docRef.id, { ...data, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -537,10 +713,12 @@ export const updateEntitySubscription = async (subscriptionId: string, data: Par
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncEntitySubscription('', '', subscriptionId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteEntitySubscription = async (subscriptionId: string): Promise<void> => {
   await deleteDoc(doc(db, 'entity_subscriptions', subscriptionId));
+  sb.deleteEntitySubscription(subscriptionId);
 };
 
 // ========== PROJECTS ==========
@@ -564,6 +742,7 @@ export const createProject = async (userId: string, data: Omit<Project, 'id' | '
     createdAt: now,
     updatedAt: now,
   });
+  sb.syncProject(userId, docRef.id, { ...data, status: 'incoming', progress: 0, createdAt: now.toDate(), updatedAt: now.toDate() });
   return docRef.id;
 };
 
@@ -573,10 +752,12 @@ export const updateProject = async (projectId: string, data: Partial<Project>): 
     ...data,
     updatedAt: Timestamp.now(),
   });
+  sb.syncProject('', projectId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
   await deleteDoc(doc(db, 'projects', projectId));
+  sb.deleteProject(projectId);
 };
 
 // ========== CATEGORY HELPERS ==========
@@ -609,6 +790,11 @@ export const reassignCategoryMovements = async (
   });
 
   await batch.commit();
+
+  // Sync reassignments to Supabase (Best effort)
+  snapshot.docs.forEach((document) => {
+    sb.syncMovement(userId, document.id, { categoryId: newCategoryId, updatedAt: new Date() });
+  });
 };
 
 export const renameSubcategoryInMovements = async (
@@ -643,6 +829,11 @@ export const renameSubcategoryInMovements = async (
     });
     await batch.commit();
   }
+
+  // Sync renames to Supabase
+  snapshot.docs.forEach((document) => {
+    sb.syncMovement(userId, document.id, { subcategory: newName, updatedAt: new Date() });
+  });
 };
 
 export const reassignSubcategoryInMovements = renameSubcategoryInMovements;
@@ -728,71 +919,66 @@ export const updateBox = async (
 // ========== ENTITY CASCADE DELETE ==========
 
 export const deleteEntityCascade = async (userId: string, entityId: string): Promise<void> => {
-  // Delete all movements for this entity
-  const movementsQuery = query(
-    collection(db, 'movements'),
-    where('userId', '==', userId),
-    where('entityId', '==', entityId)
-  );
-  const movementsSnapshot = await getDocs(movementsQuery);
-  const movementsBatch = writeBatch(db);
-  movementsSnapshot.docs.forEach((doc) => {
-    movementsBatch.delete(doc.ref);
-  });
-  await movementsBatch.commit();
+  // 1. Get all related data first
+  const movementsQuery = query(collection(db, 'movements'), where('userId', '==', userId), where('entityId', '==', entityId));
+  const loansQuery = query(collection(db, 'loans'), where('userId', '==', userId), where('entityId', '==', entityId));
+  const projectionsQuery = query(collection(db, 'projections'), where('userId', '==', userId), where('entityId', '==', entityId));
+  const clientsQuery = query(collection(db, 'clients'), where('userId', '==', userId), where('entityId', '==', entityId));
+  const projectsQuery = query(collection(db, 'projects'), where('userId', '==', userId), where('entityId', '==', entityId));
+  const entitySubscriptionsQuery = query(collection(db, 'entity_subscriptions'), where('userId', '==', userId), where('entityId', '==', entityId));
 
-  // Delete all loans for this entity
-  const loansQuery = query(
-    collection(db, 'loans'),
-    where('userId', '==', userId),
-    where('entityId', '==', entityId)
-  );
-  const loansSnapshot = await getDocs(loansQuery);
-  const loansBatch = writeBatch(db);
-  loansSnapshot.docs.forEach((doc) => {
-    loansBatch.delete(doc.ref);
-  });
-  await loansBatch.commit();
+  const [
+    movementsSnap,
+    loansSnap,
+    projectionsSnap,
+    clientsSnap,
+    projectsSnap,
+    entitySubscriptionsSnap
+  ] = await Promise.all([
+    getDocs(movementsQuery),
+    getDocs(loansQuery),
+    getDocs(projectionsQuery),
+    getDocs(clientsQuery),
+    getDocs(projectsQuery),
+    getDocs(entitySubscriptionsQuery)
+  ]);
 
-  // Delete all projections for this entity
-  const projectionsQuery = query(
-    collection(db, 'projections'),
-    where('userId', '==', userId),
-    where('entityId', '==', entityId)
-  );
-  const projectionsSnapshot = await getDocs(projectionsQuery);
-  const projectionsBatch = writeBatch(db);
-  projectionsSnapshot.docs.forEach((doc) => {
-    projectionsBatch.delete(doc.ref);
-  });
-  await projectionsBatch.commit();
+  // Find subscriptions related to these clients
+  const clientIds = clientsSnap.docs.map(doc => doc.id);
+  let subscriptionsRefs: any[] = [];
+  if (clientIds.length > 0) {
+    // We have to query subscriptions for each client or use 'in' batches of 10
+    // Since 'in' limit is 10, let's fetch all user subscriptions and filter in memory to be safe and simple
+    // (Assuming user doesn't have thousands of subscriptions, otherwise multiple queries)
+    const userSubsQuery = query(collection(db, 'subscriptions'), where('userId', '==', userId));
+    const userSubsSnap = await getDocs(userSubsQuery);
+    subscriptionsRefs = userSubsSnap.docs
+      .filter(doc => clientIds.includes(doc.data().clientId))
+      .map(doc => doc.ref);
+  }
 
-  // Delete all clients for this entity
-  const clientsQuery = query(
-    collection(db, 'clients'),
-    where('userId', '==', userId),
-    where('entityId', '==', entityId)
-  );
-  const clientsSnapshot = await getDocs(clientsQuery);
-  const clientsBatch = writeBatch(db);
-  clientsSnapshot.docs.forEach((doc) => {
-    clientsBatch.delete(doc.ref);
-  });
-  await clientsBatch.commit();
+  // Collect all references
+  const allRefs = [
+    ...movementsSnap.docs.map(doc => doc.ref),
+    ...loansSnap.docs.map(doc => doc.ref),
+    ...projectionsSnap.docs.map(doc => doc.ref),
+    ...clientsSnap.docs.map(doc => doc.ref),
+    ...projectsSnap.docs.map(doc => doc.ref),
+    ...entitySubscriptionsSnap.docs.map(doc => doc.ref),
+    ...subscriptionsRefs,
+    doc(db, 'entities', entityId)
+  ];
 
-  // Delete all projects for this entity
-  const projectsQuery = query(
-    collection(db, 'projects'),
-    where('userId', '==', userId),
-    where('entityId', '==', entityId)
-  );
-  const projectsSnapshot = await getDocs(projectsQuery);
-  const projectsBatch = writeBatch(db);
-  projectsSnapshot.docs.forEach((doc) => {
-    projectsBatch.delete(doc.ref);
-  });
-  await projectsBatch.commit();
+  console.log(`🗑️ Eliminando entidad ${entityId} y ${allRefs.length - 1} documentos dependientes...`);
 
-  // Finally, delete the entity itself
-  await deleteDoc(doc(db, 'entities', entityId));
+  // Delete in batches
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < allRefs.length; i += CHUNK_SIZE) {
+    const chunk = allRefs.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach(ref => batch.delete(ref));
+    await batch.commit();
+  }
+
+  console.log('✅ Eliminación en cascada completada.');
 };

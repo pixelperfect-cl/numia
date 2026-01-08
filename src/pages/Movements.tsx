@@ -6,6 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,10 +15,11 @@ import { Badge } from '@/components/ui/badge';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, getTodayLocalDateString, parseLocalDate } from '@/lib/utils';
-import { Edit, History, Trash2, Search, Download, Filter, ChevronUp, ChevronDown } from 'lucide-react';
+import { Edit, History, Trash2, Search, Download, Filter, ChevronUp, ChevronDown, Upload, Plus } from 'lucide-react';
 import type { MovementType, Movement, MovementHistoryEntry } from '@/types';
 import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
 import { CategorySelect } from '@/components/CategorySelect';
+import { BulkUploadWizard } from '@/components/movements/BulkUploadWizard';
 
 interface MovementsProps {
   openDialog?: boolean;
@@ -32,6 +34,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
   const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   // Handle external dialog open request
   useEffect(() => {
@@ -430,130 +433,164 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
           <h1 className="text-3xl font-bold tracking-tight">Movimientos</h1>
           <p className="text-muted-foreground">Búsqueda avanzada y auditoría</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={(open) => {
-          setIsOpen(open);
-          if (!open) {
-            setEditingMovement(null);
-            setFormData({
-              type: 'income',
-              amount: '',
-              description: '',
-              categoryValue: '',
-              box: '',
-              entityId: '',
-              date: getTodayLocalDateString(),
-            });
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button>+ Nuevo Movimiento</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingMovement ? 'Editar Movimiento' : 'Crear Nuevo Movimiento'}</DialogTitle>
-              <DialogDescription>
-                {editingMovement ? 'Modifica los datos del movimiento' : 'Registra un ingreso o gasto asociado a una entidad y caja específica'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {!entityId && (
+
+        <div className="flex gap-2">
+          <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Carga Masiva
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Carga Masiva de Movimientos</DialogTitle>
+                <DialogDescription>
+                  Importa movimientos desde cartolas bancarias (BCI - Histórica o Detallada)
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto p-1">
+                <BulkUploadWizard
+                  onClose={() => setIsBulkUploadOpen(false)}
+                  onSaveSuccess={() => {
+                    setIsBulkUploadOpen(false);
+                    alert('Movimientos importados correctamente');
+                  }}
+                  initialEntityId={entityId}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isOpen} onOpenChange={(open) => {
+            setIsOpen(open);
+            if (!open) {
+              setEditingMovement(null);
+              setFormData({
+                type: 'income',
+                amount: '',
+                description: '',
+                categoryValue: '',
+                box: '',
+                entityId: '',
+                date: getTodayLocalDateString(),
+              });
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Movimiento
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingMovement ? 'Editar Movimiento' : 'Crear Nuevo Movimiento'}</DialogTitle>
+                <DialogDescription>
+                  {editingMovement ? 'Modifica los datos del movimiento' : 'Registra un ingreso o gasto asociado a una entidad y caja específica'}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!entityId && (
+                  <div>
+                    <Label htmlFor="entity">Entidad</Label>
+                    <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una entidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entities.map((entity) => (
+                          <SelectItem key={entity.id} value={entity.id}>
+                            {entity.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
-                  <Label htmlFor="entity">Entidad</Label>
-                  <Select value={formData.entityId} onValueChange={(value) => setFormData({ ...formData, entityId: value })}>
+                  <Label htmlFor="type">Tipo</Label>
+                  <Select value={formData.type} onValueChange={(value: MovementType) => handleTypeChange(value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una entidad" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {entities.map((entity) => (
-                        <SelectItem key={entity.id} value={entity.id}>
-                          {entity.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="income">↗️ Ingreso</SelectItem>
+                      <SelectItem value="expense">↙️ Gasto</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              <div>
-                <Label htmlFor="type">Tipo</Label>
-                <Select value={formData.type} onValueChange={(value: MovementType) => handleTypeChange(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">↗️ Ingreso</SelectItem>
-                    <SelectItem value="expense">↙️ Gasto</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="amount">Monto</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  placeholder="0"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Descripción (opcional)</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Ej: Sueldo mensual"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category">Categoría</Label>
-                <CategorySelect
-                  value={formData.categoryValue}
-                  onValueChange={(value) => setFormData({ ...formData, categoryValue: value })}
-                  categories={categories}
-                  type={formData.type}
-                />
-              </div>
-              <div>
-                <Label htmlFor="box">Caja *</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {availableBoxes.map((box) => (
-                    <Button
-                      key={box}
-                      type="button"
-                      variant={formData.box === box ? 'default' : 'outline'}
-                      onClick={() => setFormData({ ...formData, box })}
-                      className="w-full"
-                    >
-                      {box}
-                    </Button>
-                  ))}
+                <div>
+                  <Label htmlFor="amount">Monto</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    placeholder="0"
+                    required
+                  />
                 </div>
-                {availableBoxes.length === 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Esta entidad no tiene cajas disponibles
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="date">Fecha</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">{editingMovement ? 'Guardar' : 'Crear'}</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div>
+                  <Label htmlFor="description">Descripción (opcional)</Label>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Ej: Sueldo mensual"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Categoría</Label>
+                  <CategorySelect
+                    value={formData.categoryValue}
+                    onValueChange={(value) => setFormData({ ...formData, categoryValue: value })}
+                    categories={categories}
+                    type={formData.type}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="box">Caja *</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {availableBoxes.map((box) => (
+                      <Button
+                        key={box}
+                        type="button"
+                        variant={formData.box === box ? 'default' : 'outline'}
+                        onClick={() => setFormData({ ...formData, box })}
+                        className="w-full"
+                      >
+                        {box}
+                      </Button>
+                    ))}
+                  </div>
+                  {availableBoxes.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Esta entidad no tiene cajas disponibles
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="date">Fecha</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">{editingMovement ? 'Guardar' : 'Crear'}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Statistics Cards */}

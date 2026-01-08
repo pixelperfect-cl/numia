@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCategoryMovementCount } from '@/lib/firebase/database';
+// getCategoryMovementCount removed as we calculate locally
 import { Edit, Trash2, Search } from 'lucide-react';
 import { CategoryDialog } from '@/components/CategoryDialog';
 import { CategoryDeleteDialog } from '@/components/CategoryDeleteDialog';
@@ -18,9 +18,20 @@ interface CategoriesPanelProps {
 
 export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
     const { user } = useAuth();
-    const { categories, updateCategory, movements } = useData();
-    const [movementCounts, setMovementCounts] = useState<Record<string, number>>({});
-    const [loading, setLoading] = useState(true);
+    const { categories, updateCategory, movements, loading: dataLoading } = useData();
+    // Removed local loading state for counts, relying on dataLoading from context if needed, 
+    // but honestly for categories we usually have them cached or fast.
+
+    // Calculate counts locally
+    const movementCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        movements.forEach(m => {
+            if (m.categoryId) {
+                counts[m.categoryId] = (counts[m.categoryId] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [movements]);
 
     // Subcategory Management State
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -31,24 +42,6 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
 
     // State for subcategory deletion dialog
     const [subToDelete, setSubToDelete] = useState<{ category: Category; name: string } | null>(null);
-
-    // Load counts
-    const loadCounts = async () => {
-        if (!user) return;
-        setLoading(true);
-        const counts: Record<string, number> = {};
-
-        for (const category of categories) {
-            counts[category.id] = await getCategoryMovementCount(user.uid, category.id);
-        }
-
-        setMovementCounts(counts);
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        loadCounts();
-    }, [categories, user]);
 
     // Subcategory movement count helper
     const getSubcategoryMovementCount = (categoryId: string, subName: string) => {
@@ -242,7 +235,7 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                             <TabsTrigger value="expense">Gastos</TabsTrigger>
                         </TabsList>
                         <TabsContent value="income" className="space-y-4 mt-4">
-                            {loading ? (
+                            {dataLoading ? (
                                 <div className="text-center py-8 text-muted-foreground">Cargando...</div>
                             ) : incomeCategories.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
@@ -253,7 +246,7 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                             )}
                         </TabsContent>
                         <TabsContent value="expense" className="space-y-4 mt-4">
-                            {loading ? (
+                            {dataLoading ? (
                                 <div className="text-center py-8 text-muted-foreground">Cargando...</div>
                             ) : expenseCategories.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">

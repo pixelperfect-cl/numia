@@ -122,10 +122,19 @@ function App() {
         return <Projections openDialog={openProjectionDialog} onDialogClose={() => setOpenProjectionDialog(false)} entityId={selectedEntityId || undefined} />;
       case 'subscriptions':
         return <Subscriptions entityId={selectedEntityId || ''} />;
-      case 'configuration':
-        return <EntityConfiguration entityId={selectedEntityId} />;
+      case 'configuration': // Fallback or direct link
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="general" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
       case 'entity-configuration':
-        return <EntityConfiguration entityId={selectedEntityId} />;
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="general" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
+      case 'config-general':
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="general" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
+      case 'config-boxes':
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="boxes" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
+      case 'config-categories':
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="categories" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
+
+      case 'config-advanced':
+        return <EntityConfiguration entityId={selectedEntityId} defaultTab="advanced" onTabChange={(tab) => setCurrentPage(`config-${tab}`)} />;
       case 'entity-selection':
         return (
           <EntitySelection
@@ -145,7 +154,15 @@ function App() {
         return <ERPDashboard />;
 
       case 'erp-services':
-        return <Services entityId={selectedEntityId || undefined} />;
+        return <Services entityId={selectedEntityId || undefined} defaultTab="summary" onTabChange={(tab) => setCurrentPage(`erp-services-${tab}`)} />;
+      case 'erp-services-summary':
+        return <Services entityId={selectedEntityId || undefined} defaultTab="summary" onTabChange={(tab) => setCurrentPage(`erp-services-${tab}`)} />;
+      case 'erp-services-active':
+        return <Services entityId={selectedEntityId || undefined} defaultTab="active" onTabChange={(tab) => setCurrentPage(`erp-services-${tab}`)} />;
+      case 'erp-services-archived':
+        return <Services entityId={selectedEntityId || undefined} defaultTab="archived" onTabChange={(tab) => setCurrentPage(`erp-services-${tab}`)} />;
+      case 'erp-services-catalog':
+        return <Services entityId={selectedEntityId || undefined} defaultTab="catalog" onTabChange={(tab) => setCurrentPage(`erp-services-${tab}`)} />;
       case 'erp-clients':
         return <Clients entityId={selectedEntityId || undefined} />;
       case 'erp-projects':

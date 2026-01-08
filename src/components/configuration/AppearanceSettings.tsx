@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/theme-provider';
-import { Palette, Sun, Moon, Monitor } from 'lucide-react';
+import { Palette, Sun, Moon, Monitor, Cloud } from 'lucide-react';
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
@@ -28,7 +28,7 @@ export function AppearanceSettings() {
             <Label htmlFor="theme">Modo de Color</Label>
             <div className="relative mt-2">
               <Palette className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-              <Select value={theme} onValueChange={(value: 'light' | 'dark' | 'system') => setTheme(value)}>
+              <Select value={theme} onValueChange={(value: 'light' | 'dark' | 'system' | 'cloudy') => setTheme(value)}>
                 <SelectTrigger className="pl-10">
                   <SelectValue />
                 </SelectTrigger>
@@ -43,6 +43,12 @@ export function AppearanceSettings() {
                     <div className="flex items-center gap-2">
                       <Moon className="h-4 w-4" />
                       <span>Oscuro</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cloudy">
+                    <div className="flex items-center gap-2">
+                      <Cloud className="h-4 w-4" />
+                      <span>Nublado</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="system">

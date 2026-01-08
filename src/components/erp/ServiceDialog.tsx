@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createSubscription, updateSubscription, getServiceDefinitions } from '@/lib/firebase/database';
@@ -9,6 +10,7 @@ import type { Client, Subscription, ServiceDefinition } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
+import { ClientDialog } from './ClientDialog';
 
 interface ServiceDialogProps {
     open: boolean;
@@ -16,9 +18,13 @@ interface ServiceDialogProps {
     subscription?: Subscription & { clientId?: string }; // Enhanced type
     clients: Client[];
     onSuccess: () => void;
+    defaultClientId?: string;
+    preselectedDefinition?: ServiceDefinition | null;
+    onRefreshClients?: () => void;
+    entityId?: string;
 }
 
-export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuccess }: ServiceDialogProps) {
+export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuccess, defaultClientId, preselectedDefinition, onRefreshClients, entityId }: ServiceDialogProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [definitions, setDefinitions] = useState<ServiceDefinition[]>([]);
@@ -26,6 +32,7 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
     // Form State
     const [clientId, setClientId] = useState('');
     const [selectedDefinitionId, setSelectedDefinitionId] = useState<string>('custom');
+    const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
     const [formData, setFormData] = useState<Partial<Subscription>>({
         name: '',
@@ -33,7 +40,8 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
         currency: 'CLP',
         frequency: 'monthly',
         startDate: format(new Date(), 'yyyy-MM-dd'),
-        status: 'active'
+        status: 'active',
+        notes: ''
     });
 
     // Load Service Definitions
@@ -53,11 +61,25 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
                 frequency: subscription.frequency,
                 startDate: subscription.startDate,
                 status: subscription.status,
-                nextBillingDate: subscription.nextBillingDate // Keep existing schedule
+
+                nextBillingDate: subscription.nextBillingDate, // Keep existing schedule
+                notes: subscription.notes || ''
             });
             setSelectedDefinitionId('custom');
+        } else if (preselectedDefinition) {
+            // Pre-fill from selection
+            setClientId(defaultClientId || '');
+            setSelectedDefinitionId(preselectedDefinition.id);
+            setFormData({
+                name: preselectedDefinition.name,
+                amount: preselectedDefinition.amount,
+                currency: preselectedDefinition.currency,
+                frequency: preselectedDefinition.frequency,
+                startDate: format(new Date(), 'yyyy-MM-dd'),
+                status: 'active'
+            });
         } else {
-            setClientId('');
+            setClientId(defaultClientId || '');
             setSelectedDefinitionId('custom');
             setFormData({
                 name: '',
@@ -65,10 +87,11 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
                 currency: 'CLP',
                 frequency: 'monthly',
                 startDate: format(new Date(), 'yyyy-MM-dd'),
-                status: 'active'
+                status: 'active',
+                notes: ''
             });
         }
-    }, [subscription, open]);
+    }, [subscription, open, defaultClientId, preselectedDefinition]);
 
     const handleDefinitionChange = (defId: string) => {
         setSelectedDefinitionId(defId);
@@ -116,11 +139,27 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
         }
     };
 
+    const handleClientSuccess = (newClient?: Client) => {
+        if (newClient) {
+            if (onRefreshClients) {
+                onRefreshClients();
+            }
+            // Temporarily add to local list if not yet refreshed by parent
+            if (!clients.find(c => c.id === newClient.id)) {
+                clients.push(newClient);
+            }
+            setClientId(newClient.id);
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle>{subscription ? 'Editar Servicio' : 'Asignar Nuevo Servicio'}</DialogTitle>
+                    <DialogDescription>
+                        {subscription ? 'Modifica los detalles del servicio existente.' : 'Completa el formulario para asignar un nuevo servicio a un cliente.'}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -130,13 +169,22 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
                         <Label htmlFor="client">Cliente</Label>
                         <Select
                             value={clientId}
-                            onValueChange={setClientId}
-                            disabled={!!subscription}
+                            onValueChange={(val) => {
+                                if (val === 'new') {
+                                    setClientDialogOpen(true);
+                                } else {
+                                    setClientId(val);
+                                }
+                            }}
+                            disabled={!!subscription || !!defaultClientId}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecciona un cliente" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="new" className="text-blue-500 hover:text-blue-700 font-medium border-b mb-1">
+                                    + Crear Nuevo Cliente
+                                </SelectItem>
                                 {clients.map(client => (
                                     <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                                 ))}
@@ -255,6 +303,18 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
                         />
                     </div>
 
+                    <div className="grid gap-2">
+                        <Label htmlFor="notes">Notas</Label>
+                        <Textarea
+                            id="notes"
+                            placeholder="Información adicional del servicio..."
+                            value={formData.notes || ''}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            className="resize-none"
+                            rows={3}
+                        />
+                    </div>
+
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancelar
@@ -266,6 +326,13 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuc
                     </DialogFooter>
                 </form>
             </DialogContent>
+
+            <ClientDialog
+                open={clientDialogOpen}
+                onOpenChange={setClientDialogOpen}
+                onSuccess={handleClientSuccess}
+                entityId={entityId}
+            />
         </Dialog>
     );
 }

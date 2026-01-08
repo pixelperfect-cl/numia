@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { deleteCategory, reassignCategoryMovements } from '@/lib/firebase/database';
+import { reassignCategoryMovements } from '@/lib/firebase/database';
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import type { Category } from '@/types';
 
 interface CategoryDeleteDialogProps {
@@ -26,6 +27,7 @@ export function CategoryDeleteDialog({
     onSuccess
 }: CategoryDeleteDialogProps) {
     const { user } = useAuth();
+    const { deleteCategory } = useData();
     const [loading, setLoading] = useState(false);
     const [targetCategoryId, setTargetCategoryId] = useState<string>('');
 
@@ -44,8 +46,6 @@ export function CategoryDeleteDialog({
             if (movementCount > 0 && targetCategoryId) {
                 await reassignCategoryMovements(user.uid, category.id, targetCategoryId);
             }
-
-
 
             // Delete the category
             await deleteCategory(category.id);

@@ -200,10 +200,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteEntity = async (id: string) => {
-    await db.deleteEntity(id);
+    if (!user) throw new Error('User not authenticated');
+    await db.deleteEntityCascade(user.uid, id);
     await createNotification(
       'Entidad eliminada',
-      'Se ha eliminado una entidad',
+      'Se ha eliminado una entidad y todos sus datos asociados',
       'warning'
     );
     await refreshData();
@@ -243,13 +244,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMovement = async (id: string) => {
-    await db.deleteMovement(id);
-    await createNotification(
-      'Movimiento eliminado',
-      'Se ha eliminado un movimiento',
-      'warning'
-    );
-    await refreshData();
+    // Optimistic update: Remove immediately from UI
+    setMovements(prev => prev.filter(m => m.id !== id));
+
+    try {
+      await db.deleteMovement(id);
+      await createNotification(
+        'Movimiento eliminado',
+        'Se ha eliminado un movimiento',
+        'warning'
+      );
+    } catch (error) {
+      console.error("Error deleting movement:", error);
+      // Revert/Reload if failed
+      await refreshData();
+    }
   };
 
   const createBatchMovements = async (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]) => {
@@ -390,6 +399,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateCategory = async (id: string, data: Partial<Category>) => {
     await db.updateCategory(id, data);
     const category = categories.find(c => c.id === id);
+    // Optimistic cache update if we wanted, but for now just refreshData is fine for update as it's not a list removal
+    // Actually, let's keep refreshData for updates to be safe, but for delete we definitely want optimistic.
+
+    // HOWEVER, for subcategory removal (which uses updateCategory), we might want it to be smooth too.
+    // The previous request was about "refreshing the page to see changes". 
+    // refreshData() DOES that, so it's technically "correct" for "seeing changes", 
+    // but now the user complains about "loading".
+    // So for consistency, let's stick with refreshData for UPDATE for now unless asked, 
+    // but definitely fix DELETE.
+
+    // Wait, the previous user request "refresh the page" meant MANUAL browser refresh.
+    // My previous fix added `refreshData()` which causes "Loading...".
+    // So for subcategory removal (updateCategory), the user might also complain about Loading.
+    // I should probably make updateCategory optimistic too.
+
+    // Let's stick to doing deleteMovement and deleteCategory first as per explicit request.
+
     const message = data.subcategories
       ? `Se ha añadido una subcategoría a "${category?.name}"`
       : 'Se ha actualizado una categoría exitosamente';
@@ -402,13 +428,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCategory = async (id: string) => {
-    await db.deleteCategory(id);
-    await createNotification(
-      'Categoría eliminada',
-      'Se ha eliminado una categoría',
-      'warning'
-    );
-    await refreshData();
+    // Optimistic update
+    setCategories(prev => prev.filter(c => c.id !== id));
+
+    try {
+      await db.deleteCategory(id);
+      await createNotification(
+        'Categoría eliminada',
+        'Se ha eliminado una categoría',
+        'warning'
+      );
+    } catch (error) {
+      console.error("Error deleting category", error);
+      await refreshData();
+    }
   };
 
   // Projection methods

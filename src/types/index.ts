@@ -23,7 +23,17 @@ export interface Entity {
   settings?: {
     erpEnabled: boolean;
     smtpEnabled?: boolean;
+    smtpConfig?: {
+      apiKey: string;
+      fromEmail: string;
+      billingNotificationsEnabled: boolean;
+    };
   };
+  rut?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,6 +76,9 @@ export interface Movement {
   date: string; // ISO date string
   status?: 'paid' | 'pending';
   clientId?: string; // Link to ERP Client
+  subscriptionId?: string; // Link to Specific Subscription
+  billingPeriod?: string; // The specific billing cycle date this payment applies to (YYYY-MM-DD)
+  isFinancial?: boolean; // Indicates if this movement is backed by a financial record
   history?: MovementHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
@@ -217,6 +230,15 @@ export interface AIConversation {
 
 // ERP Types
 
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  date: string; // ISO date
+  notes?: string;
+  isFinancial: boolean; // True if it created a movement
+  movementId?: string; // ID of the related financial movement
+}
+
 export interface Subscription {
   id: string;
   clientId: string;
@@ -226,7 +248,9 @@ export interface Subscription {
   frequency: 'monthly' | 'yearly';
   startDate: string; // ISO date
   nextBillingDate: string; // ISO date
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'archived';
+  notes?: string;
+  payments?: PaymentRecord[]; // History of payments for this service
   createdAt: Date;
   updatedAt: Date;
 }
@@ -270,6 +294,7 @@ export interface Client {
   emails?: string[]; // Additional emails for notifications
   phones?: string[]; // Additional phones for notifications
   rut?: string; // RUT de facturación
+  address?: string; // Client address
   status: 'active' | 'inactive';
   subscriptions?: Subscription[]; // Optional, populated on fetch if needed
   createdAt: Date;
@@ -277,6 +302,18 @@ export interface Client {
 }
 
 export type ProjectStatus = 'incoming' | 'design' | 'development' | 'review' | 'completed';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface ProjectChecklist {
+  id: string;
+  title: string;
+  items: ChecklistItem[];
+}
 
 export interface Project {
   id: string;
@@ -288,6 +325,7 @@ export interface Project {
   description?: string;
   dueDate?: string; // ISO date
   progress: number; // 0-100
+  checklists?: ProjectChecklist[];
   createdAt: Date;
   updatedAt: Date;
 }

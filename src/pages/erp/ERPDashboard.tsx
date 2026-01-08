@@ -39,7 +39,7 @@ export function ERPDashboard() {
             let totalMrr = 0;
             // Fetch subscriptions for all clients concurrently
             await Promise.all(clientsData.map(async (client) => {
-                const subs = await getSubscriptions(client.id);
+                const subs = await getSubscriptions(client.id, user.uid);
                 const clientMrr = subs.reduce((sum, sub) => {
                     // Only count if status is active (if we had status on sub, assuming yes or just all for now)
                     // If frequency is yearly, divide by 12? For now assume monthly or simple sum 

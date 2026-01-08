@@ -16,12 +16,18 @@ interface GeneralPanelProps {
 
 export function GeneralPanel({ entity }: GeneralPanelProps) {
     const { user } = useAuth();
+    const { refreshData } = useData();
     const [loading, setLoading] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [formData, setFormData] = useState({
         name: entity.name,
         color: entity.color || '#3b82f6',
         logoUrl: entity.logoUrl || '',
+        rut: entity.rut || '',
+        email: entity.email || '',
+        phone: entity.phone || '',
+        website: entity.website || '',
+        address: entity.address || '',
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +69,7 @@ export function GeneralPanel({ entity }: GeneralPanelProps) {
                 try {
                     // Update entity directly with base64 string
                     await updateEntity(entity.id, { logoUrl: dataUrl });
+                    await refreshData();
                     setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
                 } catch (error) {
                     console.error('Error saving logo:', error);
@@ -79,9 +86,16 @@ export function GeneralPanel({ entity }: GeneralPanelProps) {
         setLoading(true);
         try {
             await updateEntity(entity.id, {
+                userId: entity.userId,
                 name: formData.name,
                 color: formData.color,
+                rut: formData.rut,
+                email: formData.email,
+                phone: formData.phone,
+                website: formData.website,
+                address: formData.address,
             });
+            await refreshData();
         } catch (error) {
             console.error('Error saving entity:', error);
         } finally {
@@ -231,6 +245,60 @@ export function GeneralPanel({ entity }: GeneralPanelProps) {
                                 onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="rut">RUT</Label>
+                        <Input
+                            id="rut"
+                            value={formData.rut}
+                            onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
+                            placeholder="12.345.678-9"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Correo Electrónico</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                placeholder="contacto@empresa.com"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="phone">Teléfono</Label>
+                            <Input
+                                id="phone"
+                                type="tel"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                placeholder="+56 9 1234 5678"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="website">Sitio Web</Label>
+                        <Input
+                            id="website"
+                            type="url"
+                            value={formData.website}
+                            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                            placeholder="https://www.empresa.com"
+                        />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="address">Dirección</Label>
+                        <Input
+                            id="address"
+                            value={formData.address}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                            placeholder="Dirección completa"
+                        />
                     </div>
 
                     <Button onClick={handleSave} disabled={loading} className="w-full">
