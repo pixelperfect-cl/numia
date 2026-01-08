@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 // getCategoryMovementCount removed as we calculate locally
-import { Edit, Trash2, Search } from 'lucide-react';
+import { Edit, Trash2, Search, Plus } from 'lucide-react';
 import { CategoryDialog } from '@/components/CategoryDialog';
 import { CategoryDeleteDialog } from '@/components/CategoryDeleteDialog';
 import { SubcategoryDeleteDialog } from '@/components/SubcategoryDeleteDialog';
@@ -59,6 +59,11 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
     const handleDelete = (category: Category) => {
         setDeletingCategory(category);
         setDeleteDialogOpen(true);
+    };
+
+    const handleCreate = () => {
+        setEditingCategory(null);
+        setEditDialogOpen(true);
     };
 
     const handleRenameSubcategory = async (category: Category, oldName: string) => {
@@ -218,8 +223,8 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="mb-4">
-                        <div className="relative">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                        <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Buscar categorías..."
@@ -228,6 +233,10 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                                 className="pl-9"
                             />
                         </div>
+                        <Button onClick={handleCreate} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Nueva Categoría
+                        </Button>
                     </div>
                     <Tabs defaultValue="income">
                         <TabsList className="grid w-full grid-cols-2">

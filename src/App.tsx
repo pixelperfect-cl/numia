@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAI } from '@/contexts/AIContext';
 import numiaLogo from '@/assets/numialogo.png';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
@@ -23,8 +24,10 @@ import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { Button } from '@/components/ui/button';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { QuickActions } from '@/components/layout/QuickActions';
 import { EntitySelection } from '@/pages/EntitySelection';
 import { EntityConfiguration } from '@/pages/EntityConfiguration';
+import { NotificationSettings } from '@/components/configuration/NotificationSettings';
 import { useTheme } from '@/components/theme-provider';
 import {
   DropdownMenu,
@@ -39,7 +42,7 @@ import { AccountSettings } from '@/components/configuration/AccountSettings';
 import { TransferDialog } from '@/components/TransferDialog';
 import { AIAssistant } from '@/components/ai/AIAssistant';
 
-import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Upload } from 'lucide-react';
+import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Upload, Bot } from 'lucide-react';
 
 // ... (keep intervening code if possible, but replace_file_content works on contiguous blocks. 
 // Since imports and renderPage are far apart, I should split this into two calls or use multi_replace.
@@ -48,6 +51,7 @@ import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight
 function App() {
   const { user, loading, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { isOpen, openAssistant } = useAI();
   // Main State
   const [currentPage, setCurrentPage] = useState('entity-panel'); // Default to panel
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => localStorage.getItem('numia-entity-id'));
@@ -146,6 +150,8 @@ function App() {
         );
       case 'mass-upload':
         return <MassUpload onBack={() => setCurrentPage(selectedEntityId ? 'entity-panel' : 'entity-selection')} initialEntityId={selectedEntityId || undefined} />;
+      case 'notifications':
+        return <NotificationSettings />;
       case 'account-settings':
         return <AccountSettings />;
 
@@ -214,7 +220,28 @@ function App() {
 
       {/* AI Assistant */}
 
+      {/* AI Assistant */}
       <AIAssistant />
+
+      {/* Mobile Assistant FAB */}
+      {/* Mobile Quick Actions FAB */}
+      {!isOpen && (
+        <div className="fixed bottom-4 right-4 z-40 md:hidden">
+          <QuickActions
+            onAction={handleQuickAction}
+            isMobile={true}
+            align="end"
+            side="top"
+            trigger={
+              <Button
+                className="h-12 w-12 rounded-full shadow-lg bg-zinc-700 hover:bg-zinc-800 text-white p-0 flex items-center justify-center transition-all"
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/num.ia/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useData } from '@/contexts/DataContext';
 import { formatCurrency, calculateSummary, calculateBoxBalances, getTodayLocalDateString, parseLocalDate } from '@/lib/utils';
 import { IconComponent } from '@/components/IconPicker';
-import { TrendingUp, TrendingDown, ArrowLeft, Edit, History, Trash2, ChevronLeft, ChevronRight, Calendar, ArrowLeftRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowLeft, Edit, History, Trash2, ChevronLeft, ChevronRight, Calendar, ArrowLeftRight, Loader2 } from 'lucide-react';
 import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
 import { MovementsAreaChart } from '@/components/MovementsAreaChart';
 import { CategoryPieChart } from '@/components/CategoryPieChart';
@@ -28,7 +28,7 @@ interface EntityPanelProps {
 }
 
 export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDialogClose }: EntityPanelProps) {
-  const { entities, movements, categories, createMovement, updateMovement, deleteMovement } = useData();
+  const { entities, movements, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null);
   const [historyMovement, setHistoryMovement] = useState<Movement | null>(null);
@@ -291,6 +291,15 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
     setSelectedMonth(newMonthKey);
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">Cargando entidades...</p>
+      </div>
+    );
+  }
+
   if (!entity) {
     return (
       <div className="space-y-6">
@@ -449,111 +458,111 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
 
       {/* Movements List - Full Width */}
       <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                Movimientos de {formatMonthKey(selectedMonth)}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={navigateToPreviousMonth}
-                  disabled={!hasPreviousMonth}
-                  title="Mes anterior"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMonths.map((month) => (
-                      <SelectItem key={month} value={month}>
-                        {formatMonthKey(month)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={navigateToNextMonth}
-                  disabled={!hasNextMonth}
-                  title="Mes siguiente"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              Movimientos de {formatMonthKey(selectedMonth)}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={navigateToPreviousMonth}
+                disabled={!hasPreviousMonth}
+                title="Mes anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map((month) => (
+                    <SelectItem key={month} value={month}>
+                      {formatMonthKey(month)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={navigateToNextMonth}
+                disabled={!hasNextMonth}
+                title="Mes siguiente"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {currentMonthMovements.length} {currentMonthMovements.length === 1 ? 'movimiento' : 'movimientos'}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {entityMovements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay movimientos en esta entidad</p>
-            ) : currentMonthMovements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay movimientos en {formatMonthKey(selectedMonth)}</p>
-            ) : (
-              <div className="space-y-2">
-                {currentMonthMovements.map((movement) => {
-                  const Icon = movement.type === 'income' ? TrendingUp : TrendingDown;
-                  const hasHistory = movement.history && movement.history.length > 0;
-                  return (
-                    <div key={movement.id} className="flex items-center justify-between p-3 rounded-lg border gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Icon className={`h-4 w-4 flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`} />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{movement.description}</p>
-                          <p className="text-xs text-muted-foreground truncate">{movement.box} • {movement.category}</p>
-                        </div>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            {currentMonthMovements.length} {currentMonthMovements.length === 1 ? 'movimiento' : 'movimientos'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {entityMovements.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay movimientos en esta entidad</p>
+          ) : currentMonthMovements.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay movimientos en {formatMonthKey(selectedMonth)}</p>
+          ) : (
+            <div className="space-y-2">
+              {currentMonthMovements.map((movement) => {
+                const Icon = movement.type === 'income' ? TrendingUp : TrendingDown;
+                const hasHistory = movement.history && movement.history.length > 0;
+                return (
+                  <div key={movement.id} className="flex items-center justify-between p-3 rounded-lg border gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <Icon className={`h-4 w-4 flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{movement.description}</p>
+                        <p className="text-xs text-muted-foreground truncate">{movement.box} • {movement.category}</p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="text-right">
-                          <p className={`text-sm font-semibold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                            {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
-                          </p>
-                          <p className="text-xs text-muted-foreground whitespace-nowrap">{parseLocalDate(movement.date).toLocaleDateString('es-CL')}</p>
-                        </div>
-                        <div className="flex gap-1">
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+                          {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                        </p>
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">{parseLocalDate(movement.date).toLocaleDateString('es-CL')}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(movement)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        {hasHistory && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleEdit(movement)}
+                            onClick={() => setHistoryMovement(movement)}
                           >
-                            <Edit className="h-3 w-3" />
+                            <History className="h-3 w-3" />
                           </Button>
-                          {hasHistory && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setHistoryMovement(movement)}
-                            >
-                              <History className="h-3 w-3" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteClick(movement)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteClick(movement)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={(open) => {
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={(open) => {
         setIsEditOpen(open);
         if (!open) {
           setEditingMovement(null);
@@ -678,8 +687,8 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
         </DialogContent>
       </Dialog>
 
-        {/* History Dialog */}
-        <Dialog open={!!historyMovement} onOpenChange={(open) => !open && setHistoryMovement(null)}>
+      {/* History Dialog */}
+      <Dialog open={!!historyMovement} onOpenChange={(open) => !open && setHistoryMovement(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Historial de Cambios</DialogTitle>
@@ -722,8 +731,8 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
         </DialogContent>
       </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={!!deletingMovement} onOpenChange={(open) => {
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingMovement} onOpenChange={(open) => {
         if (!open) {
           setDeletingMovement(null);
           setDeleteConfirmation('');
@@ -773,8 +782,8 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
         </DialogContent>
       </Dialog>
 
-        {/* Create Movement Dialog */}
-        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+      {/* Create Movement Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={(open) => {
         setIsCreateOpen(open);
         if (!open) {
           setCreateFormData({

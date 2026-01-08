@@ -580,24 +580,25 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
     return (
         <div className="space-y-6 h-full flex flex-col">
-            <div className="flex items-center justify-between shrink-0">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between shrink-0 gap-4 md:gap-0">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Gestión de Servicios</h1>
                     <p className="text-muted-foreground">Administra las suscripciones y servicios recurrentes</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleGenerateBilling} disabled={generating}>
-                        {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                        Generar Cobros
+                <div className="flex gap-2 w-full md:w-auto">
+                    <Button variant="outline" onClick={handleGenerateBilling} disabled={generating} className={generating ? "w-full md:w-auto" : ""}>
+                        {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        <span className="hidden md:ml-2 md:inline">Generar Cobros</span>
                     </Button>
                     <Button onClick={handleCreate}>
-                        <Plus className="mr-2 h-4 w-4" /> Asignar Servicio
+                        <Plus className="h-4 w-4" />
+                        <span className="hidden md:ml-2 md:inline">Asignar Servicio</span>
                     </Button>
                 </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 flex-1 flex flex-col">
-                <TabsList>
+                <TabsList className="w-full justify-start overflow-x-auto no-scrollbar flex-nowrap">
                     <TabsTrigger value="summary">Resumen General</TabsTrigger>
                     <TabsTrigger value="active">Servicios Activos</TabsTrigger>
                     <TabsTrigger value="archived">Servicios Archivados</TabsTrigger>

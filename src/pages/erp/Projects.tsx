@@ -193,7 +193,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
             >
                 <div
                     ref={scrollContainerRef}
-                    className="flex gap-4 items-start overflow-x-auto pb-4 touch-none cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)]"
+                    className="flex gap-4 items-start overflow-x-auto pb-4 cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)]"
                     onMouseDown={handleMouseDown}
                     onMouseLeave={handleMouseLeave}
                     onMouseUp={handleMouseUp}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter
 import { menuItems } from './Sidebar';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { IndicatorsMarquee } from '@/components/common/IndicatorsMarquee';
+import { QuickActions } from './QuickActions';
 
 interface HeaderProps {
     selectedEntityId: string;
@@ -30,82 +31,7 @@ interface HeaderProps {
     onQuickAction: (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload' | 'subscription') => void;
 }
 
-function QuickActionsDropdown({ onAction, isMobile = false }: { onAction: HeaderProps['onQuickAction'], isMobile?: boolean }) {
-    const [isOpen, setIsOpen] = useState(false);
 
-    // Mobile: Standard Click behavior (uncontrolled or simple controlled)
-    // Desktop: Hover + Click interactions
-
-    // Wrapper to handle interactions
-    const InteractionWrapper = ({ children }: { children: React.ReactNode }) => {
-        if (isMobile) return <>{children}</>;
-
-        return (
-            <div
-                onMouseEnter={() => setIsOpen(true)}
-                onMouseLeave={() => setIsOpen(false)}
-            >
-                {children}
-            </div>
-        );
-    };
-
-    return (
-        <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-            <InteractionWrapper>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Crear nuevo"
-                        className="bg-secondary/50 hover:bg-secondary data-[state=open]:bg-secondary transition-colors text-header-foreground"
-                        onClick={() => { if (isMobile) setIsOpen(!isOpen) }}
-                    >
-                        <Plus className="h-5 w-5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    align="center"
-                    className="w-56"
-                    onCloseAutoFocus={(e) => !isMobile && e.preventDefault()}
-                >
-                    <DropdownMenuLabel>Crear nuevo</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onClick={() => onAction('movement')}
-                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
-                    >
-                        <ArrowLeftRight className="mr-2 h-4 w-4" /> Movimiento
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onClick={() => onAction('transfer')}
-                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
-                    >
-                        <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferencia
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onClick={() => onAction('loan')}
-                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
-                    >
-                        <Wallet className="mr-2 h-4 w-4" /> Préstamo
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onClick={() => onAction('projection')}
-                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
-                    >
-                        <TrendingUp className="mr-2 h-4 w-4" /> Proyección
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onClick={() => onAction('subscription')}
-                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
-                    >
-                        <Repeat className="mr-2 h-4 w-4" /> Suscripción
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </InteractionWrapper>
-        </DropdownMenu>
-    );
-}
 
 export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAction }: HeaderProps) {
     const { user, signOut } = useAuth();
@@ -125,6 +51,40 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
             openAssistant();
         }
     };
+
+    // Swipe gesture to open mobile menu
+    useEffect(() => {
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        const handleTouchStart = (e: TouchEvent) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        };
+
+        const handleTouchEnd = (e: TouchEvent) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = Math.abs(touchEndY - touchStartY);
+
+            // Logic:
+            // 1. Swipe starts from the left edge (first 40px)
+            // 2. Swipe is horizontal (deltaX > 50) and dominant over vertical (deltaY < 30)
+            if (touchStartX < 40 && deltaX > 50 && deltaY < 30) {
+                setSheetOpen(true);
+            }
+        };
+
+        document.addEventListener('touchstart', handleTouchStart);
+        document.addEventListener('touchend', handleTouchEnd);
+
+        return () => {
+            document.removeEventListener('touchstart', handleTouchStart);
+            document.removeEventListener('touchend', handleTouchEnd);
+        };
+    }, []);
 
     const activeEntity = entities.find(e => e.id === selectedEntityId);
     const erpEnabled = activeEntity?.settings?.erpEnabled;
@@ -274,12 +234,12 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
             {/* Top Bar with Marquee - Visible only on Desktop */}
             <IndicatorsMarquee />
 
-            <div className="flex h-16 items-center gap-4 px-6">
+            <div className="flex h-16 items-center gap-2 md:gap-4 px-3 md:px-6">
                 {/* Mobile Menu (Hamburger) */}
                 <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                     {/* ... (existing sheet content) */}
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="md:hidden">
+                        <Button variant="ghost" size="icon" className={cn("md:hidden", theme === 'cloudy' && "text-white")}>
                             <Menu className="h-6 w-6" />
                             <span className="sr-only">Menu</span>
                         </Button>
@@ -489,30 +449,16 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
 
                 {/* Logo (Visible on Mobile & Desktop) */}
                 <div
-                    className="flex items-center gap-2 font-semibold md:text-lg cursor-pointer"
+                    className="flex items-center gap-1 md:gap-2 font-semibold md:text-lg cursor-pointer flex-1 md:flex-none min-w-0"
                     onClick={() => onNavigate(selectedEntityId ? 'entity-panel' : 'entity-selection')}
                 >
-                    <img src={numiaLogo} alt="Numia" className="h-8" />
-                    <div className="md:hidden flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <QuickActionsDropdown onAction={onQuickAction} isMobile={true} />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                                "text-header-foreground hover:text-header-foreground hover:bg-slate-700/50",
-                                isOpen && "bg-secondary/50"
-                            )}
-                            onClick={handleAssistantToggle}
-                        >
-                            <Bot className="h-5 w-5" />
-                        </Button>
-                    </div>
+                    <img src={numiaLogo} alt="Numia" className="h-6 md:h-8 flex-shrink-0 object-contain" />
                 </div>
 
                 {/* Quick Actions & Entity Switcher (Desktop) */}
                 <div className="hidden md:flex items-center gap-2 ml-4">
                     <EntitySelector />
-                    <QuickActionsDropdown onAction={onQuickAction} />
+                    <QuickActions onAction={onQuickAction} />
                     <Button
                         variant="ghost"
                         size="icon"
@@ -540,13 +486,31 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                 </Dialog>
 
                 {/* Right Side Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 md:gap-2">
+                    {/* Mobile Assistant Button - Right Side */}
+                    <div className="md:hidden flex items-center">
+                        <Button
+                            variant="ghost"
+                            className={cn("bg-transparent hover:bg-secondary/20 p-0 h-10 w-10 flex items-center justify-center rounded-full active:bg-white/10", theme === 'cloudy' && "text-white")}
+                            onClick={handleAssistantToggle}
+                        >
+                            <Bot className="h-9 w-9" />
+                        </Button>
+                    </div>
+
                     <Button variant="ghost" size="icon" className="hidden md:flex text-header-foreground" onClick={cycleTheme}>
                         {theme === 'light' ? <Cloud className="h-5 w-5" /> : theme === 'cloudy' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                         <span className="sr-only">Toggle theme</span>
                     </Button>
-                    <NotificationDropdown onOpenSettings={() => onNavigate('configuration')} />
-                    <UserMenu />
+
+                    {/* Notification Dropdown wrapper to override button styles */}
+                    <div className="flex items-center justify-center">
+                        <NotificationDropdown onOpenSettings={() => onNavigate('notifications')} iconClassName="h-9 w-9" />
+                    </div>
+
+                    <div className="pl-1">
+                        <UserMenu />
+                    </div>
                 </div>
             </div>
         </header>

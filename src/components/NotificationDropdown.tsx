@@ -2,6 +2,7 @@
  * Numia v1.0 - Notification Dropdown Component
  */
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,9 +19,10 @@ import { es } from 'date-fns/locale';
 
 interface NotificationDropdownProps {
   onOpenSettings: () => void;
+  iconClassName?: string;
 }
 
-export function NotificationDropdown({ onOpenSettings }: NotificationDropdownProps) {
+export function NotificationDropdown({ onOpenSettings, iconClassName }: NotificationDropdownProps) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   const recentNotifications = notifications.slice(0, 5);
@@ -39,8 +41,12 @@ export function NotificationDropdown({ onOpenSettings }: NotificationDropdownPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-header-foreground">
-          <Bell className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size={iconClassName ? "default" : "icon"}
+          className={cn("relative text-header-foreground", iconClassName ? "h-10 w-10 p-0 flex items-center justify-center rounded-full hover:bg-secondary/20 active:bg-white/10 bg-transparent" : "")}
+        >
+          <Bell className={iconClassName || "h-5 w-5"} />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 h-2 w-2 bg-red-600 rounded-full"></span>
           )}
