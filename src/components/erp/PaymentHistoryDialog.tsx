@@ -107,12 +107,12 @@ export function PaymentHistoryDialog({
                             </div>
                         ) : (
                             movements.map((mov) => (
-                                <div key={mov.id} className="flex items-center justify-between p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                <div key={mov.id} className="flex items-start gap-2 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
                                             <Calendar className="h-4 w-4" />
                                         </div>
-                                        <div>
+                                        <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium">
                                                 {(() => {
                                                     try {
@@ -124,7 +124,7 @@ export function PaymentHistoryDialog({
                                             </div>
                                             <div className="flex flex-col gap-0.5">
                                                 {mov.description && (
-                                                    <div className="text-xs text-zinc-500 truncate max-w-[150px]">
+                                                    <div className="text-xs text-zinc-500 truncate">
                                                         {mov.description}
                                                     </div>
                                                 )}
@@ -137,34 +137,35 @@ export function PaymentHistoryDialog({
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="font-medium text-sm">
-                                        {formatCurrency(mov.amount)}
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <div className="font-medium text-sm whitespace-nowrap">
+                                            {formatCurrency(mov.amount)}
+                                        </div>
+                                        {(onEdit || onDelete) && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-600">
+                                                        <MoreVertical className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    {onEdit && (
+                                                        <DropdownMenuItem onClick={() => onEdit(mov)}>
+                                                            <Pencil className="mr-2 h-4 w-4" /> Editar
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {onDelete && (
+                                                        <DropdownMenuItem
+                                                            onClick={() => setDeletingId(mov.id)}
+                                                            className="text-red-500 focus:text-red-500"
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
-
-                                    {(onEdit || onDelete) && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 ml-2 text-zinc-400 hover:text-zinc-600">
-                                                    <MoreVertical className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                {onEdit && (
-                                                    <DropdownMenuItem onClick={() => onEdit(mov)}>
-                                                        <Pencil className="mr-2 h-4 w-4" /> Editar
-                                                    </DropdownMenuItem>
-                                                )}
-                                                {onDelete && (
-                                                    <DropdownMenuItem
-                                                        onClick={() => setDeletingId(mov.id)}
-                                                        className="text-red-500 focus:text-red-500"
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                                                    </DropdownMenuItem>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
                                 </div>
                             ))
                         )}

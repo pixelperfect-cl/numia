@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createSubscription, updateSubscription, getServiceDefinitions } from '@/lib/firebase/database';
+import { createSubscription, updateSubscription, getServiceDefinitions, getClients } from '@/lib/firebase/database';
 import type { Client, Subscription, ServiceDefinition } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -16,7 +16,7 @@ interface ServiceDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     subscription?: Subscription & { clientId?: string }; // Enhanced type
-    clients: Client[];
+    clients?: Client[];
     onSuccess: () => void;
     defaultClientId?: string;
     preselectedDefinition?: ServiceDefinition | null;
@@ -24,10 +24,21 @@ interface ServiceDialogProps {
     entityId?: string;
 }
 
-export function ServiceDialog({ open, onOpenChange, subscription, clients, onSuccess, defaultClientId, preselectedDefinition, onRefreshClients, entityId }: ServiceDialogProps) {
+export function ServiceDialog({ open, onOpenChange, subscription, clients: propClients, onSuccess, defaultClientId, preselectedDefinition, onRefreshClients, entityId }: ServiceDialogProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [definitions, setDefinitions] = useState<ServiceDefinition[]>([]);
+    const [internalClients, setInternalClients] = useState<Client[]>([]);
+
+    // Use passed clients or internal clients
+    const clients = propClients || internalClients;
+
+    // Fetch clients if not provided
+    useEffect(() => {
+        if (open && user && !propClients) {
+            getClients(user.uid).then(setInternalClients);
+        }
+    }, [open, user, propClients]);
 
     // Form State
     const [clientId, setClientId] = useState('');

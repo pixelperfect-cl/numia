@@ -625,7 +625,8 @@ export const updateSubscription = async (subscriptionId: string, data: Partial<S
     ...data,
     updatedAt: Timestamp.now(),
   });
-  sb.syncSubscription('', '', subscriptionId, { ...data, updatedAt: new Date() });
+  // Note: userId and clientId should be passed separately if needed for Supabase sync
+  sb.syncSubscription('', data.clientId || '', subscriptionId, { ...data, updatedAt: new Date() });
 };
 
 export const deleteSubscription = async (subscriptionId: string): Promise<void> => {
@@ -982,3 +983,59 @@ export const deleteEntityCascade = async (userId: string, entityId: string): Pro
 
   console.log('✅ Eliminación en cascada completada.');
 };
+
+// ========== REPAIR TOOLS ==========
+
+export const repairSupabaseData = async (userId: string) => {
+  console.log('🔧 Iniciando reparación de datos Supabase...');
+
+  // 1. Sync Entities
+  const entities = await getEntities(userId);
+  console.log(`Syncing ${entities.length} entities...`);
+  entities.forEach(e => sb.syncEntity(userId, e.id, e));
+
+  // 2. Sync Categories
+  const categories = await getCategories(userId);
+  console.log(`Syncing ${categories.length} categories...`);
+  categories.forEach(c => sb.syncCategory(userId, c.id, c));
+
+  // 3. Sync Clients
+  const clients = await getClients(userId);
+  console.log(`Syncing ${clients.length} clients...`);
+  clients.forEach(c => sb.syncClient(userId, c.id, c));
+
+  // 4. Sync Subscriptions (need to iterate clients)
+  console.log('Syncing subscriptions...');
+  for (const client of clients) {
+    const subs = await getSubscriptions(client.id, userId);
+    subs.forEach(s => sb.syncSubscription(userId, client.id, s.id, s));
+  }
+
+  // 5. Sync Movements (last 6 months to avoid overload?) - Let's do all for now or batch
+  // getMovements fetches all by default if no date limit?
+  // getMovements signature: (userId, options)
+  // Let's fetch recent ones at least, or loop.
+  // For now, let's assume specific missing ones are recent.
+  // Actually, getMovements without options returns ALL? 
+  // Code: if options is valid... it builds constraints.
+  // If no options, it only adds where('userId'...). So yes, ALL.
+  const movements = await getMovements(userId);
+  console.log(`Syncing ${movements.length} movements...`);
+  // Batch this? sb.syncMovement is just a fire-and-forget.
+  // Browser might choke if 1000s.
+  // Let's do chunks.
+  const chunk = (arr: any[], size: number) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
+
+  const chunks = chunk(movements, 50);
+  for (const batch of chunks) {
+    await Promise.all(batch.map(m => sb.syncMovement(userId, m.id, m)));
+    await new Promise(r => setTimeout(r, 100)); // slight throttle
+  }
+
+  console.log('✅ Reparación completada.');
+};
+
+// Expose to window for debugging
+if (typeof window !== 'undefined') {
+  (window as any).repairSupabaseData = repairSupabaseData;
+}

@@ -21,7 +21,7 @@ export function IndicatorsMarquee() {
     };
 
     return (
-        <div className="hidden md:flex h-8 bg-muted/30 border-b items-center overflow-hidden whitespace-nowrap relative w-full">
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex h-8 bg-header-background border-t items-center overflow-hidden whitespace-nowrap w-full md:relative md:top-0 md:border-t-0 md:border-b md:z-auto">
             <div className="animate-marquee flex items-center gap-8 w-max pl-4 hover:[animation-play-state:paused]">
                 {/* Render multiple times for seamless loop on wide screens */}
                 {[...indicators, ...indicators, ...indicators, ...indicators].map((indicator, index) => (

@@ -23,12 +23,15 @@ import { menuItems } from './Sidebar';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { IndicatorsMarquee } from '@/components/common/IndicatorsMarquee';
 import { QuickActions } from './QuickActions';
+import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
+import { ConnectionStatusDetail } from '@/components/layout/ConnectionStatusDetail';
 
 interface HeaderProps {
     selectedEntityId: string;
     onEntityChange: (entityId: string) => void;
     onNavigate: (page: string) => void;
-    onQuickAction: (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload' | 'subscription') => void;
+    onQuickAction: (action: 'movement' | 'loan' | 'projection' | 'transfer' | 'mass-upload' | 'subscription' | 'client' | 'service-assign' | 'project') => void;
 }
 
 
@@ -43,6 +46,7 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
     // Mobile menu states
     const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
     const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
 
     const handleAssistantToggle = () => {
         if (isOpen) {
@@ -442,6 +446,7 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                                     <span className="font-medium">{user?.displayName?.split(' ')[0]}</span>
                                     <span className="text-xs text-muted-foreground cursor-pointer hover:underline" onClick={handleSignOut}>Cerrar Sesión</span>
                                 </div>
+                                <ConnectionStatus onClick={() => setStatusDialogOpen(true)} />
                             </div>
                         </SheetFooter>
                     </SheetContent>
@@ -482,6 +487,16 @@ export function Header({ selectedEntityId, onEntityChange, onNavigate, onQuickAc
                             <DialogTitle>Crear Nueva Entidad</DialogTitle>
                         </DialogHeader>
                         <EntityForm onSuccess={() => setOpenCreate(false)} />
+                    </DialogContent>
+                </Dialog>
+
+                {/* Connection Status Detail Dialog */}
+                <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Estado de Conexión</DialogTitle>
+                        </DialogHeader>
+                        <ConnectionStatusDetail />
                     </DialogContent>
                 </Dialog>
 

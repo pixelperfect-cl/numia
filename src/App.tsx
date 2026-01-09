@@ -41,6 +41,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AccountSettings } from '@/components/configuration/AccountSettings';
 import { TransferDialog } from '@/components/TransferDialog';
 import { AIAssistant } from '@/components/ai/AIAssistant';
+import { ClientDialog } from '@/components/erp/ClientDialog';
+import { ProjectDialog } from '@/components/erp/ProjectDialog';
+import { ServiceDialog } from '@/components/erp/ServiceDialog';
 
 import { User, Settings as SettingsIcon, LogOut, Sun, Moon, Plus, ArrowLeftRight, Wallet, TrendingUp, ArrowRightLeft, Upload, Bot } from 'lucide-react';
 
@@ -63,6 +66,11 @@ function App() {
   const [openEntityMovementDialog, setOpenEntityMovementDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
   const [openTransferDialog, setOpenTransferDialog] = useState(false);
+
+  // ERP Dialog States
+  const [openClientDialog, setOpenClientDialog] = useState(false);
+  const [openProjectDialog, setOpenProjectDialog] = useState(false);
+  const [openServiceDialog, setOpenServiceDialog] = useState(false);
 
   // Persist entity selection
   useEffect(() => {
@@ -110,6 +118,15 @@ function App() {
         break;
       case 'transfer':
         setOpenTransferDialog(true);
+        break;
+      case 'client':
+        setOpenClientDialog(true);
+        break;
+      case 'service-assign':
+        setOpenServiceDialog(true);
+        break;
+      case 'project':
+        setOpenProjectDialog(true);
         break;
     }
   };
@@ -215,6 +232,29 @@ function App() {
           <AccountSettings />
         </DialogContent>
       </Dialog>
+
+      {/* ERP Quick Action Dialogs */}
+      <ClientDialog
+        open={openClientDialog}
+        onOpenChange={setOpenClientDialog}
+        onSuccess={() => setOpenClientDialog(false)}
+        entityId={selectedEntityId || undefined}
+      />
+
+      <ServiceDialog
+        open={openServiceDialog}
+        onOpenChange={setOpenServiceDialog}
+        onSuccess={() => setOpenServiceDialog(false)}
+        // clients prop optional thanks to our modification; entityId prop optional
+        entityId={selectedEntityId || undefined}
+      />
+
+      <ProjectDialog
+        open={openProjectDialog}
+        onOpenChange={setOpenProjectDialog}
+        onSuccess={() => setOpenProjectDialog(false)}
+        entityId={selectedEntityId || undefined}
+      />
 
       <TransferDialog open={openTransferDialog} onOpenChange={setOpenTransferDialog} />
 

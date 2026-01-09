@@ -8,10 +8,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, ArrowLeftRight, ArrowRightLeft, Wallet, TrendingUp, Repeat } from 'lucide-react';
+import { Plus, ArrowLeftRight, ArrowRightLeft, Wallet, TrendingUp, Repeat, Briefcase, Users, FolderKanban } from 'lucide-react';
 
 export interface QuickActionProps {
-    onAction: (action: 'movement' | 'transfer' | 'loan' | 'projection' | 'subscription') => void;
+    onAction: (action: 'movement' | 'transfer' | 'loan' | 'projection' | 'subscription' | 'client' | 'service-assign' | 'project') => void;
     isMobile?: boolean;
     trigger?: React.ReactNode;
     align?: "center" | "end" | "start";
@@ -88,6 +88,26 @@ export function QuickActions({ onAction, isMobile = false, trigger, align = "cen
                         className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
                     >
                         <Repeat className="mr-2 h-4 w-4" /> Suscripción
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Gestión ERP</DropdownMenuLabel>
+                    <DropdownMenuItem
+                        onClick={() => onAction('client')}
+                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
+                    >
+                        <Users className="mr-2 h-4 w-4" /> Nuevo Cliente
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => onAction('service-assign')}
+                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
+                    >
+                        <Briefcase className="mr-2 h-4 w-4" /> Asignar Servicio
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => onAction('project')}
+                        className="cursor-pointer focus:bg-secondary focus:text-secondary-foreground"
+                    >
+                        <FolderKanban className="mr-2 h-4 w-4" /> Nuevo Proyecto
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </InteractionWrapper>

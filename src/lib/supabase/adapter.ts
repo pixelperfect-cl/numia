@@ -5,15 +5,29 @@ import { Entity, Movement, Loan, Projection, Category, Client, Subscription, Ent
 // Generic writer that catches errors silently
 const safeWrite = async (table: string, data: any, id: string) => {
     try {
-        // We upsert: if ID exists, update. If not, insert.
-        const { error } = await supabase
-            .from(table)
-            .upsert({ ...data, id });
+        // Try UPDATE first (for partial updates), fallback to UPSERT for full records
+        // Check if this looks like a partial update (missing critical fields)
+        const isFull = data.name !== undefined || data.amount !== undefined;
 
-        if (error) {
-            console.warn(`⚠️ Supabase Dual-Write Error [${table}]:`, error.message);
+        if (isFull) {
+            // Full record - use upsert
+            const { error } = await supabase
+                .from(table)
+                .upsert({ ...data, id });
+
+            if (error) {
+                console.warn(`⚠️ Supabase Dual-Write Error [${table}]:`, error.message);
+            }
         } else {
-            // console.log(`✅ Supabase Mirror [${table}]: Saved ${id}`);
+            // Partial update - use update only
+            const { error } = await supabase
+                .from(table)
+                .update(data)
+                .eq('id', id);
+
+            if (error) {
+                console.warn(`⚠️ Supabase Dual-Write Error [${table}]:`, error.message);
+            }
         }
     } catch (err) {
         console.error(`💥 Supabase Dual-Write Exception [${table}]:`, err);

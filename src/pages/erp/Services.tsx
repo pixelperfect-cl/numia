@@ -418,7 +418,11 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 updatePayload.nextBillingDate = format(nextDate, 'yyyy-MM-dd');
             }
 
-            await updateSubscription(selectedSubscriptionForPayment.id, updatePayload);
+            await updateSubscription(selectedSubscriptionForPayment.id, {
+                ...updatePayload,
+                userId: user.uid,
+                clientId: selectedSubscriptionForPayment.clientId
+            });
 
             loadData();
         } catch (error) {

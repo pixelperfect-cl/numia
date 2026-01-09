@@ -430,16 +430,16 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Movimientos</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Movimientos</h1>
           <p className="text-muted-foreground">Búsqueda avanzada y auditoría</p>
         </div>
 
         <div className="flex gap-2">
           <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Carga Masiva
+              <Button variant="outline" className="px-2 md:px-4">
+                <Upload className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Carga Masiva</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -478,9 +478,9 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
             }
           }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Movimiento
+              <Button className="px-2 md:px-4">
+                <Plus className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Nuevo Movimiento</span>
               </Button>
             </DialogTrigger>
 
@@ -788,7 +788,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
           <CardContent>
             <div className="space-y-2">
               {/* Table Header */}
-              <div className="flex items-center gap-2 pb-2 border-b text-sm font-medium text-muted-foreground">
+              <div className="hidden md:flex items-center gap-2 pb-2 border-b text-sm font-medium text-muted-foreground">
                 <div className="w-8">
                   <Checkbox
                     checked={selectedMovements.size === paginatedMovements.length && paginatedMovements.length > 0}
@@ -823,58 +823,123 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
                 const isEdited = hasHistory;
 
                 return (
-                  <div key={movement.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 border text-sm">
-                    <div className="w-8">
+                  <div key={movement.id} className="flex items-start gap-2 p-3 rounded-lg hover:bg-muted/50 border text-sm md:items-center md:p-2">
+                    {/* Checkbox */}
+                    <div className="w-8 flex-shrink-0 pt-0.5 md:pt-0">
                       <Checkbox
                         checked={selectedMovements.has(movement.id)}
                         onCheckedChange={() => handleSelectMovement(movement.id)}
                       />
                     </div>
-                    <div className="flex-1">
-                      {parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
-                    </div>
-                    <div className="w-12">
-                      <span className="text-xl">{movement.type === 'income' ? '↗️' : '↙️'}</span>
-                    </div>
-                    <div className="flex-[2]">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{movement.description || 'Sin descripción'}</span>
-                        {isEdited && <Badge variant="outline" className="text-xs">Editado</Badge>}
+
+                    {/* Mobile Layout - Card Style */}
+                    <div className="flex-1 min-w-0 md:hidden">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-lg flex-shrink-0">{movement.type === 'income' ? '↗️' : '↙️'}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
+                              {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">{entity?.name}</div>
+                          </div>
+                        </div>
+                        <div className={`font-bold whitespace-nowrap flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+                          {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{movement.box}</div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <span>{parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}</span>
+                          <span>•</span>
+                          <span className="truncate">{movement.box}</span>
+                          {movement.category && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate">{movement.category}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0 ml-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => handleEdit(movement)}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          {hasHistory && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => setHistoryMovement(movement)}
+                            >
+                              <History className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 text-xs">{movement.category}</div>
-                    <div className="flex-1 text-xs">{entity?.name}</div>
-                    <div className={`w-24 text-right font-bold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                      {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
-                    </div>
-                    <div className="w-32 flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleEdit(movement)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {hasHistory && (
+
+                    {/* Desktop Layout - Table Style */}
+                    <div className="hidden md:contents">
+                      <div className="flex-1">
+                        {parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
+                      </div>
+                      <div className="w-12">
+                        <span className="text-xl">{movement.type === 'income' ? '↗️' : '↙️'}</span>
+                      </div>
+                      <div className="flex-[2] min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
+                          {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{movement.box}</div>
+                      </div>
+                      <div className="flex-1 text-xs truncate">{movement.category}</div>
+                      <div className="flex-1 text-xs truncate">{entity?.name}</div>
+                      <div className={`w-24 text-right font-bold whitespace-nowrap ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+                        {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                      </div>
+                      <div className="w-32 flex gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-8 w-8 p-0"
-                          onClick={() => setHistoryMovement(movement)}
+                          onClick={() => handleEdit(movement)}
                         >
-                          <History className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        {hasHistory && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setHistoryMovement(movement)}
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );

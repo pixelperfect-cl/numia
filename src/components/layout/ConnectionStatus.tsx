@@ -7,7 +7,11 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils'; // Keep this pending until verified if utils exists, usually it does in shadcn projects
 
-export function ConnectionStatus() {
+interface ConnectionStatusProps {
+    onClick?: () => void;
+}
+
+export function ConnectionStatus({ onClick }: ConnectionStatusProps) {
     const { status, details } = useConnectionStatus();
 
     const getStatusColor = () => {
@@ -31,7 +35,13 @@ export function ConnectionStatus() {
         <TooltipProvider delayDuration={0}>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="flex items-center justify-center p-2 cursor-help group">
+                    <div
+                        className={cn(
+                            "flex items-center justify-center p-2 group",
+                            onClick ? "cursor-pointer" : "cursor-help"
+                        )}
+                        onClick={onClick}
+                    >
                         <div
                             className={cn(
                                 'h-2.5 w-2.5 rounded-full transition-all duration-500',
@@ -61,6 +71,6 @@ export function ConnectionStatus() {
                     )}
                 </TooltipContent>
             </Tooltip>
-        </TooltipProvider>
+        </TooltipProvider >
     );
 }

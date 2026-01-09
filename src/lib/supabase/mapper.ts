@@ -66,6 +66,9 @@ export const mapSubscription = (userId: string | undefined, clientId: string | u
     const obj: any = { ...data };
     if (userId) obj.userId = userId;
     if (clientId) obj.clientId = clientId;
+    // Payments array is for internal app use, not stored in subscription table
+    if (obj.payments) delete obj.payments;
+
     return mapObject(obj, {
         userId: 'user_id',
         clientId: 'client_id',
