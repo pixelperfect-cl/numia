@@ -80,6 +80,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
 
   // Selection state
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -338,18 +339,36 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
   const handleSelectAll = () => {
     if (selectedMovements.size === paginatedMovements.length) {
       setSelectedMovements(new Set());
+      setLastSelectedId(null);
     } else {
       setSelectedMovements(new Set(paginatedMovements.map(m => m.id)));
+      setLastSelectedId(null);
     }
   };
 
-  const handleSelectMovement = (id: string) => {
+  const handleSelectMovement = (id: string, shiftKey: boolean = false) => {
     const newSelected = new Set(selectedMovements);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
+
+    if (shiftKey && lastSelectedId) {
+      const lastIndex = paginatedMovements.findIndex(m => m.id === lastSelectedId);
+      const currentIndex = paginatedMovements.findIndex(m => m.id === id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const range = paginatedMovements.slice(start, end + 1);
+
+        range.forEach(m => newSelected.add(m.id));
+      }
     } else {
-      newSelected.add(id);
+      if (newSelected.has(id)) {
+        newSelected.delete(id);
+      } else {
+        newSelected.add(id);
+      }
+      setLastSelectedId(id);
     }
+
     setSelectedMovements(newSelected);
   };
 
@@ -828,7 +847,8 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
                     <div className="w-8 flex-shrink-0 pt-0.5 md:pt-0">
                       <Checkbox
                         checked={selectedMovements.has(movement.id)}
-                        onCheckedChange={() => handleSelectMovement(movement.id)}
+                        onCheckedChange={() => { }}
+                        onClick={(e) => handleSelectMovement(movement.id, e.shiftKey)}
                       />
                     </div>
 
