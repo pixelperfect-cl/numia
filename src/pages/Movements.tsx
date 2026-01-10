@@ -2,47 +2,83 @@
  * Numia v1.0 - Movements Page (Advanced Search & Audit)
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useData } from '@/contexts/DataContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, getTodayLocalDateString, parseLocalDate } from '@/lib/utils';
-import { Edit, History, Trash2, Search, Download, Filter, ChevronUp, ChevronDown, Upload, Plus } from 'lucide-react';
-import type { MovementType, Movement, MovementHistoryEntry } from '@/types';
-import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
-import { CategorySelect } from '@/components/CategorySelect';
+import type { Movement, MovementType, MovementHistoryEntry } from '@/types';
+import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { BulkUploadWizard } from '@/components/movements/BulkUploadWizard';
+import { CategorySelect } from '@/components/CategorySelect';
+import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
 
 interface MovementsProps {
-  openDialog?: boolean;
-  onDialogClose?: () => void;
   entityId?: string;
 }
 
 type SortField = 'date' | 'amount' | 'description' | 'category';
 type SortDirection = 'asc' | 'desc';
 
-export function Movements({ openDialog = false, onDialogClose, entityId }: MovementsProps = {}) {
+export function Movements({ entityId }: MovementsProps = {}) {
   const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
-  // Handle external dialog open request
+  // Handle URL action params
   useEffect(() => {
-    if (openDialog) {
+    const action = searchParams.get('action');
+    if (action === 'create') {
       setIsOpen(true);
-      onDialogClose?.();
+      // Optional: clear param after opening, or keep it to allow sharing "create link"
+      // setSearchParams(prev => { 
+      //    const newParams = new URLSearchParams(prev);
+      //    newParams.delete('action');
+      //    return newParams;
+      // });
     }
-  }, [openDialog, onDialogClose]);
+  }, [searchParams]);
+
+  // Update URL when dialog closes (optional, but cleaner if we want to remove ?action=create)
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      // Remove action param if present
+      if (searchParams.get('action') === 'create') {
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.delete('action');
+          return newParams;
+        });
+      }
+      setEditingMovement(null);
+      setFormData({
+        type: 'income',
+        amount: '',
+        description: '',
+        categoryValue: '',
+        box: '',
+        entityId: entityId || '', // Ensure entityId is reset
+        date: getTodayLocalDateString(),
+      });
+    }
+  };
 
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null);
   const [historyMovement, setHistoryMovement] = useState<Movement | null>(null);
@@ -204,7 +240,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
         });
       }
 
-      setIsOpen(false);
+      handleOpenChange(false);
       setEditingMovement(null);
       setFormData({
         type: 'income',
@@ -481,23 +517,9 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isOpen} onOpenChange={(open) => {
-            setIsOpen(open);
-            if (!open) {
-              setEditingMovement(null);
-              setFormData({
-                type: 'income',
-                amount: '',
-                description: '',
-                categoryValue: '',
-                box: '',
-                entityId: '',
-                date: getTodayLocalDateString(),
-              });
-            }
-          }}>
+          <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-              <Button className="px-2 md:px-4">
+              <Button size="icon" className="md:w-auto md:px-4 md:py-2">
                 <Plus className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Nuevo Movimiento</span>
               </Button>
@@ -601,7 +623,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
                   />
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
                     Cancelar
                   </Button>
                   <Button type="submit">{editingMovement ? 'Guardar' : 'Crear'}</Button>
@@ -897,7 +919,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
                               className="h-7 w-7 p-0"
                               onClick={() => setHistoryMovement(movement)}
                             >
-                              <History className="h-3.5 w-3.5" />
+                              <Clock className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           <Button
@@ -948,7 +970,7 @@ export function Movements({ openDialog = false, onDialogClose, entityId }: Movem
                             className="h-8 w-8 p-0"
                             onClick={() => setHistoryMovement(movement)}
                           >
-                            <History className="h-4 w-4" />
+                            <Clock className="h-4 w-4" />
                           </Button>
                         )}
                         <Button

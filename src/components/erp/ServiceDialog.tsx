@@ -22,9 +22,35 @@ interface ServiceDialogProps {
     preselectedDefinition?: ServiceDefinition | null;
     onRefreshClients?: () => void;
     entityId?: string;
+    defaultFrequency?: 'monthly' | 'yearly';
+    defaultMonthIndex?: number; // 0 = monthly/general, 1-12 = Jan-Dec
 }
 
-export function ServiceDialog({ open, onOpenChange, subscription, clients: propClients, onSuccess, defaultClientId, preselectedDefinition, onRefreshClients, entityId }: ServiceDialogProps) {
+// Helper to calculate default date from month index
+function getDefaultDateFromMonth(monthIndex?: number): string {
+    if (!monthIndex || monthIndex === 0) {
+        // Monthly (General) column or no context - use today
+        return format(new Date(), 'yyyy-MM-dd');
+    }
+    // Yearly column - use 1st of that month in current year
+    const year = new Date().getFullYear();
+    const month = monthIndex - 1; // Convert 1-12 to 0-11
+    return format(new Date(year, month, 1), 'yyyy-MM-dd');
+}
+
+export function ServiceDialog({
+    open,
+    onOpenChange,
+    subscription,
+    clients: propClients,
+    onSuccess,
+    defaultClientId,
+    preselectedDefinition,
+    onRefreshClients,
+    entityId,
+    defaultFrequency,
+    defaultMonthIndex
+}: ServiceDialogProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [definitions, setDefinitions] = useState<ServiceDefinition[]>([]);
@@ -81,28 +107,30 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients: propC
             // Pre-fill from selection
             setClientId(defaultClientId || '');
             setSelectedDefinitionId(preselectedDefinition.id);
+            const defaultDate = getDefaultDateFromMonth(defaultMonthIndex);
             setFormData({
                 name: preselectedDefinition.name,
                 amount: preselectedDefinition.amount,
                 currency: preselectedDefinition.currency,
                 frequency: preselectedDefinition.frequency,
-                startDate: format(new Date(), 'yyyy-MM-dd'),
+                startDate: defaultDate,
                 status: 'active'
             });
         } else {
             setClientId(defaultClientId || '');
             setSelectedDefinitionId('custom');
+            const defaultDate = getDefaultDateFromMonth(defaultMonthIndex);
             setFormData({
                 name: '',
                 amount: 0,
                 currency: 'CLP',
-                frequency: 'monthly',
-                startDate: format(new Date(), 'yyyy-MM-dd'),
+                frequency: defaultFrequency || 'monthly',
+                startDate: defaultDate,
                 status: 'active',
                 notes: ''
             });
         }
-    }, [subscription, open, defaultClientId, preselectedDefinition]);
+    }, [subscription, open, defaultClientId, preselectedDefinition, defaultFrequency, defaultMonthIndex]);
 
     const handleDefinitionChange = (defId: string) => {
         setSelectedDefinitionId(defId);
@@ -178,29 +206,48 @@ export function ServiceDialog({ open, onOpenChange, subscription, clients: propC
                     {/* Client Selection */}
                     <div className="grid gap-2">
                         <Label htmlFor="client">Cliente</Label>
-                        <Select
-                            value={clientId}
-                            onValueChange={(val) => {
-                                if (val === 'new') {
-                                    setClientDialogOpen(true);
-                                } else {
-                                    setClientId(val);
-                                }
-                            }}
-                            disabled={!!subscription || !!defaultClientId}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecciona un cliente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="new" className="text-blue-500 hover:text-blue-700 font-medium border-b mb-1">
-                                    + Crear Nuevo Cliente
-                                </SelectItem>
-                                {clients.map(client => (
-                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {/* Show client info card when preselected (from 3-step flow) */}
+                        {defaultClientId && !subscription ? (
+                            <div className="flex items-center gap-3 p-3 rounded-md border bg-muted/30">
+                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                    <span className="text-sm font-semibold text-primary">
+                                        {clients.find(c => c.id === clientId)?.name?.charAt(0)?.toUpperCase() || '?'}
+                                    </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">
+                                        {clients.find(c => c.id === clientId)?.name || 'Cliente seleccionado'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                        {clients.find(c => c.id === clientId)?.email || 'Sin email'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <Select
+                                value={clientId}
+                                onValueChange={(val) => {
+                                    if (val === 'new') {
+                                        setClientDialogOpen(true);
+                                    } else {
+                                        setClientId(val);
+                                    }
+                                }}
+                                disabled={!!subscription}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona un cliente" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="new" className="text-blue-500 hover:text-blue-700 font-medium border-b mb-1">
+                                        + Crear Nuevo Cliente
+                                    </SelectItem>
+                                    {clients.map(client => (
+                                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
 
                     {/* Catalog Selection (Only for new) */}

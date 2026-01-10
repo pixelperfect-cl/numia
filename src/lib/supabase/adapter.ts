@@ -7,7 +7,7 @@ const safeWrite = async (table: string, data: any, id: string) => {
     try {
         // Try UPDATE first (for partial updates), fallback to UPSERT for full records
         // Check if this looks like a partial update (missing critical fields)
-        const isFull = data.name !== undefined || data.amount !== undefined;
+        const isFull = data.name !== undefined || data.amount !== undefined || data.user_id !== undefined;
 
         if (isFull) {
             // Full record - use upsert
@@ -47,17 +47,17 @@ const safeDelete = async (table: string, id: string) => {
 
 export const syncEntity = (userId: string | undefined, id: string, data: Partial<Entity>) => {
     const mapped = mapper.mapEntity(userId, data);
-    safeWrite('entities', mapped, id);
+    return safeWrite('entities', mapped, id);
 };
 
 export const syncCategory = (userId: string | undefined, id: string, data: Partial<Category>) => {
     const mapped = mapper.mapCategory(userId, data);
-    safeWrite('categories', mapped, id);
+    return safeWrite('categories', mapped, id);
 };
 
 export const syncClient = (userId: string | undefined, id: string, data: Partial<Client>) => {
     const mapped = mapper.mapClient(userId, data);
-    safeWrite('clients', mapped, id);
+    return safeWrite('clients', mapped, id);
 };
 
 export const syncServiceDefinition = (userId: string | undefined, id: string, data: Partial<ServiceDefinition>) => {

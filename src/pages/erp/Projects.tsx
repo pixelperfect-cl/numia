@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Archive, RotateCcw, Trash2, SquareKanban } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjects, getClients, deleteProject, updateProject } from '@/lib/firebase/database';
-import type { Project, ProjectStatus } from '@/types';
+import type { Project, ProjectStatus, ProjectList } from '@/types';
 import { ProjectDialog } from '@/components/erp/ProjectDialog';
 import {
     DndContext,
@@ -19,6 +19,20 @@ import {
 } from '@dnd-kit/core';
 import { KanbanColumn } from '@/components/erp/KanbanColumn';
 import { SortableProjectCard } from '@/components/erp/SortableProjectCard';
+import { ProjectListDialog } from '@/components/erp/ProjectListDialog';
+import { getProjectLists, createProjectList, updateProjectList, deleteProjectList, initializeDefaultProjectLists } from '@/lib/firebase/database';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface ProjectsProps {
     entityId?: string;
@@ -26,6 +40,11 @@ interface ProjectsProps {
 
 export function Projects({ entityId }: ProjectsProps = {}) {
     const { user } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const searchParams = new URLSearchParams(location.search);
+    const currentTab = searchParams.get('tab') || 'active'; // 'summary' | 'active' | 'archived'
+
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Record<string, string>>({}); // Map id -> name
     const [loading, setLoading] = useState(true);
@@ -33,6 +52,11 @@ export function Projects({ entityId }: ProjectsProps = {}) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | undefined>(undefined);
     const [activeId, setActiveId] = useState<string | null>(null);
+
+    // List Management State
+    const [projectLists, setProjectLists] = useState<ProjectList[]>([]);
+    const [listDialogOpen, setListDialogOpen] = useState(false);
+    const [editingList, setEditingList] = useState<ProjectList | undefined>(undefined);
 
     // Drag to scroll state
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -77,13 +101,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
         }
     };
 
-    const columns: { id: ProjectStatus; title: string, color: string }[] = [
-        { id: 'incoming', title: 'Incoming', color: 'bg-slate-500/10 border-slate-500/20' },
-        { id: 'design', title: 'Diseño', color: 'bg-slate-500/10 border-slate-500/20' },
-        { id: 'development', title: 'Desarrollo', color: 'bg-slate-500/10 border-slate-500/20' },
-        { id: 'review', title: 'Revisión', color: 'bg-slate-500/10 border-slate-500/20' },
-        { id: 'completed', title: 'Finalizado', color: 'bg-slate-500/10 border-slate-500/20' },
-    ];
+    const columns = projectLists;
 
     useEffect(() => {
         if (user) {
@@ -96,9 +114,10 @@ export function Projects({ entityId }: ProjectsProps = {}) {
         try {
             if (!user) return;
 
-            const [projectsData, clientsData] = await Promise.all([
+            const [projectsData, clientsData, listsData] = await Promise.all([
                 getProjects(user.uid),
-                getClients(user.uid)
+                getClients(user.uid),
+                getProjectLists(user.uid)
             ]);
 
             setProjects(projectsData);
@@ -106,6 +125,14 @@ export function Projects({ entityId }: ProjectsProps = {}) {
             const clientMap: Record<string, string> = {};
             clientsData.forEach(c => clientMap[c.id] = c.name);
             setClients(clientMap);
+
+            if (listsData.length === 0) {
+                await initializeDefaultProjectLists(user.uid);
+                const initializedLists = await getProjectLists(user.uid);
+                setProjectLists(initializedLists);
+            } else {
+                setProjectLists(listsData);
+            }
 
         } catch (error) {
             console.error("Error loading projects/clients:", error);
@@ -115,12 +142,31 @@ export function Projects({ entityId }: ProjectsProps = {}) {
     };
 
     const handleDelete = async (projectId: string) => {
-        if (!confirm('¿Estás seguro de eliminar este proyecto?')) return;
+        if (!confirm('¿Estás seguro de eliminar este proyecto permanentemente?')) return;
         try {
             await deleteProject(projectId);
             loadData();
         } catch (error) {
             console.error("Error deleting project:", error);
+        }
+    };
+
+    const handleArchive = async (project: Project) => {
+        const isArchiving = !project.archived;
+        const message = isArchiving
+            ? '¿Estás seguro de archivar este proyecto? Dejará de aparecer en el tablero activo.'
+            : '¿Estás seguro de restaurar este proyecto? Volverá al tablero activo.';
+
+        if (!confirm(message)) return;
+
+        try {
+            await updateProject(project.id, {
+                archived: isArchiving,
+                archiveDate: isArchiving ? new Date().toISOString() : undefined
+            });
+            loadData();
+        } catch (error) {
+            console.error("Error archiving/restoring project:", error);
         }
     };
 
@@ -130,6 +176,37 @@ export function Projects({ entityId }: ProjectsProps = {}) {
         setEditingProject(undefined);
         setInitialStatus(status);
         setDialogOpen(true);
+    };
+
+    const handleEditList = (listId: string) => {
+        const list = projectLists.find(l => l.id === listId);
+        if (list) {
+            setEditingList(list);
+            setListDialogOpen(true);
+        }
+    };
+
+    const handleDeleteList = async (listId: string) => {
+        // Validation: Cannot delete if has projects
+        const hasProjects = projects.some(p => p.status === listId && !p.archived);
+        if (hasProjects) {
+            alert('No puedes eliminar un flujo que contiene proyectos activos. Mueve los proyectos primero.');
+            return;
+        }
+
+        if (!confirm('¿Estás seguro de eliminar este flujo?')) return;
+
+        try {
+            await deleteProjectList(listId);
+            loadData();
+        } catch (error) {
+            console.error("Error deleting list:", error);
+        }
+    };
+
+    const handleCreateList = () => {
+        setEditingList(undefined);
+        setListDialogOpen(true);
     };
 
     const handleDragStart = (event: DragStartEvent) => {
@@ -160,84 +237,264 @@ export function Projects({ entityId }: ProjectsProps = {}) {
     };
 
     const activeProject = activeId ? projects.find(p => p.id === activeId) : null;
-    const filteredProjects = projects.filter(project =>
+
+    // Filter projects based on tab and active status
+    const allProjects = projects;
+    const activeProjects = projects.filter(p => !p.archived);
+    const archivedProjects = projects.filter(p => p.archived);
+
+    const filteredActiveProjects = activeProjects.filter(project =>
         project.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (clients[project.clientId] || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const filteredArchivedProjects = archivedProjects.filter(project =>
+        project.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (clients[project.clientId] || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Summary Calculations
+    const totalActive = activeProjects.length;
+    const totalArchived = archivedProjects.length;
+    const projectsByStatus = projectLists.map(list => ({
+        name: list.title,
+        count: activeProjects.filter(p => p.status === list.id).length,
+        color: list.color
+    }));
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Proyectos</h1>
-                    <p className="text-muted-foreground">Gestiona tus proyectos y flujo de trabajo</p>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        {currentTab === 'summary' && 'Resumen de Proyectos'}
+                        {currentTab === 'active' && 'Tablero de Proyectos'}
+                        {currentTab === 'archived' && 'Proyectos Archivados'}
+                    </h1>
+                    <p className="text-muted-foreground">
+                        {currentTab === 'summary' && 'Vista general del estado de tus proyectos'}
+                        {currentTab === 'active' && 'Gestiona tus proyectos activos y flujo de trabajo'}
+                        {currentTab === 'archived' && 'Historial de proyectos finalizados o cancelados'}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Buscar proyecto..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-8"
-                        />
+                {currentTab !== 'summary' && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar proyecto..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-8"
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCorners}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-            >
-                <div
-                    ref={scrollContainerRef}
-                    className="flex gap-4 items-start overflow-x-auto pb-4 cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)]"
-                    onMouseDown={handleMouseDown}
-                    onMouseLeave={handleMouseLeave}
-                    onMouseUp={handleMouseUp}
-                    onMouseMove={handleMouseMove}
-                >
-                    {columns.map((column) => (
-                        <KanbanColumn
-                            key={column.id}
-                            id={column.id}
-                            title={column.title}
-                            color={column.color}
-                            projects={filteredProjects.filter(p => p.status === column.id)}
-                            clients={clients}
-                            loading={loading}
-                            onEdit={(project) => {
-                                setEditingProject(project);
-                                setDialogOpen(true);
-                            }}
-                            onDelete={handleDelete}
-                            onAdd={() => handleAddNew(column.id)}
-                        />
-                    ))}
+            {/* Summary View */}
+            {currentTab === 'summary' && (
+                <div className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Proyectos Activos</CardTitle>
+                                <SquareKanban className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{totalActive}</div>
+                                <p className="text-xs text-muted-foreground">En curso actualmente</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Proyectos Archivados</CardTitle>
+                                <Archive className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{totalArchived}</div>
+                                <p className="text-xs text-muted-foreground">Finalizados o cancelados</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Estado de Proyectos Activos</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {projectsByStatus.map(status => (
+                                    <div key={status.name} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded-full ${status.color?.includes('bg-') ? status.color.split(' ')[0] : 'bg-primary'}`} />
+                                            <span>{status.name}</span>
+                                        </div>
+                                        <span className="font-bold">{status.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
+            )}
 
-                <DragOverlay>
-                    {activeProject ? (
-                        <SortableProjectCard
-                            project={activeProject}
-                            clientName={clients[activeProject.clientId] || 'Cliente desconocido'}
-                            onEdit={() => { }}
-                            onDelete={() => { }}
-                        />
-                    ) : null}
-                </DragOverlay>
-            </DndContext>
+            {/* Active Kanban View */}
+            {currentTab === 'active' && (
+                <>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCorners}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <div
+                            ref={scrollContainerRef}
+                            className="flex gap-4 items-start overflow-x-auto pb-4 cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)]"
+                            onMouseDown={handleMouseDown}
+                            onMouseLeave={handleMouseLeave}
+                            onMouseUp={handleMouseUp}
+                            onMouseMove={handleMouseMove}
+                        >
+                            {columns.map((column, index) => (
+                                <KanbanColumn
+                                    key={column.id}
+                                    id={column.id}
+                                    title={column.title}
+                                    color={column.color || 'bg-slate-500/10 border-slate-500/20'}
+                                    projects={filteredActiveProjects.filter(p => {
+                                        // Standard match: status matches column ID
+                                        if (p.status === column.id) return true;
 
-            <ProjectDialog
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
-                project={editingProject}
-                onSuccess={loadData}
-                entityId={entityId}
-                initialStatus={initialStatus}
-            />
+                                        // Legacy/Orphan match: if this is the first column, 
+                                        // capture all projects whose status DOES NOT match any existing list key
+                                        // This creates a "catch-all" for legacy data or mismatched UUIDs
+                                        if (index === 0) {
+                                            const allListIds = columns.map(c => c.id);
+                                            // Iterate the other columns - if status matches NO known column ID, it belongs here
+                                            return !allListIds.includes(p.status);
+                                        }
+                                        return false;
+                                    })}
+                                    clients={clients}
+                                    loading={loading}
+                                    onEdit={(project) => {
+                                        setEditingProject(project);
+                                        setDialogOpen(true);
+                                    }}
+                                    onDelete={(projectId) => {
+                                        const project = projects.find(p => p.id === projectId);
+                                        if (project) handleArchive(project);
+                                    }}
+                                    onAdd={() => handleAddNew(column.id)}
+                                    onEditList={handleEditList}
+                                    onDeleteList={handleDeleteList}
+                                />
+                            ))}
+
+                            {/* Add List Button */}
+                            <div className="flex-none w-[280px] pt-2">
+                                <Button
+                                    variant="outline"
+                                    className="w-full h-12 border-dashed bg-transparent hover:bg-slate-500/5 text-muted-foreground hover:text-foreground"
+                                    onClick={handleCreateList}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" /> Añadir Flujo
+                                </Button>
+                            </div>
+                        </div>
+
+                        <DragOverlay>
+                            {activeProject ? (
+                                <SortableProjectCard
+                                    project={activeProject}
+                                    clientName={clients[activeProject.clientId] || 'Cliente desconocido'}
+                                    onEdit={() => { }}
+                                    onDelete={() => { }}
+                                />
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
+
+                    <ProjectDialog
+                        open={dialogOpen}
+                        onOpenChange={setDialogOpen}
+                        project={editingProject}
+                        onSuccess={loadData}
+                        entityId={entityId}
+                        initialStatus={initialStatus}
+                        lists={projectLists}
+                    />
+
+                    <ProjectListDialog
+                        open={listDialogOpen}
+                        onOpenChange={setListDialogOpen}
+                        list={editingList}
+                        onSuccess={loadData}
+                        currentOrder={projectLists.length}
+                    />
+                </>
+            )}
+
+            {/* Archived View */}
+            {currentTab === 'archived' && (
+                <Card>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Proyecto</TableHead>
+                                    <TableHead>Cliente</TableHead>
+                                    <TableHead>Fecha Archivado</TableHead>
+                                    <TableHead className="text-right">Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredArchivedProjects.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                            No hay proyectos archivados
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredArchivedProjects.map((project) => (
+                                        <TableRow key={project.id}>
+                                            <TableCell className="font-medium">{project.name}</TableCell>
+                                            <TableCell>{clients[project.clientId] || 'Desconocido'}</TableCell>
+                                            <TableCell>
+                                                {project.archiveDate
+                                                    ? format(new Date(project.archiveDate), 'dd MMM yyyy', { locale: es })
+                                                    : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleArchive(project)}
+                                                        title="Restaurar"
+                                                    >
+                                                        <RotateCcw className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(project.id)}
+                                                        title="Eliminar permanentemente"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
         </div >
     );
 }

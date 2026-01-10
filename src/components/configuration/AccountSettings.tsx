@@ -11,7 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Mail, Globe, Upload, X } from 'lucide-react';
 import { updateProfile } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '@/lib/firebase/config';
+import { useEffect } from 'react';
 
 export function AccountSettings() {
   const { user } = useAuth();
@@ -20,6 +23,23 @@ export function AccountSettings() {
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const loadSettings = async () => {
+        try {
+          const docRef = doc(db, 'users', user.uid);
+          const snapshot = await getDoc(docRef);
+          if (snapshot.exists() && snapshot.data().settings?.timezone) {
+            setTimezone(snapshot.data().settings.timezone);
+          }
+        } catch (error) {
+          console.error("Error loading settings:", error);
+        }
+      };
+      loadSettings();
+    }
+  }, [user]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,13 +79,38 @@ export function AccountSettings() {
         });
       }
 
-      // TODO: Photo upload would require Firebase Storage setup
+      // Photo upload
+      let photoURL = user.photoURL;
       if (photoFile) {
-        alert('La carga de foto de perfil se implementará próximamente con Firebase Storage');
-        clearPhoto();
+        try {
+          const storageRef = ref(storage, `users/${user.uid}/profile_${Date.now()}`);
+          const snapshot = await uploadBytes(storageRef, photoFile);
+          photoURL = await getDownloadURL(snapshot.ref);
+
+          await updateProfile(auth.currentUser, {
+            photoURL: photoURL
+          });
+
+          // Clear file input
+          clearPhoto();
+        } catch (storageError) {
+          console.error("Storage error:", storageError);
+          alert("Error al subir la imagen. Verifica tu conexión.");
+        }
       }
 
-      // TODO: Save timezone to user preferences in Firestore
+      // Save timezone and potentially updated photoURL to Firestore user doc
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        displayName: displayName,
+        email: user.email,
+        photoURL: photoURL,
+        settings: {
+          timezone: timezone
+        },
+        updatedAt: new Date()
+      }, { merge: true });
+
       alert('Configuración guardada exitosamente');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -226,10 +271,10 @@ export function AccountSettings() {
               <p className="text-lg font-semibold">
                 {user.metadata?.creationTime
                   ? new Date(user.metadata.creationTime).toLocaleDateString('es-CL', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })
                   : 'No disponible'}
               </p>
             </div>
@@ -239,11 +284,11 @@ export function AccountSettings() {
               <p className="text-lg font-semibold">
                 {user.metadata?.lastSignInTime
                   ? new Date(user.metadata.lastSignInTime).toLocaleDateString('es-CL', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
                   : 'No disponible'}
               </p>
             </div>

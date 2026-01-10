@@ -2,42 +2,60 @@
  * Numia v1.0 - Loans Page
  */
 
+import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useData } from '@/contexts/DataContext';
+import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useData } from '@/contexts/DataContext';
 import { formatCurrency, getTodayLocalDateString } from '@/lib/utils';
-import { Trash2, Edit } from 'lucide-react';
-import type { LoanType, MovementType } from '@/types';
+import type { Loan, LoanType, MovementType } from '@/types';
+import { Plus, Search, Filter, Trash2, Edit, Wallet, Calendar as CalendarIcon, CheckCircle2, XCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface LoansProps {
-  openDialog?: boolean;
-  onDialogClose?: () => void;
   entityId?: string;
 }
 
-export function Loans({ openDialog = false, onDialogClose, entityId }: LoansProps = {}) {
+export function Loans({ entityId }: LoansProps = {}) {
   const { loans, entities, categories, createLoan, createMovement, updateLoan, deleteLoan, loading } = useData();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<typeof loans[0] | null>(null);
   const [paymentDialogLoan, setPaymentDialogLoan] = useState<typeof loans[0] | null>(null);
 
-  // Handle external dialog open request
+  // Handle URL params
   useEffect(() => {
-    if (openDialog) {
+    if (searchParams.get('action') === 'create') {
       setIsOpen(true);
-      onDialogClose?.();
     }
-  }, [openDialog, onDialogClose]);
+  }, [searchParams]);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      if (searchParams.get('action') === 'create') {
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.delete('action');
+          return newParams;
+        });
+      }
+    }
+  };
   const [formData, setFormData] = useState({
     type: 'lent' as LoanType,
     personName: '',
@@ -129,7 +147,7 @@ export function Loans({ openDialog = false, onDialogClose, entityId }: LoansProp
         });
       }
 
-      setIsOpen(false);
+      handleOpenChange(false);
       setFormData({
         type: 'lent',
         personName: '',
@@ -411,9 +429,12 @@ export function Loans({ openDialog = false, onDialogClose, entityId }: LoansProp
           <h1 className="text-3xl font-bold tracking-tight">Préstamos</h1>
           <p className="text-muted-foreground">Gestiona lo que debes y lo que te deben</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button>+ Nuevo Préstamo</Button>
+            <Button size="icon" className="md:w-auto md:px-4 md:py-2">
+              <Plus className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Nuevo Préstamo</span>
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -526,7 +547,7 @@ export function Loans({ openDialog = false, onDialogClose, entityId }: LoansProp
               </div>
 
               <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
                   Cancelar
                 </Button>
                 <Button type="submit">Registrar</Button>

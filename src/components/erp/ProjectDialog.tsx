@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // Removed missing imports
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
-import { createProject, updateProject, getClients } from '@/lib/firebase/database';
-import type { Project, Client, ProjectStatus, ProjectChecklist, ChecklistItem } from '@/types';
+import { createProject, updateProject, getClients, getEntities, getEntity } from '@/lib/firebase/database';
+import type { Project, Client, ProjectStatus, ProjectChecklist, ChecklistItem, ProjectList, Entity } from '@/types';
 import { Loader2, Plus, Trash, X, CheckSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available, else I'll use a custom function or random string
 import { Progress } from '@/components/ui/progress';
+import { syncClient, syncEntity } from '@/lib/supabase/adapter';
+import { toast } from 'sonner';
 
 interface ProjectDialogProps {
     open: boolean;
@@ -20,12 +22,14 @@ interface ProjectDialogProps {
     onSuccess: () => void;
     entityId?: string;
     initialStatus?: ProjectStatus;
+    lists?: ProjectList[];
 }
 
-export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId, initialStatus = 'incoming' }: ProjectDialogProps) {
+export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId, initialStatus = 'incoming', lists = [] }: ProjectDialogProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
+    const [entities, setEntities] = useState<Entity[]>([]);
     const [formData, setFormData] = useState<Partial<Project>>({
         name: '',
         clientId: '',
@@ -40,6 +44,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
     useEffect(() => {
         if (user) {
             loadClients();
+            loadEntities();
         }
     }, [user]);
 
@@ -79,6 +84,16 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
         }
     };
 
+    const loadEntities = async () => {
+        if (!user) return;
+        try {
+            const data = await getEntities(user.uid);
+            setEntities(data);
+        } catch (error) {
+            console.error("Error loading entities:", error);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !formData.name || !formData.clientId) return;
@@ -88,12 +103,53 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
             if (project) {
                 await updateProject(project.id, formData);
             } else {
+                // Ensure client exists in Supabase before creating project to avoid FK error
+                const selectedClient = clients.find(c => c.id === formData.clientId);
+                if (selectedClient && user) {
+                    // Try to find entity in loaded list or fetch directly as fallback
+                    let clientEntity = entities.find(e => e.id === selectedClient.entityId);
+
+                    if (!clientEntity && selectedClient.entityId) {
+                        try {
+                            const fetchedEntity = await getEntity(selectedClient.entityId);
+                            if (fetchedEntity) {
+                                clientEntity = fetchedEntity;
+                            }
+                        } catch (err) {
+                            console.warn("Failed to fallback fetch entity", err);
+                        }
+                    }
+
+                    if (clientEntity) {
+                        console.log("Syncing related Entity:", clientEntity.id);
+                        await syncEntity(user.uid, clientEntity.id, clientEntity);
+                    } else {
+                        console.warn("Could not find related Entity for Client:", selectedClient.entityId);
+                        // Fallback: Use the first available entity if specific one fails
+                        if (entities.length > 0) {
+                            console.log("⚠️ Defaulting to first available entity:", entities[0].name);
+                            clientEntity = entities[0];
+                            // Patch the client object for this sync operation
+                            // (We cast to any to avoid strict readonly issues if present, though Client interface usually mutable here)
+                            (selectedClient as any).entityId = clientEntity.id;
+                            await syncEntity(user.uid, clientEntity.id, clientEntity);
+                        } else {
+                            console.error("❌ No entities available to assign to client!");
+                        }
+                    }
+
+                    console.log("Syncing Client:", selectedClient.id, "Entity:", selectedClient.entityId);
+                    await syncClient(user.uid, selectedClient.id, selectedClient);
+                }
+
                 await createProject(user.uid, formData as any);
             }
             onSuccess();
             onOpenChange(false);
+            toast.success(project ? 'Proyecto actualizado' : 'Proyecto creado exitosamente');
         } catch (error) {
             console.error("Error saving project:", error);
+            toast.error("Error al guardar el proyecto");
         } finally {
             setLoading(false);
         }
@@ -146,11 +202,19 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="incoming">Incoming</SelectItem>
-                                    <SelectItem value="design">Diseño</SelectItem>
-                                    <SelectItem value="development">Desarrollo</SelectItem>
-                                    <SelectItem value="review">Revisión</SelectItem>
-                                    <SelectItem value="completed">Finalizado</SelectItem>
+                                    {lists.length > 0 ? (
+                                        lists.map(list => (
+                                            <SelectItem key={list.id} value={list.id}>{list.title}</SelectItem>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <SelectItem value="incoming">Incoming</SelectItem>
+                                            <SelectItem value="design">Diseño</SelectItem>
+                                            <SelectItem value="development">Desarrollo</SelectItem>
+                                            <SelectItem value="review">Revisión</SelectItem>
+                                            <SelectItem value="completed">Finalizado</SelectItem>
+                                        </>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

@@ -80,7 +80,7 @@ export function MovementsAreaChart({ movements }: MovementsAreaChartProps) {
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex flex-row items-center justify-between">
             <CardTitle>Actividad de Movimientos</CardTitle>
             <DateFilter value={dateFilter} onChange={setDateFilter} />
           </div>

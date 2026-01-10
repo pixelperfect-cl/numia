@@ -135,9 +135,51 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updatePreferences = (newPreferences: NotificationPreferences) => {
+  // Load preferences
+  useEffect(() => {
+    if (!user) return;
+
+    const loadPreferences = async () => {
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        // We use referencing to the user document for preferences
+        // Ideally we would use onSnapshot here too if we want real-time updates across devices
+        // For now, let's just fetch it.
+        // Actually, let's use onSnapshot to be consistent with notifications
+        const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const data = docSnapshot.data();
+            if (data.notificationPreferences) {
+              setPreferences(data.notificationPreferences);
+            }
+          }
+        });
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
+    };
+
+    const cleanupPromise = loadPreferences();
+    return () => {
+      cleanupPromise.then(cleanup => cleanup && cleanup());
+    };
+  }, [user]);
+
+  const updatePreferences = async (newPreferences: NotificationPreferences) => {
     setPreferences(newPreferences);
-    // TODO: Save to Firestore user preferences when implemented
+    if (user) {
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        // Use setDoc with merge to ensure document exists
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(userDocRef, {
+          notificationPreferences: newPreferences
+        }, { merge: true });
+      } catch (error) {
+        console.error('Error saving preferences:', error);
+      }
+    }
   };
 
   return (

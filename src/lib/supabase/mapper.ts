@@ -97,11 +97,19 @@ export const mapEntitySubscription = (userId: string | undefined, entityId: stri
 export const mapProject = (userId: string | undefined, data: Partial<Project>) => {
     const obj: any = { ...data };
     if (userId) obj.userId = userId;
+
+    // Convert empty strings to null for date fields to prevent Supabase errors
+    if (obj.dueDate === '') obj.dueDate = null;
+    if (obj.archiveDate === '') obj.archiveDate = null;
+    if (obj.archiveReason === '') obj.archiveReason = null;
+
     return mapObject(obj, {
         userId: 'user_id',
         entityId: 'entity_id',
         clientId: 'client_id',
         dueDate: 'due_date',
+        archiveDate: 'archive_date',
+        archiveReason: 'archive_reason',
         createdAt: 'created_at',
         updatedAt: 'updated_at'
     });

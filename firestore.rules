@@ -77,6 +77,13 @@ service cloud.firestore {
       allow update, delete: if isOwner(resource.data.userId);
     }
 
+    // ERP: Project Lists (Kanban Columns)
+    match /project_lists/{listId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
     // Entity Subscriptions (Expenses) collection
     match /entity_subscriptions/{subscriptionId} {
       allow read: if isOwner(resource.data.userId);

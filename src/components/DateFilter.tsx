@@ -49,35 +49,19 @@ export function DateFilter({ value, onChange }: DateFilterProps) {
 
   return (
     <div className="space-y-2">
-      {/* Mobile: Dropdown */}
-      <div className="sm:hidden">
-        <Select value={value.type} onValueChange={handleTypeChange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Desktop: Buttons */}
-      <div className="hidden sm:flex gap-2 flex-wrap">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => handleTypeChange(option.value)}
-            data-active={value.type === option.value}
-            className="px-3 py-1.5 text-sm rounded-md border transition-all data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:border-primary hover:bg-accent hover:text-accent-foreground"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {/* Dropdown for all screen sizes */}
+      <Select value={value.type} onValueChange={handleTypeChange}>
+        <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {value.type === 'CUSTOM' && (
         <div className="flex gap-2 items-end">

@@ -92,8 +92,9 @@ export function Clients({ entityId }: ClientsProps = {}) {
                     <p className="text-muted-foreground">Administra tu base de datos de clientes</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={handleCreate}>
-                        <Plus className="mr-2 h-4 w-4" /> Nuevo Cliente
+                    <Button onClick={handleCreate} size="icon" className="md:w-auto md:px-4 md:py-2">
+                        <Plus className="h-4 w-4 md:mr-2" />
+                        <span className="hidden md:inline">Nuevo Cliente</span>
                     </Button>
                 </div>
             </div>

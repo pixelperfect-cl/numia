@@ -12,9 +12,10 @@ interface ServiceSelectionDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSelect: (definition: ServiceDefinition | null) => void;
+    filterFrequency?: 'monthly' | 'yearly';
 }
 
-export function ServiceSelectionDialog({ open, onOpenChange, onSelect }: ServiceSelectionDialogProps) {
+export function ServiceSelectionDialog({ open, onOpenChange, onSelect, filterFrequency }: ServiceSelectionDialogProps) {
     const { user } = useAuth();
     const [definitions, setDefinitions] = useState<ServiceDefinition[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,9 +34,14 @@ export function ServiceSelectionDialog({ open, onOpenChange, onSelect }: Service
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Seleccionar Servicio</DialogTitle>
+                    <DialogTitle>
+                        Seleccionar Servicio {filterFrequency === 'monthly' ? 'Mensual' : filterFrequency === 'yearly' ? 'Anual' : ''}
+                    </DialogTitle>
                     <DialogDescription>
-                        Elige un servicio de la lista o crea uno personalizado.
+                        {filterFrequency
+                            ? `Elige un servicio ${filterFrequency === 'monthly' ? 'mensual' : 'anual'} de la lista o crea uno personalizado.`
+                            : 'Elige un servicio de la lista o crea uno personalizado.'
+                        }
                     </DialogDescription>
                 </DialogHeader>
 
@@ -66,42 +72,44 @@ export function ServiceSelectionDialog({ open, onOpenChange, onSelect }: Service
                     )}
 
                     {/* Service Definitions */}
-                    {!loading && definitions.map((def) => (
-                        <Card
-                            key={def.id}
-                            className="cursor-pointer hover:border-primary hover:shadow-sm transition-all group relative overflow-hidden"
-                            onClick={() => onSelect(def)}
-                        >
-                            <CardContent className="p-6 space-y-4">
-                                <div className="space-y-2">
-                                    <div className="flex items-start justify-between">
-                                        <div className="p-2 bg-muted rounded-lg group-hover:bg-primary/10 transition-colors">
-                                            <Package className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    {!loading && definitions
+                        .filter(def => !filterFrequency || def.frequency === filterFrequency)
+                        .map((def) => (
+                            <Card
+                                key={def.id}
+                                className="cursor-pointer hover:border-primary hover:shadow-sm transition-all group relative overflow-hidden"
+                                onClick={() => onSelect(def)}
+                            >
+                                <CardContent className="p-6 space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-start justify-between">
+                                            <div className="p-2 bg-muted rounded-lg group-hover:bg-primary/10 transition-colors">
+                                                <Package className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                            </div>
+                                            <Badge variant="secondary" className="capitalize">
+                                                {def.frequency === 'monthly' ? 'Mensual' : 'Anual'}
+                                            </Badge>
                                         </div>
-                                        <Badge variant="secondary" className="capitalize">
-                                            {def.frequency === 'monthly' ? 'Mensual' : 'Anual'}
-                                        </Badge>
+
+                                        <div>
+                                            <h3 className="font-semibold text-lg line-clamp-1" title={def.name}>
+                                                {def.name}
+                                            </h3>
+                                            <p className="text-xl font-bold mt-1 text-primary">
+                                                {def.currency === 'UF' ? 'UF' : '$'} {def.currency === 'UF' ? def.amount : def.amount.toLocaleString()}
+                                            </p>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <h3 className="font-semibold text-lg line-clamp-1" title={def.name}>
-                                            {def.name}
-                                        </h3>
-                                        <p className="text-xl font-bold mt-1 text-primary">
-                                            {def.currency === 'UF' ? 'UF' : '$'} {def.currency === 'UF' ? def.amount : def.amount.toLocaleString()}
-                                        </p>
+                                    <div className="pt-4 border-t flex items-center justify-between text-sm text-muted-foreground">
+                                        <span className="group-hover:text-foreground transition-colors">
+                                            Seleccionar
+                                        </span>
+                                        <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                                     </div>
-                                </div>
-
-                                <div className="pt-4 border-t flex items-center justify-between text-sm text-muted-foreground">
-                                    <span className="group-hover:text-foreground transition-colors">
-                                        Seleccionar
-                                    </span>
-                                    <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                </CardContent>
+                            </Card>
+                        ))}
                 </div>
             </DialogContent>
         </Dialog>

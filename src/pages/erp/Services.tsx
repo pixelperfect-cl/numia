@@ -1,41 +1,40 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getClients, getSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/firebase/database';
 import { checkAndGenerateSubscriptionMovements } from '@/lib/erp/billing';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { ServiceDialog } from '@/components/erp/ServiceDialog';
 import { ServiceKanbanBoard } from '@/components/erp/ServiceKanbanBoard';
-import { ServiceCatalogPanel } from '@/components/erp/ServiceCatalogPanel';
+
 import { ServiceSelectionDialog } from '@/components/erp/ServiceSelectionDialog';
+import { ClientSelectionDialog } from '@/components/erp/ClientSelectionDialog';
 import { PaymentDetailDialog } from '@/components/erp/PaymentDetailDialog';
 import { PaymentHistoryDialog } from '@/components/erp/PaymentHistoryDialog';
 import { EditPaymentDialog } from '@/components/erp/EditPaymentDialog';
 import { PaymentDialog } from '@/components/erp/PaymentDialog';
+import { ArchiveServiceDialog } from '@/components/erp/ArchiveServiceDialog';
 import { fetchIndicators } from '@/lib/indicators';
-import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, LayoutGrid, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord } from '@/types';
+import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord, EnhancedSubscription } from '@/types';
 import { format, addMonths, addYears, subMonths, subYears, parseISO, isAfter } from 'date-fns';
 
 interface ServicesProps {
     entityId?: string;
-    defaultTab?: 'summary' | 'active' | 'archived' | 'catalog';
+    defaultTab?: 'summary' | 'active' | 'archived';
     onTabChange?: (tab: string) => void;
 }
 
-export interface EnhancedSubscription extends Subscription {
-    clientName: string;
-    clientId: string;
-    paidAmount?: number;
-    currentMovements?: Movement[];
-    allPayments?: Movement[];
-}
+// Re-export from types for backwards compatibility
+export type { EnhancedSubscription } from '@/types';
 
 export function Services({ entityId, defaultTab = 'summary', onTabChange }: ServicesProps = {}) {
     const { user } = useAuth();
@@ -45,14 +44,16 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [generating, setGenerating] = useState(false);
-    const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
     const [ufValue, setUfValue] = useState<number | null>(null);
 
     // Dialog State
     const [dialogOpen, setDialogOpen] = useState(false);
     const [serviceSelectionOpen, setServiceSelectionOpen] = useState(false);
+    const [clientSelectionOpen, setClientSelectionOpen] = useState(false);
     const [editingSubscription, setEditingSubscription] = useState<EnhancedSubscription | undefined>(undefined);
+    const [selectedClientForService, setSelectedClientForService] = useState<Client | null>(null);
     const [preselectedDefinition, setPreselectedDefinition] = useState<ServiceDefinition | null>(null);
+    const [creationContext, setCreationContext] = useState<{ frequency: 'monthly' | 'yearly'; monthIndex: number } | null>(null);
 
     // Payment Dialog State
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -65,6 +66,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [selectedSubscriptionForDetail, setSelectedSubscriptionForDetail] = useState<EnhancedSubscription | null>(null);
     const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
     const [paymentToEdit, setPaymentToEdit] = useState<PaymentRecord | null>(null);
+
+    // Archive Dialog State
+    const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+    const [subscriptionToArchive, setSubscriptionToArchive] = useState<EnhancedSubscription | null>(null);
 
     const loadData = async () => {
         if (!user) return;
@@ -273,14 +278,22 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         setDetailDialogOpen(true);
     };
 
-    const handleCreate = () => {
+    const handleCreate = (context?: { frequency: 'monthly' | 'yearly'; monthIndex: number }) => {
         setEditingSubscription(undefined);
+        setCreationContext(context || null);
         setServiceSelectionOpen(true);
     };
 
     const handleServiceSelect = (definition: ServiceDefinition | null) => {
         setServiceSelectionOpen(false);
         setPreselectedDefinition(definition);
+        // Open client selection as step 2 instead of going directly to form
+        setClientSelectionOpen(true);
+    };
+
+    const handleClientSelect = (client: Client) => {
+        setClientSelectionOpen(false);
+        setSelectedClientForService(client);
         setDialogOpen(true);
     };
 
@@ -300,13 +313,27 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         }
     };
 
-    const handleArchive = async (subscriptionId: string) => {
-        if (!confirm('¿Estás seguro de archivar este servicio?')) return;
+    const handleArchive = (subscriptionId: string) => {
+        const sub = subscriptions.find(s => s.id === subscriptionId);
+        if (sub) {
+            setSubscriptionToArchive(sub);
+            setArchiveDialogOpen(true);
+        }
+    };
+
+    const handleArchiveConfirm = async (reason: string, notes: string) => {
+        if (!subscriptionToArchive) return;
         try {
-            await updateSubscription(subscriptionId, { status: 'archived' });
+            await updateSubscription(subscriptionToArchive.id, {
+                status: 'archived',
+                archiveReason: reason,
+                archiveNotes: notes || null,
+                archivedAt: format(new Date(), 'yyyy-MM-dd')
+            });
             loadData();
         } catch (error) {
             console.error("Error archiving subscription:", error);
+            throw error;
         }
     };
 
@@ -563,20 +590,30 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     );
 
     // Summary Statistics
-    const totalMonthly = subscriptions
-        .filter(s => s.status === 'active' && s.frequency === 'monthly')
-        .reduce((acc, curr) => acc + (curr.currency === 'CLP' ? curr.amount : 0), 0);
+    const activeSubs = subscriptions.filter(s => s.status === 'active');
 
-    const activeCount = subscriptions.filter(s => s.status === 'active').length;
+    const totalAnnual = activeSubs.reduce((acc, curr) => {
+        const amountInClp = curr.currency === 'UF' && ufValue ? curr.amount * ufValue : curr.amount;
+        if (curr.frequency === 'monthly') {
+            return acc + (amountInClp * 12);
+        } else {
+            return acc + amountInClp;
+        }
+    }, 0);
 
-    const [activeTab, setActiveTab] = useState(defaultTab);
+    const monthlyAverage = totalAnnual / 12;
 
-    useEffect(() => {
-        setActiveTab(defaultTab);
-    }, [defaultTab]);
+    const activeCount = activeSubs.length;
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || defaultTab;
 
     const handleTabChange = (val: string) => {
-        setActiveTab(val as any);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('tab', val);
+            return newParams;
+        });
         if (onTabChange) {
             onTabChange(val);
         }
@@ -590,11 +627,11 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                     <p className="text-muted-foreground">Administra las suscripciones y servicios recurrentes</p>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={handleGenerateBilling} disabled={generating} className={generating ? "w-full md:w-auto" : ""}>
+                    <Button variant="outline" onClick={handleGenerateBilling} disabled={generating} size="icon" className={`md:w-auto md:px-4 md:py-2 ${generating ? "w-full md:w-auto" : ""}`}>
                         {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                         <span className="hidden md:ml-2 md:inline">Generar Cobros</span>
                     </Button>
-                    <Button onClick={handleCreate}>
+                    <Button onClick={() => handleCreate()} size="icon" className="md:w-auto md:px-4 md:py-2">
                         <Plus className="h-4 w-4" />
                         <span className="hidden md:ml-2 md:inline">Asignar Servicio</span>
                     </Button>
@@ -603,275 +640,102 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 flex-1 flex flex-col">
                 <TabsList className="w-full justify-start overflow-x-auto no-scrollbar flex-nowrap">
-                    <TabsTrigger value="summary">Resumen General</TabsTrigger>
-                    <TabsTrigger value="active">Servicios Activos</TabsTrigger>
-                    <TabsTrigger value="archived">Servicios Archivados</TabsTrigger>
-                    <TabsTrigger value="catalog">Catálogo de Servicios</TabsTrigger>
+                    <TabsTrigger value="summary">Resumen</TabsTrigger>
+                    <TabsTrigger value="active">Activos</TabsTrigger>
+                    <TabsTrigger value="archived">Archivados</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="summary" className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Servicios Activos</CardTitle>
-                                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{activeCount}</div>
-                                <p className="text-xs text-muted-foreground">Suscripciones vigentes</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Ingreso Mensual (Est.)</CardTitle>
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">${totalMonthly.toLocaleString()}</div>
-                                <p className="text-xs text-muted-foreground">+ UF (Calculado en base a CLP)</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Ticket Promedio</CardTitle>
-                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">
-                                    ${activeCount > 0 ? Math.round(totalMonthly / activeCount).toLocaleString() : 0}
-                                </div>
-                                <p className="text-xs text-muted-foreground">Por suscripción activa</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Clientes con Servicios</CardTitle>
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{new Set(subscriptions.map(s => s.clientId)).size}</div>
-                                <p className="text-xs text-muted-foreground">Total de clientes únicos</p>
-                            </CardContent>
-                        </Card>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-7">
-                        <Card className="md:col-span-4">
-                            <CardHeader>
-                                <CardTitle>Próximos Vencimientos</CardTitle>
-                                <CardDescription>Servicios que renuevan en los próximos 7 días</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {subscriptions
-                                    .filter(s => s.status === 'active')
-                                    .filter(s => {
-                                        const date = parseISO(s.nextBillingDate);
-                                        const now = new Date();
-                                        const nextWeek = new Date();
-                                        nextWeek.setDate(now.getDate() + 7);
-                                        return date >= now && date <= nextWeek;
-                                    })
-                                    .length === 0 ? (
-                                    <div className="text-sm text-muted-foreground text-center py-8">
-                                        No hay vencimientos próximos.
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {subscriptions
-                                            .filter(s => s.status === 'active')
-                                            .filter(s => {
-                                                const date = parseISO(s.nextBillingDate);
-                                                const now = new Date();
-                                                const nextWeek = new Date();
-                                                nextWeek.setDate(now.getDate() + 7);
-                                                return date >= now && date <= nextWeek;
-                                            })
-                                            .sort((a, b) => new Date(a.nextBillingDate).getTime() - new Date(b.nextBillingDate).getTime())
-                                            .slice(0, 5)
-                                            .map(sub => (
-                                                <div key={sub.id} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
-                                                    <div>
-                                                        <p className="font-medium text-sm">{sub.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{sub.clientName}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-sm font-bold text-primary">
-                                                            {format(parseISO(sub.nextBillingDate), 'dd/MM')}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
 
-                        <Card className="md:col-span-3">
-                            <CardHeader>
-                                <CardTitle>Proyección de Renovaciones</CardTitle>
-                                <CardDescription>Próximos 6 meses</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[200px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart
-                                            data={(() => {
-                                                const next6Months = Array.from({ length: 6 }, (_, i) => {
-                                                    const d = addMonths(new Date(), i);
-                                                    return {
-                                                        name: format(d, 'MMM'), // e.g. "Ene"
-                                                        fullDate: d,
-                                                        count: 0
-                                                    };
-                                                });
-
-                                                subscriptions.filter(s => s.status === 'active').forEach(sub => {
-                                                    const date = parseISO(sub.nextBillingDate);
-                                                    const now = new Date();
-                                                    // Simple projection: Check if next billing date falls in the bucket
-                                                    // For monthly subs, this technically only counts the NEXT one, 
-                                                    // ensuring "Próximos Vencimientos" logic.
-                                                    // To enable true projection we'd need more complex logic.
-                                                    // Keeping it simple based on `nextBillingDate` distribution for now.
-
-                                                    next6Months.forEach(month => {
-                                                        if (month.fullDate.getMonth() === date.getMonth() &&
-                                                            month.fullDate.getFullYear() === date.getFullYear()) {
-                                                            month.count++;
-                                                        }
-                                                    });
-                                                });
-
-                                                return next6Months;
-                                            })()}
-                                        >
-                                            <XAxis
-                                                dataKey="name"
-                                                stroke="#888888"
-                                                fontSize={12}
-                                                tickLine={false}
-                                                axisLine={false}
-                                            />
-                                            <YAxis
-                                                stroke="#888888"
-                                                fontSize={12}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                tickFormatter={(value) => `${value}`}
-                                                allowDecimals={false}
-                                            />
-                                            <Tooltip
-                                                cursor={{ fill: 'transparent' }}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Bar
-                                                dataKey="count"
-                                                fill="currentColor"
-                                                radius={[4, 4, 0, 0]}
-                                                className="fill-primary"
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="active" className="space-y-4 flex-1 flex flex-col h-full">
-                    <div className="flex items-center justify-between shrink-0">
-                        <div className="relative w-64">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar servicio o cliente..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-8"
-                            />
+                <TabsContent value="summary" className="space-y-4 flex-1 flex flex-col h-full">
+                    <div className="flex flex-col gap-4 shrink-0">
+                        <div className="flex items-center justify-between shrink-0">
+                            <div className="relative w-64">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Buscar servicio o cliente..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-8"
+                                />
+                            </div>
                         </div>
-                        <div className="flex items-center space-x-2 bg-muted p-1 rounded-md">
-                            <Button
-                                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className="h-8 w-8 p-0"
-                            >
-                                <ListIcon className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('kanban')}
-                                className="h-8 w-8 p-0"
-                            >
-                                <LayoutGrid className="h-4 w-4" />
-                            </Button>
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground px-1">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp className="h-3.5 w-3.5" />
+                                <span>Mensual: <span className="font-medium text-foreground">${Math.round(monthlyAverage).toLocaleString()}</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                <span>Anual: <span className="font-medium text-foreground">${Math.round(totalAnnual).toLocaleString()}</span></span>
+                            </div>
                         </div>
                     </div>
 
-                    {viewMode === 'list' ? (
-                        <Card>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                        {/* Monthly Services */}
+                        <Card className="h-full border-t-4 border-t-emerald-500 shadow-sm">
+                            <CardHeader className="pb-3 bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                        Servicios Mensuales
+                                    </CardTitle>
+                                    <Badge variant="outline" className="bg-background">
+                                        {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length}
+                                    </Badge>
+                                </div>
+                                <CardDescription>Recurrencia mensual indefinida</CardDescription>
+                            </CardHeader>
                             <CardContent className="p-0">
-                                <div className="rounded-md border">
+                                <div className="border-t">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Servicio / Plan</TableHead>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead className="w-[30%]">Servicio</TableHead>
                                                 <TableHead>Cliente</TableHead>
                                                 <TableHead>Monto</TableHead>
-                                                <TableHead>Frecuencia</TableHead>
                                                 <TableHead>Próx. Cobro</TableHead>
-                                                <TableHead>Estado</TableHead>
                                                 <TableHead className="text-right">Acciones</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {loading ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell>
+                                                    <TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell>
                                                 </TableRow>
-                                            ) : filteredSubscriptions.length === 0 ? (
+                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                        No se encontraron servicios activos.
+                                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                        No hay servicios mensuales.
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                filteredSubscriptions.filter(s => s.status !== 'archived').map((sub) => (
+                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').map((sub) => (
                                                     <TableRow key={sub.id}>
                                                         <TableCell className="font-medium">
-                                                            {sub.name}
-                                                            {sub.currency === 'UF' && <Badge variant="outline" className="ml-2 text-[10px]">UF</Badge>}
+                                                            <div className="flex flex-col">
+                                                                <span>{sub.name}</span>
+                                                                {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="flex items-center gap-2">
-                                                                <Briefcase className="h-3 w-3 text-muted-foreground" />
-                                                                {sub.clientName}
+                                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                                <Briefcase className="h-3 w-3" />
+                                                                <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
                                                             {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
                                                         </TableCell>
-                                                        <TableCell className="capitalize">{sub.frequency === 'monthly' ? 'Mensual' : 'Anual'}</TableCell>
-                                                        <TableCell>{format(new Date(sub.nextBillingDate + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={sub.status === 'active' ? 'default' : 'secondary'}>
-                                                                {sub.status === 'active' ? 'Activo' : 'Inactivo'}
-                                                            </Badge>
-                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">{format(new Date(sub.nextBillingDate + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
                                                         <TableCell className="text-right">
-                                                            <div className="flex justify-end gap-2">
-                                                                <Button variant="ghost" size="icon" onClick={() => handleArchive(sub.id)} title="Archivar servicio">
-                                                                    <Archive className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
+                                                                    <Edit className="h-4 w-4 text-zinc-500" />
                                                                 </Button>
-                                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(sub)}>
-                                                                    <Edit className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button variant="ghost" size="icon" onClick={() => handleDelete(sub.id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
-                                                                    <Trash2 className="h-4 w-4" />
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
+                                                                    <Archive className="h-4 w-4 text-zinc-500" />
                                                                 </Button>
                                                             </div>
                                                         </TableCell>
@@ -883,26 +747,127 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                 </div>
                             </CardContent>
                         </Card>
-                    ) : (
-                        <div className="flex-1 overflow-hidden min-h-[500px]">
-                            <ServiceKanbanBoard
-                                subscriptions={filteredSubscriptions}
-                                onEdit={handleEdit}
-                                onCreate={handleCreate}
-                                onArchive={handleArchive}
-                                onDelete={handleDelete}
-                                ufValue={ufValue}
-                                onMarkPaid={onMarkPaid}
-                                onPartialPayment={onPartialPayment}
-                                onRevertPayment={handleRevertPayment}
-                                onViewPaymentDetails={handleViewPaymentDetails}
-                                onShowHistory={(sub) => {
-                                    setSelectedSubscriptionForDetail(sub);
-                                    setHistoryDialogOpen(true);
-                                }}
-                            />
+
+                        {/* Annual/Other Services */}
+                        <Card className="h-full border-t-4 border-t-blue-500 shadow-sm">
+                            <CardHeader className="pb-3 bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                        Servicios Anuales
+                                    </CardTitle>
+                                    <Badge variant="outline" className="bg-background">
+                                        {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length}
+                                    </Badge>
+                                </div>
+                                <CardDescription>Pagos anuales y periodicidad larga</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="border-t">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead className="w-[30%]">Servicio</TableHead>
+                                                <TableHead>Cliente</TableHead>
+                                                <TableHead>Monto</TableHead>
+                                                <TableHead>Próx. Cobro</TableHead>
+                                                <TableHead className="text-right">Acciones</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {loading ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell>
+                                                </TableRow>
+                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                        No hay servicios anuales.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').map((sub) => (
+                                                    <TableRow key={sub.id}>
+                                                        <TableCell className="font-medium">
+                                                            <div className="flex flex-col">
+                                                                <span>{sub.name}</span>
+                                                                {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                                <Briefcase className="h-3 w-3" />
+                                                                <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">{format(new Date(sub.nextBillingDate + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
+                                                                    <Edit className="h-4 w-4 text-zinc-500" />
+                                                                </Button>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
+                                                                    <Archive className="h-4 w-4 text-zinc-500" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="active" className="space-y-4 flex-1 flex flex-col h-full">
+                    <div className="flex flex-col gap-4 shrink-0">
+                        <div className="flex items-center justify-between shrink-0">
+                            <div className="relative w-64">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Buscar servicio o cliente..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-8"
+                                />
+                            </div>
                         </div>
-                    )}
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground px-1">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp className="h-3.5 w-3.5" />
+                                <span>Mensual: <span className="font-medium text-foreground">${Math.round(monthlyAverage).toLocaleString()}</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                <span>Anual: <span className="font-medium text-foreground">${Math.round(totalAnnual).toLocaleString()}</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-hidden min-h-[500px]">
+                        <ServiceKanbanBoard
+                            subscriptions={filteredSubscriptions}
+                            onEdit={handleEdit}
+                            onCreate={handleCreate}
+                            onArchive={handleArchive}
+                            onDelete={handleDelete}
+                            ufValue={ufValue}
+                            onMarkPaid={onMarkPaid}
+                            onPartialPayment={onPartialPayment}
+                            onRevertPayment={handleRevertPayment}
+                            onViewPaymentDetails={handleViewPaymentDetails}
+                            onShowHistory={(sub) => {
+                                setSelectedSubscriptionForDetail(sub);
+                                setHistoryDialogOpen(true);
+                            }}
+                        />
+                    </div>
                 </TabsContent>
 
                 <TabsContent value="archived" className="space-y-4 flex-1 flex flex-col h-full">
@@ -927,8 +892,8 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                             <TableHead>Servicio / Plan</TableHead>
                                             <TableHead>Cliente</TableHead>
                                             <TableHead>Monto</TableHead>
-                                            <TableHead>Frecuencia</TableHead>
-                                            <TableHead>Estado</TableHead>
+                                            <TableHead>Motivo</TableHead>
+                                            <TableHead>Archivado</TableHead>
                                             <TableHead className="text-right">Acciones</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -958,10 +923,44 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                                     </TableCell>
                                                     <TableCell>
                                                         {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
+                                                        <span className="text-xs text-muted-foreground ml-1">
+                                                            ({sub.frequency === 'monthly' ? 'Mensual' : 'Anual'})
+                                                        </span>
                                                     </TableCell>
-                                                    <TableCell className="capitalize">{sub.frequency === 'monthly' ? 'Mensual' : 'Anual'}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant="secondary">Archivado</Badge>
+                                                        {sub.archiveReason ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {sub.archiveReason}
+                                                                </Badge>
+                                                                {sub.archiveNotes && (
+                                                                    <Popover>
+                                                                        <PopoverTrigger asChild>
+                                                                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                                                <FileText className="h-3 w-3 text-muted-foreground" />
+                                                                            </Button>
+                                                                        </PopoverTrigger>
+                                                                        <PopoverContent className="w-80">
+                                                                            <div className="space-y-2">
+                                                                                <h4 className="font-medium leading-none">Notas del archivado</h4>
+                                                                                <p className="text-sm text-muted-foreground">
+                                                                                    {sub.archiveNotes}
+                                                                                </p>
+                                                                            </div>
+                                                                        </PopoverContent>
+                                                                    </Popover>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground italic">Sin motivo</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {sub.archivedAt ? (
+                                                            <span className="text-sm">{sub.archivedAt}</span>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">-</span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-2">
@@ -983,26 +982,41 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="catalog">
-                    <ServiceCatalogPanel />
-                </TabsContent>
+
             </Tabs>
 
             <ServiceSelectionDialog
                 open={serviceSelectionOpen}
                 onOpenChange={setServiceSelectionOpen}
                 onSelect={handleServiceSelect}
+                filterFrequency={creationContext?.frequency}
+            />
+
+            <ClientSelectionDialog
+                open={clientSelectionOpen}
+                onOpenChange={setClientSelectionOpen}
+                onSelect={handleClientSelect}
+                entityId={entityId || entities[0]?.id}
             />
 
             <ServiceDialog
                 open={dialogOpen}
-                onOpenChange={setDialogOpen}
+                onOpenChange={(open) => {
+                    setDialogOpen(open);
+                    if (!open) {
+                        setSelectedClientForService(null);
+                        setCreationContext(null);
+                    }
+                }}
                 subscription={editingSubscription}
                 clients={clients}
                 onSuccess={loadData}
                 preselectedDefinition={preselectedDefinition}
                 onRefreshClients={loadData}
                 entityId={entityId || entities[0]?.id}
+                defaultClientId={selectedClientForService?.id}
+                defaultFrequency={creationContext?.frequency}
+                defaultMonthIndex={creationContext?.monthIndex}
             />
 
             <PaymentDialog
@@ -1038,6 +1052,13 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 payment={paymentToEdit}
                 onSave={handleEditPayment}
             />
-        </div>
+
+            <ArchiveServiceDialog
+                open={archiveDialogOpen}
+                onOpenChange={setArchiveDialogOpen}
+                subscription={subscriptionToArchive}
+                onConfirm={handleArchiveConfirm}
+            />
+        </div >
     );
 }

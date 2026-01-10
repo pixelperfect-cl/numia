@@ -13,6 +13,9 @@ Aplicación de gestión financiera personal y empresarial construida con React, 
 
 ## 📦 Características
 
+> [!IMPORTANT]
+> **Para Desarrolladores y Agentes AI**: Antes de realizar cambios en la base de datos, por favor lee [DATABASE_GUIDELINES.md](DATABASE_GUIDELINES.md).
+
 - ✅ Autenticación con Google
 - ✅ Gestión de entidades (personal/empresarial)
 - ✅ Sistema de cajas (cuentas bancarias, efectivo, etc.)
@@ -21,6 +24,13 @@ Aplicación de gestión financiera personal y empresarial construida con React, 
 - ✅ Proyección financiera
 - ✅ Modo oscuro/claro
 - ✅ Responsive design
+
+## 🔄 Versionado y Changelog
+
+Manajamos un estricto control de versiones siguiendo **Semantic Versioning**.
+Para más detalles sobre el flujo de trabajo de versiones y cómo registrar cambios:
+
+👉 **[Ver Guía de Versionado](./VERSIONING_GUIDE.md)**
 
 ## 🛠️ Setup
 

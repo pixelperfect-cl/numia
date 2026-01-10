@@ -129,38 +129,23 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
   if (chartData.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Flujo de Caja</CardTitle>
 
-          {/* Period selector buttons */}
+          {/* Period selector dropdown */}
           <div className="space-y-2">
-            <div className="sm:hidden">
-              <Select value={periodType} onValueChange={(value) => setPeriodType(value as DateFilterType)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="hidden sm:flex gap-2 flex-wrap">
-              {periodOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setPeriodType(option.value as DateFilterType)}
-                  data-active={periodType === option.value}
-                  className="px-3 py-1.5 text-sm rounded-md border transition-all data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:border-primary hover:bg-accent hover:text-accent-foreground"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <Select value={periodType} onValueChange={(value) => setPeriodType(value as DateFilterType)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {periodOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {periodType === 'CUSTOM' && (
               <div className="flex gap-2 items-end">
@@ -211,101 +196,90 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4">
-          <CardTitle>Flujo de Caja</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle>Flujo de Caja</CardTitle>
 
-          {/* Period selector buttons - Mobile: Dropdown, Desktop: Buttons */}
-          <div className="space-y-2">
-            {/* Mobile: Dropdown */}
-            <div className="sm:hidden">
-              <Select value={periodType} onValueChange={(value) => setPeriodType(value as DateFilterType)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Desktop: Buttons */}
-            <div className="hidden sm:flex gap-2 flex-wrap">
+        {/* Period selector dropdown */}
+        <div className="space-y-2">
+          <Select value={periodType} onValueChange={(value) => setPeriodType(value as DateFilterType)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {periodOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setPeriodType(option.value as DateFilterType)}
-                  data-active={periodType === option.value}
-                  className="px-3 py-1.5 text-sm rounded-md border transition-all data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:border-primary hover:bg-accent hover:text-accent-foreground"
-                >
+                <SelectItem key={option.value} value={option.value}>
                   {option.label}
-                </button>
+                </SelectItem>
               ))}
-            </div>
+            </SelectContent>
+          </Select>
 
-            {/* Custom date inputs */}
-            {periodType === 'CUSTOM' && (
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <Label htmlFor="start-date" className="text-xs">Desde</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="end-date" className="text-xs">Hasta</Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+          {periodType === 'CUSTOM' && (
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Label htmlFor="start-date" className="text-xs">
+                  Desde
+                </Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full"
+                />
               </div>
-            )}
+              <div className="flex-1">
+                <Label htmlFor="end-date" className="text-xs">
+                  Hasta
+                </Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <CardDescription>
+          {startDate.toLocaleDateString('es-CL', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}
+          {' - '}
+          {endDate.toLocaleDateString('es-CL', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}
+        </CardDescription>
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Ingresos</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {formatCurrency(totalIncome)}
+            </p>
           </div>
-
-          <CardDescription>
-            {startDate.toLocaleDateString('es-CL', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            })} - {endDate.toLocaleDateString('es-CL', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            })}
-          </CardDescription>
-
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Ingresos</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {formatCurrency(totalIncome)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Gastos</p>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {formatCurrency(totalExpense)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Balance</p>
-              <p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCurrency(balance)}
-              </p>
-            </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Gastos</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+              {formatCurrency(totalExpense)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Balance</p>
+            <p
+              className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                }`}
+            >
+              {formatCurrency(balance)}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -422,6 +396,6 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
           </AreaChart>
         </ChartContainer>
       </CardContent>
-    </Card>
+    </Card >
   );
 }

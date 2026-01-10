@@ -2,80 +2,34 @@
  * Numia v1.0 - Settings Page
  */
 
-import { useState } from 'react';
+import { AccountSettings } from '@/components/configuration/AccountSettings';
+import { ChangelogPanel } from '@/components/configuration/ChangelogPanel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/theme-provider';
-import { User, Mail, Globe, Palette, Upload, X } from 'lucide-react';
-import { updateProfile } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { Palette, Info, ChevronRight, Settings as SettingsIcon, Wallet, LayoutGrid, Network } from 'lucide-react';
+import { changelog } from '@/data/changelog';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export function Settings() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [timezone, setTimezone] = useState('America/Santiago');
-  const [saving, setSaving] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Por favor selecciona una imagen válida');
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        alert('La imagen no debe superar 2MB');
-        return;
-      }
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  // Default to 'general' tab
+  const activeTab = searchParams.get('tab') || 'general';
 
-  const clearPhoto = () => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  };
-
-  const handleSave = async () => {
-    if (!user || !auth.currentUser) return;
-
-    try {
-      setSaving(true);
-
-      // Update display name
-      if (displayName !== user.displayName) {
-        await updateProfile(auth.currentUser, {
-          displayName: displayName,
-        });
-      }
-
-      // TODO: Photo upload would require Firebase Storage setup
-      // For now, we'll just show a message
-      if (photoFile) {
-        alert('La carga de foto de perfil se implementará próximamente con Firebase Storage');
-        clearPhoto();
-      }
-
-      // TODO: Save timezone to user preferences in Firestore
-      alert('Configuración guardada exitosamente');
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Error al guardar configuración');
-    } finally {
-      setSaving(false);
-    }
+  const handleTabChange = (value: string) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('tab', value);
+      return newParams;
+    });
   };
 
   if (!user) {
@@ -89,151 +43,103 @@ export function Settings() {
         <p className="text-muted-foreground">Administra las preferencias de tu cuenta</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Account Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Información de Cuenta</CardTitle>
-            <CardDescription>Actualiza tu información personal</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Photo Upload */}
-            <div>
-              <Label>Foto de Perfil</Label>
-              <div className="mt-2 space-y-2">
-                {photoPreview || user.photoURL ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={photoPreview || user.photoURL || ''}
-                      alt="Preview"
-                      className="h-24 w-24 rounded-full object-cover border-2 border-border"
-                    />
-                    {photoPreview && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full bg-background"
-                        onClick={clearPhoto}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center">
-                    <User className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                )}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+        <TabsList className="w-full justify-start overflow-x-auto no-scrollbar flex-nowrap">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="boxes">Cajas</TabsTrigger>
+          <TabsTrigger value="categories">Categorías</TabsTrigger>
+          <TabsTrigger value="advanced">Avanzado</TabsTrigger>
+          <TabsTrigger value="changelog">Versión y Cambios</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Account Settings */}
+            <div className="md:col-span-1">
+              <AccountSettings />
+            </div>
+
+            {/* Appearance Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Apariencia</CardTitle>
+                <CardDescription>Personaliza el aspecto de la aplicación</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <label htmlFor="photo" className="inline-flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-muted transition-colors">
-                    <Upload className="h-4 w-4" />
-                    <span className="text-sm">Cambiar foto</span>
-                  </label>
-                  <input
-                    id="photo"
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
+                  <Label htmlFor="theme">Tema</Label>
+                  <div className="relative mt-2">
+                    <Palette className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                    <Select value={theme} onValueChange={(value: 'light' | 'dark' | 'system') => setTheme(value)}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">Claro</SelectItem>
+                        <SelectItem value="dark">Oscuro</SelectItem>
+                        <SelectItem value="system">Sistema</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Imagen cuadrada recomendada (max 2MB)
+                    Cambia entre modo claro y oscuro
                   </p>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Display Name */}
-            <div>
-              <Label htmlFor="displayName">Nombre</Label>
-              <div className="relative mt-2">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="displayName"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="pl-10"
-                  placeholder="Tu nombre"
-                />
-              </div>
-            </div>
+            {/* System Version Card (Link to Tab) */}
+            <Card className="md:col-span-2 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleTabChange('changelog')}>
+              <CardContent className="flex items-center justify-between p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <Info className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Versión del Sistema</h3>
+                    <p className="text-sm text-muted-foreground">
+                      v{changelog[0]?.version || '0.0.0'} (BETA)
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  Ver Detalles
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-            {/* Email (Read-only) */}
-            <div>
-              <Label htmlFor="email">Correo Electrónico</Label>
-              <div className="relative mt-2">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  value={user.email || ''}
-                  disabled
-                  className="pl-10 bg-muted"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                El correo no puede ser modificado
-              </p>
-            </div>
+        <TabsContent value="boxes">
+          <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg bg-muted/20">
+            <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">Configuración de Cajas</h3>
+            <p className="text-muted-foreground mb-4">Gestiona tus cuentas y cajas de efectivo.</p>
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>Ir al Dashboard</Button>
+          </div>
+        </TabsContent>
 
-            {/* Timezone */}
-            <div>
-              <Label htmlFor="timezone">Zona Horaria</Label>
-              <div className="relative mt-2">
-                <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger className="pl-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="America/Santiago">América/Santiago (CL)</SelectItem>
-                    <SelectItem value="America/Buenos_Aires">América/Buenos Aires (AR)</SelectItem>
-                    <SelectItem value="America/Lima">América/Lima (PE)</SelectItem>
-                    <SelectItem value="America/Bogota">América/Bogotá (CO)</SelectItem>
-                    <SelectItem value="America/Mexico_City">América/Ciudad de México (MX)</SelectItem>
-                    <SelectItem value="America/New_York">América/Nueva York (US-Este)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">América/Los Ángeles (US-Oeste)</SelectItem>
-                    <SelectItem value="Europe/Madrid">Europa/Madrid (ES)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        <TabsContent value="categories">
+          <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg bg-muted/20">
+            <LayoutGrid className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">Categorías</h3>
+            <p className="text-muted-foreground">Próximamente: Gestión avanzada de categorías personalizadas.</p>
+          </div>
+        </TabsContent>
 
-            <Button onClick={handleSave} disabled={saving} className="w-full">
-              {saving ? 'Guardando...' : 'Guardar Cambios'}
-            </Button>
-          </CardContent>
-        </Card>
+        <TabsContent value="advanced">
+          <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg bg-muted/20">
+            <Network className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">Configuración Avanzada</h3>
+            <p className="text-muted-foreground">Opciones técnicas y de conexión.</p>
+          </div>
+        </TabsContent>
 
-        {/* Appearance Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Apariencia</CardTitle>
-            <CardDescription>Personaliza el aspecto de la aplicación</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="theme">Tema</Label>
-              <div className="relative mt-2">
-                <Palette className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-                <Select value={theme} onValueChange={(value: 'light' | 'dark' | 'system') => setTheme(value)}>
-                  <SelectTrigger className="pl-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Claro</SelectItem>
-                    <SelectItem value="dark">Oscuro</SelectItem>
-                    <SelectItem value="system">Sistema</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Cambia entre modo claro y oscuro
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="changelog">
+          <ChangelogPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

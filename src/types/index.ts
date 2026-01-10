@@ -251,8 +251,20 @@ export interface Subscription {
   status: 'active' | 'inactive' | 'archived';
   notes?: string;
   payments?: PaymentRecord[]; // History of payments for this service
+  // Archive tracking
+  archiveReason?: string;     // Reason for archiving (e.g., "Servicio Concluido")
+  archiveNotes?: string;      // Additional comments when archiving
+  archivedAt?: string;        // ISO date when archived
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Enhanced Subscription with client info (for use in components)
+export interface EnhancedSubscription extends Subscription {
+  clientName: string;
+  paidAmount?: number;
+  currentMovements?: Movement[];
+  allPayments?: Movement[];
 }
 
 export interface EntitySubscription {
@@ -301,7 +313,18 @@ export interface Client {
   updatedAt: Date;
 }
 
-export type ProjectStatus = 'incoming' | 'design' | 'development' | 'review' | 'completed';
+// Project Types
+export interface ProjectList {
+  id: string;
+  userId: string;
+  title: string;
+  order: number;
+  color?: string; // Tailwind class or hex
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ProjectStatus = string;
 
 export interface ChecklistItem {
   id: string;
@@ -326,6 +349,9 @@ export interface Project {
   dueDate?: string; // ISO date
   progress: number; // 0-100
   checklists?: ProjectChecklist[];
+  archived?: boolean;
+  archiveReason?: string;
+  archiveDate?: string; // ISO date
   createdAt: Date;
   updatedAt: Date;
 }

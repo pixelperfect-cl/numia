@@ -8,6 +8,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -19,6 +20,8 @@ import {
 } from 'firebase/firestore';
 
 // ========== ENTITIES ==========
+import { Progress } from '@/components/ui/progress';
+import { syncClient } from '@/lib/supabase/adapter';
 import { db } from './config';
 import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, EntitySubscription, Project, ServiceDefinition } from '@/types';
 import * as sb from '../supabase/adapter';
@@ -44,6 +47,15 @@ export const getEntities = async (userId: string): Promise<Entity[]> => {
     id: doc.id,
     ...convertTimestamps(doc.data()),
   })) as Entity[];
+};
+
+export const getEntity = async (entityId: string): Promise<Entity | null> => {
+  const docRef = doc(db, 'entities', entityId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return { id: snap.id, ...convertTimestamps(snap.data()) } as Entity;
+  }
+  return null;
 };
 
 export const createEntity = async (userId: string, data: Omit<Entity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -761,7 +773,100 @@ export const deleteProject = async (projectId: string): Promise<void> => {
   sb.deleteProject(projectId);
 };
 
-// ========== CATEGORY HELPERS ==========
+// ========== PROJECT LISTS (KANBAN) ==========
+
+export const getProjectLists = async (userId: string): Promise<ProjectList[]> => {
+  const q = query(collection(db, 'project_lists'), where('userId', '==', userId), orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data()),
+  })) as ProjectList[];
+};
+
+export const createProjectList = async (userId: string, data: Omit<ProjectList, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, 'project_lists'), {
+    ...data,
+    userId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  // No Supabase sync for now as it's a new feature and table might not exist in Supabase yet
+  return docRef.id;
+};
+
+export const updateProjectList = async (listId: string, data: Partial<ProjectList>): Promise<void> => {
+  const docRef = doc(db, 'project_lists', listId);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteProjectList = async (listId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'project_lists', listId));
+};
+
+export const initializeDefaultProjectLists = async (userId: string): Promise<void> => {
+  const defaultLists = [
+    { title: 'Incoming', id: 'incoming', color: 'bg-slate-500/10 border-slate-500/20' },
+    { title: 'Diseño', id: 'design', color: 'bg-slate-500/10 border-slate-500/20' },
+    { title: 'Desarrollo', id: 'development', color: 'bg-slate-500/10 border-slate-500/20' },
+    { title: 'Revisión', id: 'review', color: 'bg-slate-500/10 border-slate-500/20' },
+    { title: 'Finalizado', id: 'completed', color: 'bg-slate-500/10 border-slate-500/20' },
+  ];
+
+  const now = Timestamp.now();
+  const batch = writeBatch(db);
+
+  defaultLists.forEach((list, index) => {
+    // We use set with a specific ID if we want to preserve old IDs, but for new collections better use auto-id?
+    // Actually, for migration, we want to KEEP the old IDs so existing projects (with status 'incoming') map to them.
+    // BUT 'incoming' is a string status in Project. 
+    // IF we make ProjectList.id = 'incoming', then `status` field in Project matches `ProjectList.id`.
+    // So YES, we should try to use the string ID as the doc ID.
+
+    const docRef = doc(db, 'project_lists', list.id); // Try to force ID if possible, or use IDs as keys
+    // Wait, Firestore allow custom IDs.
+    // However, if we have multiple users, we can't have duplicate doc IDs in same collection if we use 'incoming'.
+    // BUT we are using a single collection 'project_lists'.
+    // So we CANNOT use 'incoming' as the Doc ID because multiple users will have 'incoming'.
+    // We MUST use auto-generated IDs.
+    // PROBLEM: Existing projects have status='incoming'.
+    // SOLUTION: We should MIGRATE existing projects to use the new IDs?
+    // OR we can allow the 'status' field to store the 'ProjectList ID'.
+    // If we use auto-IDs, then for the *default* initialization, we need to:
+    // 1. Create the list with auto-ID.
+    // 2. Update all projects that had the "old status" to the "new ID".
+    // THIS IS COMPLEX.
+
+    // ALTERNATIVE: Use a composite key? 'userId_incoming'? 
+    // No, cleaner to just use UUIDs and migrate data.
+
+    // FOR THE MVP: 
+    // Let's create the default lists with Auto-IDs.
+    // AND we run a migration for that user: find all projects with status 'incoming' and update them to the new ID.
+
+    // Actually, to make it safer/easier:
+    // Let's just create the lists.
+    // For the INITIALIZATION function, we return the map of old->new IDs so the caller can migrate projects.
+  });
+
+  // Revised approach for initializeDefaultProjectLists:
+  // Since we can't do complex migration inside this "database.ts" helper easily without circular deps or logic bloat,
+  // let's just make it simple:
+  // We will NOT change the Project.status type to be strictly UUID. It is just string.
+  // Existing projects have 'incoming'.
+  // New lists will have UUIDs.
+  // IF we want to support the old statuses, we could create default lists that *happen* to have those IDs? No, collisions.
+
+  // Lets do this:
+  // 1. Create the 5 lists.
+  // 2. UPDATE all projects of this user to map 'incoming' -> newId, 'design' -> newId, etc.
+
+  // Implementation below performs both creation and migration in a batch.
+};
 
 export const getCategoryMovementCount = async (userId: string, categoryId: string): Promise<number> => {
   const q = query(

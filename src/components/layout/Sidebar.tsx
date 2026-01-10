@@ -5,13 +5,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import {
   CreditCard,
   LayoutGrid,
   Building2,
@@ -28,70 +21,193 @@ import {
   Repeat,
   Network,
   Archive,
+  List as ListIcon,
+  Info,
+  FileText,
+  BarChart3,
   type LucideIcon
 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-
-import { IconComponent } from '@/components/IconPicker';
 import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
+import { changelog } from '@/data/changelog';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
-  currentPage: string;
-  onNavigate: (page: string) => void;
   selectedEntityId: string;
 }
 
-interface MenuItem {
+export interface MenuItem {
   id: string;
   label: string;
   icon: LucideIcon;
+  path: string;
   erpRequired?: boolean;
   subItems?: MenuItem[];
 }
 
 export const menuItems: MenuItem[] = [
-  { id: 'entity-panel', label: 'Panel General', icon: LayoutDashboard },
-  { id: 'movements', label: 'Movimientos', icon: ArrowLeftRight },
-  { id: 'loans', label: 'Préstamos', icon: Wallet },
-  { id: 'projections', label: 'Proyecciones', icon: TrendingUp },
-  { id: 'subscriptions', label: 'Suscripciones', icon: Repeat },
-  // ERP Group
-  { id: 'erp-dashboard', label: 'ERP: Control', icon: LayoutGrid, erpRequired: true },
-  { id: 'erp-clients', label: 'Clientes', icon: Users, erpRequired: true },
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    path: '/dashboard'
+  },
+  {
+    id: 'movements',
+    label: 'Movimientos',
+    icon: ArrowLeftRight,
+    path: '/movements'
+  },
+  {
+    id: 'loans',
+    label: 'Préstamos',
+    icon: Wallet,
+    path: '/loans'
+  },
+  {
+    id: 'projections',
+    label: 'Proyecciones',
+    icon: TrendingUp,
+    path: '/projections'
+  },
+  {
+    id: 'subscriptions',
+    label: 'Suscripciones',
+    icon: Repeat,
+    path: '/subscriptions'
+  },
+  {
+    id: 'reports',
+    label: 'Reportes',
+    icon: FileText,
+    path: '/reports/financial',
+    subItems: [
+      {
+        id: 'reports-financial',
+        label: 'Reporte Financiero',
+        icon: BarChart3,
+        path: '/reports/financial'
+      },
+      {
+        id: 'reports-erp',
+        label: 'Reporte ERP',
+        icon: Briefcase,
+        path: '/reports/erp',
+        erpRequired: true
+      }
+    ]
+  },
+  {
+    id: 'erp-dashboard',
+    label: 'ERP: Control',
+    icon: Briefcase,
+    path: '/erp/dashboard',
+    erpRequired: true
+  },
+  {
+    id: 'erp-clients',
+    label: 'ERP: Clientes',
+    icon: Users,
+    path: '/erp/clients',
+    erpRequired: true
+  },
   {
     id: 'erp-services',
     label: 'Servicios',
-    icon: Briefcase,
+    icon: ListIcon,
+    path: '/erp/services',
     erpRequired: true,
     subItems: [
-      { id: 'erp-services-summary', label: 'Resumen General', icon: TrendingUp }, // Using TrendingUp reuse or similar
-      { id: 'erp-services-active', label: 'Servicios Activos', icon: ListIcon }, // Need ListIcon
-      { id: 'erp-services-archived', label: 'Servicios Archivados', icon: Archive },
-      { id: 'erp-services-catalog', label: 'Catálogo', icon: LayoutGrid } // Using LayoutGrid reuse or similar
+      {
+        id: 'services-summary',
+        label: 'Resumen',
+        icon: ListIcon,
+        path: '/erp/services?tab=summary'
+      },
+      {
+        id: 'services-active',
+        label: 'Activos',
+        icon: LayoutGrid,
+        path: '/erp/services?tab=active'
+      },
+      {
+        id: 'services-archived',
+        label: 'Archivados',
+        icon: Archive,
+        path: '/erp/services?tab=archived'
+      }
     ]
   },
-  { id: 'erp-projects', label: 'Proyectos', icon: SquareKanban, erpRequired: true },
-  // Configuration at the end
-  // Configuration at the end
+  {
+    id: 'erp-projects',
+    label: 'ERP: Proyectos',
+    icon: SquareKanban,
+    path: '/erp/projects',
+    erpRequired: true,
+    subItems: [
+      {
+        id: 'projects-summary',
+        label: 'Resumen',
+        icon: ListIcon,
+        path: '/erp/projects?tab=summary'
+      },
+      {
+        id: 'projects-active',
+        label: 'Activos',
+        icon: SquareKanban,
+        path: '/erp/projects?tab=active'
+      },
+      {
+        id: 'projects-archived',
+        label: 'Archivados',
+        icon: Archive,
+        path: '/erp/projects?tab=archived'
+      }
+    ]
+  },
   {
     id: 'entity-configuration',
     label: 'Configuración',
     icon: Settings,
+    path: '/configuration',
     subItems: [
-      { id: 'config-general', label: 'General', icon: Settings },
-      { id: 'config-boxes', label: 'Cajas', icon: Wallet },
-      { id: 'config-categories', label: 'Categorías', icon: LayoutGrid },
-      { id: 'config-advanced', label: 'Avanzado', icon: Network }
+      {
+        id: 'config-general',
+        label: 'General',
+        icon: Building2,
+        path: '/configuration?tab=general'
+      },
+      {
+        id: 'config-boxes',
+        label: 'Cajas',
+        icon: CreditCard,
+        path: '/configuration?tab=boxes'
+      },
+      {
+        id: 'config-categories',
+        label: 'Categorías',
+        icon: LayoutGrid,
+        path: '/configuration?tab=categories'
+      },
+      {
+        id: 'config-advanced',
+        label: 'Avanzado',
+        icon: Settings,
+        path: '/configuration?tab=advanced'
+      }
     ]
-  },
+  }
 ];
 
-import { List as ListIcon } from 'lucide-react'; // Ensure import
-
-export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarProps) {
+export function Sidebar({ selectedEntityId }: SidebarProps) {
   const { entities } = useData();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [servicesOpen, setServicesOpen] = useState(true);
-  const [configOpen, setConfigOpen] = useState(false); // Default closed as per request "cerrado pero que si se abre..."
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [erpOpen, setErpOpen] = useState(true);
 
   const entity = entities.find(e => e.id === selectedEntityId);
   if (!entity) return null;
@@ -99,16 +215,27 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
   const erpEnabled = entity.settings?.erpEnabled;
 
   const isChildActive = (item: MenuItem) => {
-    return item.subItems?.some(sub => sub.id === currentPage) ?? false;
+    return item.subItems?.some(sub => location.pathname === sub.path.split('?')[0]) ?? false;
+  };
+
+  const isActive = (path: string) => {
+    const [pathBase, pathQuery] = path.split('?');
+    if (pathQuery) {
+      return location.pathname === pathBase && location.search.includes(pathQuery);
+    }
+    return location.pathname === pathBase;
   };
 
   const configItem = menuItems.find(item => item.id === 'entity-configuration');
   const mainItems = menuItems.filter(item => item.id !== 'entity-configuration');
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card h-full">
       <div className="flex-1 overflow-y-auto py-4 no-scrollbar">
-        {/* Sidebar content */}
         <div className="px-4 mb-4">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Gestionando
@@ -120,117 +247,175 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
           {mainItems.map((item) => {
             const Icon = item.icon;
 
-            // Skip ERP items if not enabled
             if (item.erpRequired && !erpEnabled) return null;
 
-            // Optional: Group ERP items visually
             if (item.id === 'erp-dashboard' && erpEnabled) {
               return (
                 <div key="erp-section" className="pt-4 pb-1">
-                  <h3 className="px-3 py-2 rounded-lg bg-zinc-800/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Briefcase className="h-3 w-3" />
-                    ERP Agencia
-                  </h3>
+                  <button
+                    onClick={() => setErpOpen(!erpOpen)}
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-800/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center justify-between cursor-pointer hover:bg-zinc-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-3 w-3" />
+                      <span>ERP Agencia</span>
+                    </div>
+                    {erpOpen ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                  </button>
 
-                  <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
-                    {/* Render dashboard item first */}
-                    <button
-                      onClick={() => onNavigate(item.id)}
-                      className={cn(
-                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer mb-1',
-                        currentPage === item.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="flex-1 text-left">{item.label.replace('ERP: ', '')}</span>
-                    </button>
+                  {erpOpen && (
+                    <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
+                      <button
+                        onClick={() => handleNavigate(item.path)}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer mb-1',
+                          isActive(item.path)
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="flex-1 text-left">{item.label.replace('ERP: ', '')}</span>
+                      </button>
 
-                    {/* Render other ERP items immediately after */}
-                    {mainItems.filter(i => i.erpRequired && i.id !== 'erp-dashboard').map(subItem => {
-                      const SubIcon = subItem.icon;
-                      // Logic for collapsible items (like Services)
-                      if (subItem.subItems) {
-                        const isOpen = servicesOpen || isChildActive(subItem) || currentPage === subItem.id;
+                      {mainItems.filter(i => i.erpRequired && i.id !== 'erp-dashboard').map(subItem => {
+                        const SubIcon = subItem.icon;
+                        if (subItem.subItems) {
+                          return (
+                            <div key={subItem.id} className="space-y-1">
+                              <button
+                                onClick={() => {
+                                  if (!isActive(subItem.path) && !isChildActive(subItem)) handleNavigate(subItem.path);
+                                  if (subItem.id === 'erp-services') setServicesOpen(!servicesOpen);
+                                  if (subItem.id === 'erp-projects') setProjectsOpen(!projectsOpen);
+                                }}
+                                className={cn(
+                                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer justify-between',
+                                  isActive(subItem.path) || isChildActive(subItem)
+                                    ? 'bg-accent text-accent-foreground'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                )}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <SubIcon className="h-4 w-4" />
+                                  <span>{subItem.label}</span>
+                                </div>
+                                {(subItem.id === 'erp-services' ? servicesOpen : subItem.id === 'erp-projects' ? projectsOpen : false) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                              </button>
+
+                              {(subItem.id === 'erp-services' ? servicesOpen : subItem.id === 'erp-projects' ? projectsOpen : false) && (
+                                <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
+                                  {subItem.subItems.map(child => {
+                                    const ChildIcon = child.icon;
+                                    return (
+                                      <button
+                                        key={child.id}
+                                        onClick={() => handleNavigate(child.path)}
+                                        className={cn(
+                                          'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer',
+                                          isActive(child.path)
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                        )}
+                                      >
+                                        <ChildIcon className="h-3 w-3" />
+                                        <span>{child.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
 
                         return (
-                          <div key={subItem.id} className="space-y-1">
-                            <button
-                              onClick={() => {
-                                if (currentPage !== subItem.id && !isChildActive(subItem)) onNavigate(subItem.id);
-                                setServicesOpen(!servicesOpen);
-                              }}
-                              className={cn(
-                                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer justify-between',
-                                currentPage === subItem.id || isChildActive(subItem)
-                                  ? 'bg-accent text-accent-foreground'
-                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <SubIcon className="h-4 w-4" />
-                                <span>{subItem.label}</span>
-                              </div>
-                              {servicesOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                            </button>
-
-                            {servicesOpen && (
-                              <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
-                                {subItem.subItems.map(child => {
-                                  const ChildIcon = child.icon;
-                                  return (
-                                    <button
-                                      key={child.id}
-                                      onClick={() => onNavigate(child.id)}
-                                      className={cn(
-                                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer',
-                                        currentPage === child.id
-                                          ? 'bg-primary text-primary-foreground'
-                                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                      )}
-                                    >
-                                      <ChildIcon className="h-3 w-3" />
-                                      <span>{child.label}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                          <button
+                            key={subItem.id}
+                            onClick={() => handleNavigate(subItem.path)}
+                            className={cn(
+                              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer mb-1',
+                              isActive(subItem.path)
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                             )}
-                          </div>
-                        )
-                      }
-
-                      return (
-                        <button
-                          key={subItem.id}
-                          onClick={() => onNavigate(subItem.id)}
-                          className={cn(
-                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer mb-1',
-                            currentPage === subItem.id
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                          )}
-                        >
-                          <SubIcon className="h-4 w-4" />
-                          <span className="flex-1 text-left">{subItem.label.replace('ERP: ', '')}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          >
+                            <SubIcon className="h-4 w-4" />
+                            <span className="flex-1 text-left">{subItem.label.replace('ERP: ', '')}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             }
-            // Skip other ERP items as they are rendered in the group above
             if (item.erpRequired) return null;
+
+            // Handle Reports menu item with sub-items
+            if (item.subItems) {
+              const visibleSubItems = item.subItems.filter(sub => !sub.erpRequired || erpEnabled);
+              if (visibleSubItems.length === 0) return null;
+
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (item.id === 'reports') {
+                        setReportsOpen(!reportsOpen);
+                      }
+                    }}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer justify-between',
+                      isActive(item.path) || isChildActive(item)
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </div>
+                    {reportsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </button>
+
+                  {reportsOpen && (
+                    <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
+                      {visibleSubItems.map(child => {
+                        const ChildIcon = child.icon;
+                        return (
+                          <button
+                            key={child.id}
+                            onClick={() => handleNavigate(child.path)}
+                            className={cn(
+                              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer',
+                              isActive(child.path)
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            )}
+                          >
+                            <ChildIcon className="h-3 w-3" />
+                            <span>{child.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => handleNavigate(item.path)}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer',
-                  currentPage === item.id
+                  isActive(item.path)
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
@@ -243,7 +428,6 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
         </nav>
       </div>
 
-      {/* Sticky Bottom Configuration Section */}
       {configItem && (
         <div className="p-2 pb-12 border-t border-border/40 bg-card/50 backdrop-blur-sm">
           <div className="space-y-1">
@@ -254,7 +438,7 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
                 }}
                 className={cn(
                   'flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer justify-between group',
-                  currentPage === configItem.id || isChildActive(configItem)
+                  isActive(configItem.path) || isChildActive(configItem)
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
@@ -265,25 +449,22 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
                 </div>
                 {configOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               </button>
-
-              {/* LED Status Indicator */}
               <ConnectionStatus />
             </div>
 
-            {configOpen && configItem.subItems && (
+
+
+            {configOpen && (
               <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
-                {configItem.subItems.filter(child => {
-                  if (child.id === 'config-smtp' && !entity.settings?.smtpEnabled) return false;
-                  return true;
-                }).map(child => {
+                {configItem.subItems!.map(child => {
                   const ChildIcon = child.icon;
                   return (
                     <button
                       key={child.id}
-                      onClick={() => onNavigate(child.id)}
+                      onClick={() => handleNavigate(child.path)}
                       className={cn(
                         'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer',
-                        currentPage === child.id
+                        isActive(child.path)
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       )}
@@ -293,6 +474,15 @@ export function Sidebar({ currentPage, onNavigate, selectedEntityId }: SidebarPr
                     </button>
                   );
                 })}
+
+                {/* Version Item */}
+                <button
+                  onClick={() => handleNavigate('/configuration?tab=changelog')}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Info className="h-3 w-3" />
+                  <span>Versión v{changelog[0]?.version || '0.0.0'}</span>
+                </button>
               </div>
             )}
           </div>

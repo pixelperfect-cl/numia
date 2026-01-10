@@ -1,28 +1,22 @@
-
-import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/contexts/DataContext';
 import { GeneralPanel } from '@/components/configuration/GeneralPanel';
 import { BoxesPanel } from '@/components/configuration/BoxesPanel';
 import { CategoriesPanel } from '@/components/configuration/CategoriesPanel';
-
 import { AdvancedSettings } from '@/components/configuration/AdvancedSettings';
+import { ChangelogPanel } from '@/components/configuration/ChangelogPanel';
 
 interface EntityConfigurationProps {
     entityId: string;
-    defaultTab?: string;
-    onTabChange?: (tab: string) => void;
 }
 
-export function EntityConfiguration({ entityId, defaultTab = 'general', onTabChange }: EntityConfigurationProps) {
-    const [activeTab, setActiveTab] = useState(defaultTab);
+export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'general';
     const { entities } = useData();
     const [refreshKey, setRefreshKey] = useState(0);
-
-    // Sync activeTab when defaultTab changes (from parent/sidebar)
-    useEffect(() => {
-        setActiveTab(defaultTab);
-    }, [defaultTab]);
 
     const entity = entities.find(e => e.id === entityId);
 
@@ -34,10 +28,11 @@ export function EntityConfiguration({ entityId, defaultTab = 'general', onTabCha
     };
 
     const handleTabChange = (value: string) => {
-        setActiveTab(value);
-        if (onTabChange) {
-            onTabChange(value);
-        }
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('tab', value);
+            return newParams;
+        });
     };
 
     return (
@@ -52,8 +47,8 @@ export function EntityConfiguration({ entityId, defaultTab = 'general', onTabCha
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="boxes">Cajas</TabsTrigger>
                     <TabsTrigger value="categories">Categorías</TabsTrigger>
-
                     <TabsTrigger value="advanced">Avanzado</TabsTrigger>
+                    <TabsTrigger value="changelog">Versión y Cambios</TabsTrigger>
                 </TabsList>
                 <TabsContent value="general">
                     <GeneralPanel entity={entity} />
@@ -67,10 +62,12 @@ export function EntityConfiguration({ entityId, defaultTab = 'general', onTabCha
                     <CategoriesPanel entityId={entityId} />
                 </TabsContent>
 
-
-
                 <TabsContent value="advanced">
                     <AdvancedSettings entity={entity} onUpdate={handleUpdate} />
+                </TabsContent>
+
+                <TabsContent value="changelog">
+                    <ChangelogPanel />
                 </TabsContent>
             </Tabs>
         </div>

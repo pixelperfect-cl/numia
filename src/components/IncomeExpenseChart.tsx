@@ -145,16 +145,14 @@ export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-4">
+          <div className="flex flex-row items-center justify-between">
+            <CardTitle>Ingresos vs Gastos</CardTitle>
+            <DateFilter value={dateFilter} onChange={setDateFilter} />
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <CardTitle>Ingresos vs Gastos</CardTitle>
-                <DateFilter value={dateFilter} onChange={setDateFilter} />
-              </div>
-              <CardDescription>
-                {startDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
-              </CardDescription>
-            </div>
+            <CardDescription>
+              {startDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
+            </CardDescription>
             <div className="flex gap-4 sm:gap-6 flex-shrink-0">
               <div className="text-left sm:text-right flex-1 sm:flex-none">
                 <div className="text-xs text-muted-foreground mb-1">Ingresos</div>

@@ -16,7 +16,7 @@ import type { EnhancedSubscription } from '@/pages/erp/Services';
 interface ServiceKanbanBoardProps {
     subscriptions: EnhancedSubscription[];
     onEdit: (sub: EnhancedSubscription) => void;
-    onCreate: () => void;
+    onCreate: (context: { frequency: 'monthly' | 'yearly'; monthIndex: number }) => void;
     onArchive: (id: string) => void;
     onDelete: (id: string) => void;
     ufValue: number | null;
@@ -282,6 +282,12 @@ export function ServiceKanbanBoard({
                             <span>{Math.round(progress)}%</span>
                             <span>{formatCurrency(paidCLP)} / {formatCurrency(targetCLP)}</span>
                         </div>
+                        <div className="flex justify-between text-[10px] mt-1">
+                            <span className="text-zinc-500">Pendiente</span>
+                            <span className="font-medium text-amber-600 dark:text-amber-400">
+                                {formatCurrency(targetCLP - paidCLP)}
+                            </span>
+                        </div>
                     </div>
                 )}
 
@@ -374,83 +380,105 @@ export function ServiceKanbanBoard({
         scrollContainerRef.current.scrollLeft = scrollLeft - walk;
     };
 
-    return (
-        <div
-            className={cn(
-                "h-full w-full overflow-x-auto overflow-y-hidden rounded-md border-none select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
-                isDragging ? "cursor-grabbing" : "cursor-grab"
-            )}
-            ref={scrollContainerRef}
-            onMouseDown={onMouseDown}
-            onMouseLeave={onMouseLeave}
-            onMouseUp={onMouseUp}
-            onMouseMove={onMouseMove}
-        >
-            <div className="flex space-x-4 pb-4 px-2 h-full min-w-max">
-                {months.map((monthName, index) => {
-                    const subs = columns[index] || [];
-                    const isMonthly = index === 0;
-                    const { totalCLP_Estimated, totalUF_Estimated } = calculateColumnStats(subs);
+    const monthlyColumn = columns[0] || [];
+    const monthlyStats = calculateColumnStats(monthlyColumn);
 
-                    return (
-                        <div key={index} className="w-64 shrink-0 flex flex-col gap-3 rounded-xl bg-zinc-100/50 dark:bg-black/40 p-2 h-full border border-zinc-200 dark:border-white/5">
-                            <div className="flex flex-col gap-1 px-1 shrink-0">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-semibold text-zinc-700 dark:text-zinc-200 text-sm">
-                                        {isMonthly ? 'Mensual' : monthName}
-                                    </h3>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-xs text-muted-foreground font-mono bg-zinc-200/50 dark:bg-zinc-900 px-1.5 py-0.5 rounded">
-                                            {subs.length}
-                                        </span>
-                                    </div>
-                                </div>
-                                {/* Column Total */}
-                                {subs.length > 0 && (
-                                    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground font-medium mt-1">
-                                        {isMonthly ? (
-                                            // Monthly: Show UF Total prioritized
-                                            <>
-                                                <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
-                                                    UF {totalUF_Estimated.toFixed(1)}
-                                                </span>
-                                                {ufValue && <span className="opacity-70 text-[10px]">({formatCurrency(Math.round(totalUF_Estimated * ufValue))})</span>}
-                                            </>
-                                        ) : (
-                                            // Annual Months: Show CLP Total prioritized
-                                            <>
-                                                <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
-                                                    {formatCurrency(totalCLP_Estimated)}
-                                                </span>
-                                                {ufValue && totalUF_Estimated > 0 && (
-                                                    <span className="opacity-70 text-[10px]">(~UF {totalUF_Estimated.toFixed(1)})</span>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+    const timelineMonths = months.slice(1); // Indices 1 to 12
 
-                            <div className="flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar max-h-[480px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                {subs.length > 0 ? (
-                                    subs.map(renderCard)
-                                ) : (
-                                    <div className="flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-800/50 rounded-lg min-h-[100px]">
-                                        <span className="text-xs text-zinc-500 dark:text-zinc-600">Sin servicios</span>
-                                    </div>
-                                )}
+    const renderColumn = (subs: EnhancedSubscription[], title: string, index: number, isMonthly: boolean) => {
+        const { totalCLP_Estimated, totalUF_Estimated } = calculateColumnStats(subs);
 
-                                <Button
-                                    variant="ghost"
-                                    className="justify-start text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 h-9 text-xs px-2 font-normal mt-1 shrink-0"
-                                    onClick={onCreate}
-                                >
-                                    <Plus className="mr-2 h-3.5 w-3.5" /> Activar Servicio
-                                </Button>
-                            </div>
+        return (
+            <div key={index} className="w-64 shrink-0 flex flex-col gap-3 rounded-xl bg-zinc-100/50 dark:bg-black/40 p-2 h-full border border-zinc-200 dark:border-white/5">
+                <div className="flex flex-col gap-1 px-1 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-zinc-700 dark:text-zinc-200 text-sm">
+                            {title}
+                        </h3>
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground font-mono bg-zinc-200/50 dark:bg-zinc-900 px-1.5 py-0.5 rounded">
+                                {subs.length}
+                            </span>
                         </div>
-                    );
-                })}
+                    </div>
+                    {/* Column Total */}
+                    {subs.length > 0 && (
+                        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground font-medium mt-1">
+                            {isMonthly ? (
+                                // Monthly: Show UF Total prioritized
+                                <>
+                                    <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
+                                        UF {totalUF_Estimated.toFixed(1)}
+                                    </span>
+                                    {ufValue && <span className="opacity-70 text-[10px]">({formatCurrency(Math.round(totalUF_Estimated * ufValue))})</span>}
+                                </>
+                            ) : (
+                                // Annual Months: Show CLP Total prioritized
+                                <>
+                                    <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
+                                        {formatCurrency(totalCLP_Estimated)}
+                                    </span>
+                                    {ufValue && totalUF_Estimated > 0 && (
+                                        <span className="opacity-70 text-[10px]">(~UF {totalUF_Estimated.toFixed(1)})</span>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar max-h-[480px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {subs.length > 0 ? (
+                        subs.map(renderCard)
+                    ) : (
+                        <div className="flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-800/50 rounded-lg min-h-[100px]">
+                            <span className="text-xs text-zinc-500 dark:text-zinc-600">Sin servicios</span>
+                        </div>
+                    )}
+
+                    <Button
+                        variant="ghost"
+                        className="justify-start text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 h-9 text-xs px-2 font-normal mt-1 shrink-0"
+                        onClick={() => onCreate({
+                            frequency: isMonthly ? 'monthly' : 'yearly',
+                            monthIndex: index
+                        })}
+                    >
+                        <Plus className="mr-2 h-3.5 w-3.5" /> Activar Servicio
+                    </Button>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="flex h-full gap-4">
+            {/* Fixed Left Column: Monthly */}
+            <div className="h-full shrink-0">
+                {renderColumn(monthlyColumn, 'Mensual', 0, true)}
+            </div>
+
+            {/* Separator Line */}
+            <div className="w-[1px] bg-zinc-200 dark:bg-zinc-800 h-full shrink-0 my-2" />
+
+            {/* Scrollable Right Area: Timeline */}
+            <div
+                className={cn(
+                    "flex-1 h-full overflow-x-auto overflow-y-hidden rounded-md border-none select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+                    isDragging ? "cursor-grabbing" : "cursor-grab"
+                )}
+                ref={scrollContainerRef}
+                onMouseDown={onMouseDown}
+                onMouseLeave={onMouseLeave}
+                onMouseUp={onMouseUp}
+                onMouseMove={onMouseMove}
+            >
+                <div className="flex space-x-4 pb-4 h-full min-w-max">
+                    {timelineMonths.map((monthName, i) => {
+                        const originalIndex = i + 1; // 1-based index for jan-dec
+                        return renderColumn(columns[originalIndex] || [], monthName, originalIndex, false);
+                    })}
+                </div>
             </div>
         </div>
     );
