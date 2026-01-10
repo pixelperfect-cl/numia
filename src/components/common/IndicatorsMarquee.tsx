@@ -2,8 +2,14 @@ import { useIndicators } from '@/hooks/useIndicators';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-export function IndicatorsMarquee() {
-    const { indicators, loading, error } = useIndicators();
+import { ApiPreference } from '@/types';
+
+interface IndicatorsMarqueeProps {
+    preferences?: ApiPreference[];
+}
+
+export function IndicatorsMarquee({ preferences }: IndicatorsMarqueeProps) {
+    const { indicators, loading, error } = useIndicators(preferences);
 
     if (loading || error || indicators.length === 0) {
         return null;

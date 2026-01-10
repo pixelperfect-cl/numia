@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/theme-provider';
-import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, ArrowLeftRight, Wallet, TrendingUp, Repeat, Bot, Cloud, ChevronDown, ChevronRight, Briefcase } from 'lucide-react';
+import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, ArrowLeftRight, Wallet, TrendingUp, Repeat, Bot, Cloud, ChevronDown, ChevronRight, Briefcase, Info } from 'lucide-react';
 import { useAI } from '@/contexts/AIContext';
 import { useData } from '@/contexts/DataContext';
 import { IconComponent } from '@/components/IconPicker';
@@ -206,7 +206,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
     return (
         <header className="sticky top-0 z-30 flex flex-col border-b bg-header-background shadow-sm">
             {/* Top Bar with Marquee - Visible only on Desktop */}
-            <IndicatorsMarquee />
+            <IndicatorsMarquee preferences={activeEntity?.settings?.apiPreferences} />
 
             <div className="flex h-16 items-center gap-2 md:gap-4 px-3 md:px-6">
                 {/* Mobile Menu (Hamburger) */}

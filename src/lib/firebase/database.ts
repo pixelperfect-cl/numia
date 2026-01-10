@@ -23,7 +23,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { syncClient } from '@/lib/supabase/adapter';
 import { db } from './config';
-import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, EntitySubscription, Project, ServiceDefinition } from '@/types';
+import type { Entity, Movement, Loan, Projection, Category, Client, Subscription, EntitySubscription, Project, ServiceDefinition, ProjectList } from '@/types';
 import * as sb from '../supabase/adapter';
 
 // Helper to convert Firestore timestamps to Date

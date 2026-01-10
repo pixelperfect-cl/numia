@@ -10,6 +10,7 @@ import { MigrationPanel } from './MigrationPanel';
 import { ModulesPanel } from './ModulesPanel'; // Import ModulesPanel
 import { SMTPPanel } from './SMTPPanel'; // Import SMTPPanel
 import { Entity } from '@/types'; // Import Entity type
+import { useData } from '@/contexts/DataContext';
 
 import {
     DndContext,
@@ -92,27 +93,29 @@ interface AdvancedSettingsProps {
 }
 
 export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
+    const { updateEntity } = useData();
+
     // Initialize state properly handling potentially missing new keys in old localStorage data
     const [preferences, setPreferences] = useState<ApiPreference[]>(() => {
-        const saved = localStorage.getItem('api_preferences');
-        if (!saved) return DEFAULT_PREFERENCES;
+        // Use entity preferences if available, otherwise defaults
+        const saved = entity?.settings?.apiPreferences;
 
-        try {
-            const parsed = JSON.parse(saved);
-            // Merge saved prefs with defaults to ensure all keys exist
-            // Also we must preserve the ORDER of parsed prefs if possible, 
-            // but add new defaults at the end.
-
+        // If we have saved preferences in the entity, use those
+        if (saved && saved.length > 0) {
             // Map defaults to be easily accessible
             const defaultsMap = new Map(DEFAULT_PREFERENCES.map(d => [d.id, d]));
 
-            // Reconstruct based on parsed to keep order
-            const merged = parsed.map((p: ApiPreference) => {
+            // Reconstruct based on saved to keep order
+            // Ensure we have all properties from default (like source) in case we add more fields later
+            // though for now saved has everything.
+            const merged = saved.map((p: ApiPreference) => {
                 const def = defaultsMap.get(p.id);
+                // If the preference exists in defaults, merge to ensure latest metadata (like name/source changes)
+                // but keep 'enabled' status from saved
                 return def ? { ...def, enabled: p.enabled } : p;
             }).filter((p: ApiPreference) => defaultsMap.has(p.id));
 
-            // Add any missing defaults at the end
+            // Add any missing defaults at the end (newly added indicators in code)
             DEFAULT_PREFERENCES.forEach(def => {
                 if (!merged.find((p: ApiPreference) => p.id === def.id)) {
                     merged.push(def);
@@ -120,10 +123,33 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
             });
 
             return merged;
-        } catch (e) {
-            console.error('Error parsing api preferences', e);
-            return DEFAULT_PREFERENCES;
         }
+
+        // Fallback: check localStorage for migration during first save? 
+        // Or just default. Let's just default to avoid complexity, or checking localStorage 
+        // one last time as a "migration" step would be nice.
+        const localSaved = localStorage.getItem('api_preferences');
+        if (localSaved) {
+            try {
+                const parsed = JSON.parse(localSaved);
+                // Same merge logic
+                const defaultsMap = new Map(DEFAULT_PREFERENCES.map(d => [d.id, d]));
+                const merged = parsed.map((p: ApiPreference) => {
+                    const def = defaultsMap.get(p.id);
+                    return def ? { ...def, enabled: p.enabled } : p;
+                }).filter((p: ApiPreference) => defaultsMap.has(p.id));
+                DEFAULT_PREFERENCES.forEach(def => {
+                    if (!merged.find((p: ApiPreference) => p.id === def.id)) {
+                        merged.push(def);
+                    }
+                });
+                return merged;
+            } catch (e) {
+                return DEFAULT_PREFERENCES;
+            }
+        }
+
+        return DEFAULT_PREFERENCES;
     });
 
     const [hasChanges, setHasChanges] = useState(false);
@@ -156,14 +182,38 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
         setHasChanges(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        if (!entity) return;
         setIsSaving(true);
-        localStorage.setItem('api_preferences', JSON.stringify(preferences));
-        window.dispatchEvent(new Event('api-preferences-changed'));
-        setTimeout(() => {
-            setIsSaving(false);
+        try {
+            // Update entity in Firestore
+            await updateEntity(entity.id, {
+                settings: {
+                    ...entity.settings,
+                    // valid properties for settings
+                    erpEnabled: entity.settings?.erpEnabled ?? false,
+                    apiPreferences: preferences
+                }
+            });
+
+            // Also update localStorage as a backup/cache for this device if needed, 
+            // or just remove it to clean up. Let's keep it in sync for now or just ignore it.
+            // Actually better to remove it to avoid confusion? 
+            // Let's leave it alone or update it so if they switch back to old version (unlikely) it works?
+            // Nah, let's just stick to DB.
+
+            // We don't need window dispatch anymore as data flows through Entity
+            // but for immediate feedback if using optimistic UI in Header...
+            // Header uses activeEntity from DataContext, which refreshes after updateEntity.
+
+            if (onUpdate) onUpdate();
+
             setHasChanges(false);
-        }, 500);
+        } catch (error) {
+            console.error('Error saving preferences:', error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (

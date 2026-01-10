@@ -28,6 +28,7 @@ export interface Entity {
       fromEmail: string;
       billingNotificationsEnabled: boolean;
     };
+    apiPreferences?: ApiPreference[];
   };
   rut?: string;
   email?: string;
@@ -36,6 +37,14 @@ export interface Entity {
   address?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Configuration Types
+export interface ApiPreference {
+  id: string;
+  name: string;
+  enabled: boolean;
+  source: string;
 }
 
 // Category Types
