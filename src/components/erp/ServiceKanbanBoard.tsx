@@ -67,6 +67,7 @@ export function ServiceKanbanBoard({
     const [isDragging, setIsDragging] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
+    const [mobileView, setMobileView] = useState<'monthly' | 'annual'>('monthly');
 
     const columns = useMemo(() => {
         const cols: Record<number, EnhancedSubscription[]> = {};
@@ -389,7 +390,7 @@ export function ServiceKanbanBoard({
         const { totalCLP_Estimated, totalUF_Estimated } = calculateColumnStats(subs);
 
         return (
-            <div key={index} className="w-64 shrink-0 flex flex-col gap-3 rounded-xl bg-zinc-100/50 dark:bg-black/40 p-2 h-full border border-zinc-200 dark:border-white/5">
+            <div key={index} className="w-[85vw] md:w-64 shrink-0 flex flex-col gap-3 rounded-xl bg-zinc-100/50 dark:bg-black/40 p-2 h-full border border-zinc-200 dark:border-white/5">
                 <div className="flex flex-col gap-1 px-1 shrink-0">
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-zinc-700 dark:text-zinc-200 text-sm">
@@ -452,32 +453,64 @@ export function ServiceKanbanBoard({
     };
 
     return (
-        <div className="flex h-full gap-4">
-            {/* Fixed Left Column: Monthly */}
-            <div className="h-full shrink-0">
-                {renderColumn(monthlyColumn, 'Mensual', 0, true)}
+        <div className="h-full flex flex-col gap-4">
+            {/* Mobile View Switcher */}
+            <div className="flex md:hidden bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg shrink-0">
+                <button
+                    onClick={() => setMobileView('monthly')}
+                    className={cn(
+                        "flex-1 py-1.5 text-xs font-medium rounded-md transition-all",
+                        mobileView === 'monthly'
+                            ? "bg-white dark:bg-black shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    Mensual
+                </button>
+                <button
+                    onClick={() => setMobileView('annual')}
+                    className={cn(
+                        "flex-1 py-1.5 text-xs font-medium rounded-md transition-all",
+                        mobileView === 'annual'
+                            ? "bg-white dark:bg-black shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    Anual
+                </button>
             </div>
 
-            {/* Separator Line */}
-            <div className="w-[1px] bg-zinc-200 dark:bg-zinc-800 h-full shrink-0 my-2" />
+            <div className="flex-1 h-full flex overflow-hidden">
+                {/* Monthly Column */}
+                <div className={cn(
+                    "h-full shrink-0 w-full md:w-auto transition-all duration-300",
+                    mobileView === 'monthly' ? "block" : "hidden md:block" // Mobile: show only if monthly. Desktop: always show.
+                )}>
+                    {renderColumn(monthlyColumn, 'Mensual', 0, true)}
+                </div>
 
-            {/* Scrollable Right Area: Timeline */}
-            <div
-                className={cn(
-                    "flex-1 h-full overflow-x-auto overflow-y-hidden rounded-md border-none select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
-                    isDragging ? "cursor-grabbing" : "cursor-grab"
-                )}
-                ref={scrollContainerRef}
-                onMouseDown={onMouseDown}
-                onMouseLeave={onMouseLeave}
-                onMouseUp={onMouseUp}
-                onMouseMove={onMouseMove}
-            >
-                <div className="flex space-x-4 pb-4 h-full min-w-max">
-                    {timelineMonths.map((monthName, i) => {
-                        const originalIndex = i + 1; // 1-based index for jan-dec
-                        return renderColumn(columns[originalIndex] || [], monthName, originalIndex, false);
-                    })}
+                {/* Separator Line (Desktop Only) */}
+                <div className="hidden md:block w-[1px] bg-zinc-200 dark:bg-zinc-800 h-full shrink-0 mx-4" />
+
+                {/* Scrollable Right Area: Timeline */}
+                <div
+                    className={cn(
+                        "flex-1 h-full overflow-x-auto overflow-y-hidden rounded-md border-none select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+                        isDragging ? "cursor-grabbing" : "cursor-grab",
+                        mobileView === 'annual' ? "block w-full" : "hidden md:block"
+                    )}
+                    ref={scrollContainerRef}
+                    onMouseDown={onMouseDown}
+                    onMouseLeave={onMouseLeave}
+                    onMouseUp={onMouseUp}
+                    onMouseMove={onMouseMove}
+                >
+                    <div className="flex flex-row gap-4 pb-4 h-full min-w-max">
+                        {timelineMonths.map((monthName, i) => {
+                            const originalIndex = i + 1;
+                            return renderColumn(columns[originalIndex] || [], monthName, originalIndex, false);
+                        })}
+                    </div>
                 </div>
             </div>
         </div>
