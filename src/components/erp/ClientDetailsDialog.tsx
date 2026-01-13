@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getSubscriptions, deleteSubscription } from '@/lib/firebase/database';
 import { ServiceDialog } from './ServiceDialog';
 import { ServiceSelectionDialog } from './ServiceSelectionDialog';
-import { Briefcase, Mail, Phone, Calendar, Plus, Edit, Trash2, CreditCard, User, Building2, MapPin } from 'lucide-react';
+import { Briefcase, Mail, Phone, Calendar, Plus, Edit, Trash2, CreditCard, User, Building2, MapPin, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Client, Subscription, ServiceDefinition } from '@/types';
 
@@ -113,6 +113,25 @@ export function ClientDetailsDialog({ client, open, onOpenChange, onEditClient }
                                                 <div>
                                                     <p className="font-medium">Contacto Principal</p>
                                                     <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                                                        {client.representative && (
+                                                            <div className="flex items-center gap-2 font-medium text-foreground">
+                                                                <User className="h-3.5 w-3.5" />
+                                                                <span>{client.representative}</span>
+                                                            </div>
+                                                        )}
+                                                        {client.website && (
+                                                            <div className="flex items-center gap-2">
+                                                                <Globe className="h-3.5 w-3.5" />
+                                                                <a
+                                                                    href={client.website.startsWith('http') ? client.website : `https://${client.website}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="hover:underline"
+                                                                >
+                                                                    {client.website}
+                                                                </a>
+                                                            </div>
+                                                        )}
                                                         {client.email && (
                                                             <div className="flex items-center gap-2">
                                                                 <Mail className="h-3.5 w-3.5" />

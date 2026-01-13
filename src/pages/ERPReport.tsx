@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ReportCard } from '@/components/reports/ReportCard';
 import { ReportFilters, type ReportFilterState } from '@/components/reports/ReportFilters';
 import { formatCurrency } from '@/lib/utils';
+import { fetchIndicators } from '@/lib/indicators';
 import {
     calculateMRR,
     calculateARR,
@@ -41,6 +42,7 @@ export function ERPReport() {
     const [clients, setClients] = useState<Client[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+    const [ufValue, setUfValue] = useState<number>(0);
 
     const [filters, setFilters] = useState<ReportFilterState>(() => {
         const { start, end } = getDateRangePreset('this-month');
@@ -63,10 +65,13 @@ export function ERPReport() {
             if (!user) return;
             setLoading(true);
 
-            const [clientsData, projectsData] = await Promise.all([
+            const [clientsData, projectsData, indicators] = await Promise.all([
                 getClients(user.uid),
-                getProjects(user.uid)
+                getProjects(user.uid),
+                fetchIndicators()
             ]);
+
+            setUfValue(indicators.uf.valor);
 
             // Load subscriptions for all clients
             const allSubscriptions: Subscription[] = [];
@@ -91,17 +96,34 @@ export function ERPReport() {
     const filteredData = useMemo(() => {
         let filteredMovements = movements;
         let filteredClients = clients;
-        let filteredProjects = projects;
+        let filteredProjects = projects.filter(p => !p.archived); // Exclude archived projects
         let filteredSubscriptions = subscriptions;
 
         // Filter by entity
         if (filters.entityIds.length > 0) {
             filteredClients = clients.filter(c => filters.entityIds.includes(c.entityId));
-            filteredProjects = projects.filter(p => filters.entityIds.includes(p.entityId));
+            filteredProjects = projects.filter(p => filters.entityIds.includes(p.entityId) && !p.archived); // Exclude archived projects
             filteredMovements = movements.filter(m => filters.entityIds.includes(m.entityId));
 
             const clientIds = filteredClients.map(c => c.id);
             filteredSubscriptions = subscriptions.filter(s => clientIds.includes(s.clientId));
+        } else {
+            // Ensure archived projects are filtered out even when no entity filter is applied
+            filteredProjects = projects.filter(p => !p.archived);
+        }
+
+        // Normalize subscriptions currency (Convert UF to CLP) checking against ufValue > 0
+        if (ufValue > 0) {
+            filteredSubscriptions = filteredSubscriptions.map(sub => {
+                if (sub.currency === 'UF') {
+                    return {
+                        ...sub,
+                        amount: (Number(sub.amount) || 0) * ufValue,
+                        currency: 'CLP' // Normalize currency indicator as well for consistency if needed, though mostly amount matters
+                    };
+                }
+                return sub;
+            });
         }
 
         // Filter movements by date
@@ -119,18 +141,23 @@ export function ERPReport() {
             subscriptions: filteredSubscriptions,
             movements: filteredMovements
         };
-    }, [clients, projects, subscriptions, movements, filters]);
+    }, [clients, projects, subscriptions, movements, filters, ufValue]);
 
     // Calculate metrics
     const metrics = useMemo(() => {
-        const activeClients = filteredData.clients.filter(c => c.status === 'active').length;
+        const activeClientsList = filteredData.clients.filter(c => c.status === 'active');
+        const activeClients = activeClientsList.length;
         const totalClients = filteredData.clients.length;
         const mrr = calculateMRR(filteredData.subscriptions);
         const arr = calculateARR(filteredData.subscriptions);
         const activeServices = filteredData.subscriptions.filter(s => s.status === 'active').length;
         const collectionRate = calculateCollectionRate(filteredData.subscriptions, filteredData.movements);
         const projectMetrics = calculateProjectMetrics(filteredData.projects);
-        const clientRevenue = groupByClient(filteredData.subscriptions, filteredData.clients, filteredData.movements);
+        const clientRevenue = groupByClient(filteredData.subscriptions, activeClientsList, filteredData.movements)
+            .filter(c => c.activeServices > 0); // Filter clients with 0 active services
+
+        // Calculate Average Service Value (Only considering active paying services)
+        const activePayingServices = filteredData.subscriptions.filter(s => s.status === 'active' && Number(s.amount) > 0).length;
 
         return {
             activeClients,
@@ -142,8 +169,8 @@ export function ERPReport() {
             totalServices: filteredData.subscriptions.length,
             collectionRate,
             projectMetrics,
-            clientRevenue: clientRevenue.slice(0, 10), // Top 10 clients
-            averageServiceValue: activeServices > 0 ? mrr / activeServices : 0
+            clientRevenue, // Return all clients, no limit
+            averageServiceValue: activePayingServices > 0 ? mrr / activePayingServices : 0
         };
     }, [filteredData]);
 
@@ -352,7 +379,7 @@ export function ERPReport() {
             {/* Top Clients by Revenue */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Top 10 Clientes por Ingresos</CardTitle>
+                    <CardTitle>Ingresos por Cliente</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {metrics.clientRevenue.length > 0 ? (
@@ -363,35 +390,37 @@ export function ERPReport() {
                                     <XAxis type="number" className="text-xs" tickFormatter={(value) => formatCurrency(value)} />
                                     <YAxis type="category" dataKey="clientName" className="text-xs" width={120} />
                                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                    <Bar dataKey="totalRevenue" fill="#10b981" name="Ingresos Totales" />
+                                    <Bar dataKey="projectedRevenue" fill="#10b981" name="Ingresos Anuales (Est.)" />
                                 </BarChart>
                             </ResponsiveContainer>
 
-                            <div className="mt-6 overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b">
-                                            <th className="text-left py-2 px-4">Cliente</th>
-                                            <th className="text-right py-2 px-4">Servicios Activos</th>
-                                            <th className="text-right py-2 px-4">MRR</th>
-                                            <th className="text-right py-2 px-4">Ingresos Totales</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {metrics.clientRevenue.map((client) => (
-                                            <tr key={client.clientId} className="border-b">
-                                                <td className="py-2 px-4 font-medium">{client.clientName}</td>
-                                                <td className="py-2 px-4 text-right">{client.activeServices}</td>
-                                                <td className="py-2 px-4 text-right text-emerald-600 dark:text-emerald-500">
-                                                    {formatCurrency(client.mrr)}
-                                                </td>
-                                                <td className="py-2 px-4 text-right font-semibold">
-                                                    {formatCurrency(client.totalRevenue)}
-                                                </td>
+                            <div className="mt-6 overflow-hidden border rounded-md">
+                                <div className="max-h-[400px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                    <table className="w-full relative">
+                                        <thead className="sticky top-0 bg-background z-10 shadow-sm">
+                                            <tr className="border-b">
+                                                <th className="text-left py-2 px-4">Cliente</th>
+                                                <th className="text-right py-2 px-4">Servicios Activos</th>
+                                                <th className="text-right py-2 px-4">MRR</th>
+                                                <th className="text-right py-2 px-4">Ingresos Anuales (Est.)</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {metrics.clientRevenue.map((client) => (
+                                                <tr key={client.clientId} className="border-b">
+                                                    <td className="py-2 px-4 font-medium">{client.clientName}</td>
+                                                    <td className="py-2 px-4 text-right">{client.activeServices}</td>
+                                                    <td className="py-2 px-4 text-right text-emerald-600 dark:text-emerald-500">
+                                                        {formatCurrency(client.mrr)}
+                                                    </td>
+                                                    <td className="py-2 px-4 text-right font-semibold">
+                                                        {formatCurrency(client.projectedRevenue)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </>
                     ) : (
@@ -434,6 +463,6 @@ export function ERPReport() {
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

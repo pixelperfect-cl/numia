@@ -21,6 +21,8 @@ import { PaymentHistoryDialog } from '@/components/erp/PaymentHistoryDialog';
 import { EditPaymentDialog } from '@/components/erp/EditPaymentDialog';
 import { PaymentDialog } from '@/components/erp/PaymentDialog';
 import { ArchiveServiceDialog } from '@/components/erp/ArchiveServiceDialog';
+import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';
+import { ClientDialog } from '@/components/erp/ClientDialog';
 import { fetchIndicators } from '@/lib/indicators';
 import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
@@ -32,6 +34,71 @@ interface ServicesProps {
     defaultTab?: 'summary' | 'active' | 'archived';
     onTabChange?: (tab: string) => void;
 }
+
+// Logic extracted to helper for reuse
+const processSubscription = (sub: Subscription, client: Client, userId: string): EnhancedSubscription => {
+    // Calculate paid amount for the *current* period
+    // Current period start = nextBillingDate - frequency
+    const nextDate = parseISO(sub.nextBillingDate);
+    let periodStart = sub.frequency === 'monthly'
+        ? subMonths(nextDate, 1)
+        : subYears(nextDate, 1);
+
+    // Calculate paid amount from Payment Records in Subscription
+    // This is the single source of truth for "Service Status"
+    // If sub.payments is undefined, fallback to empty array
+    const currentPayments = (sub.payments || []).filter(p => {
+        const pDate = parseISO(p.date);
+        // Logic: date > periodStart AND date <= nextBillingDate
+        return isAfter(pDate, periodStart) && pDate <= parseISO(sub.nextBillingDate);
+    });
+
+    // Map PaymentRecord to Movement-like structure for the UI
+    const displayedMovements: Movement[] = currentPayments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        date: p.date,
+        description: p.notes,
+        type: 'income',
+        userId: userId,
+        categoryId: '',
+        entityId: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: 'paid',
+        box: 'general',
+        isFinancial: p.isFinancial
+    }));
+
+    // Map ALL payments for history
+    const allPayments = (sub.payments || []).map(p => ({
+        id: p.id,
+        userId: userId,
+        amount: p.amount,
+        date: p.date,
+        description: p.notes,
+        type: 'income' as const,
+        categoryId: '',
+        entityId: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: 'paid' as 'paid',
+        box: 'general',
+        isFinancial: p.isFinancial
+    }));
+
+    const paid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+        ...sub,
+        clientName: client.name,
+        clientWebsite: client.website,
+        clientId: client.id,
+        paidAmount: paid,
+        currentMovements: displayedMovements,
+        allPayments: allPayments
+    };
+};
 
 // Re-export from types for backwards compatibility
 export type { EnhancedSubscription } from '@/types';
@@ -71,6 +138,12 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
     const [subscriptionToArchive, setSubscriptionToArchive] = useState<EnhancedSubscription | null>(null);
 
+    // Client Dialog State (for viewing/editing from cards)
+    const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
+    const [clientDialogOpen, setClientDialogOpen] = useState(false);
+    const [selectedClientForView, setSelectedClientForView] = useState<Client | null>(null);
+    const [selectedClientForEdit, setSelectedClientForEdit] = useState<Client | null>(null);
+
     const loadData = async () => {
         if (!user) return;
         setLoading(true);
@@ -95,74 +168,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             // 3. Fetch Subscriptions for each filtered client
             const subsPromises = filteredClients.map(async (client) => {
                 const clientSubs = await getSubscriptions(client.id, user.uid);
-                return clientSubs.map(sub => {
-                    // Calculate paid amount for the *current* period
-                    // Current period start = nextBillingDate - frequency
-                    const nextDate = parseISO(sub.nextBillingDate);
-                    let periodStart = sub.frequency === 'monthly'
-                        ? subMonths(nextDate, 1)
-                        : subYears(nextDate, 1);
-
-                    // Calculate paid amount from Payment Records in Subscription
-                    // This is the single source of truth for "Service Status"
-                    // If sub.payments is undefined, fallback to empty array
-                    const currentPayments = (sub.payments || []).filter(p => {
-                        const pDate = parseISO(p.date);
-                        // Logic: date > periodStart AND date <= nextBillingDate
-                        return isAfter(pDate, periodStart) && pDate <= parseISO(sub.nextBillingDate);
-                    });
-
-                    // Map PaymentRecord to Movement-like structure for the UI
-                    // (The Dialog expects Movement[])
-                    const displayedMovements: Movement[] = currentPayments.map(p => ({
-                        id: p.id,
-                        amount: p.amount,
-                        date: p.date,
-                        description: p.notes,
-                        type: 'income',
-                        userId: user.uid,
-                        categoryId: '', // Placeholder
-                        entityId: '', // Placeholder
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        status: 'paid',
-                        box: 'general',
-                        isFinancial: p.isFinancial
-                    }));
-
-                    // Map ALL payments for history
-                    const allPayments = (sub.payments || []).map(p => ({
-                        id: p.id,
-                        userId: user.uid,
-                        amount: p.amount,
-                        date: p.date,
-                        description: p.notes,
-                        type: 'income' as const,
-                        categoryId: '',
-                        entityId: '',
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        status: 'paid' as 'paid',
-                        box: 'general',
-                        isFinancial: p.isFinancial
-                    }));
-
-                    const paid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
-
-                    // Debug log
-                    if (paid > 0) {
-                        console.log(`💰 [Services] Paid Amount for ${sub.name}: ${paid} (from ${currentPayments.length} records)`);
-                    }
-
-                    return {
-                        ...sub,
-                        clientName: client.name,
-                        clientId: client.id,
-                        paidAmount: paid,
-                        currentMovements: displayedMovements,
-                        allPayments: allPayments
-                    };
-                });
+                return clientSubs.map(sub => processSubscription(sub, client, user.uid));
             });
 
             const results = await Promise.all(subsPromises);
@@ -377,6 +383,27 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         setPaymentDialogOpen(true);
     };
 
+    const handleViewClient = (sub: EnhancedSubscription) => {
+        const client = clients.find(c => c.id === sub.clientId);
+        if (client) {
+            setSelectedClientForView(client);
+            setClientDetailsOpen(true);
+        }
+    };
+
+    const handleEditClientFromDetails = (client: Client) => {
+        setClientDetailsOpen(false);
+        setSelectedClientForEdit(client);
+        setClientDialogOpen(true);
+    };
+
+    const handleClientSave = () => {
+        loadData(); // Refresh clients and services (names might change)
+        setClientDialogOpen(false);
+        // If we were viewing details, reopen details? No, usually generic save closes everything.
+        // User workflow: View -> Edit -> Save -> Done.
+    };
+
     const handlePaymentConfirm = async (amount: number, date: Date, notes: string, registerMovement: boolean) => {
         if (!user || !selectedSubscriptionForPayment) return;
 
@@ -469,61 +496,50 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             // 1. Remove from subscription.payments array
             const updatedPayments = (sub.payments || []).filter(p => p.id !== paymentId);
 
+            // Logic to revert date if we are deleting the *latest* payment
+            // Payments are not guaranteed to be sorted in the sub object, so let's sort them.
+            const allPayments = [...(sub.payments || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const latestPayment = allPayments[0];
+
+            let newNextDate = sub.nextBillingDate;
+
+            // If we are deleting the latest payment, we should revert the date
+            if (latestPayment && latestPayment.id === paymentId) {
+                const currentNext = parseISO(sub.nextBillingDate);
+                const revertedDate = sub.frequency === 'monthly'
+                    ? subMonths(currentNext, 1)
+                    : subYears(currentNext, 1);
+                newNextDate = format(revertedDate, 'yyyy-MM-dd');
+                console.log(`Reverting date from ${sub.nextBillingDate} to ${newNextDate}`);
+            }
+
             await updateSubscription(sub.id, {
-                payments: updatedPayments
+                payments: updatedPayments,
+                nextBillingDate: newNextDate
             });
 
-            // 2. If it has a financial movement, delete it too
-            // We need to find the movement ID. If we don't store it directly on the payment record for older payments,
-            // we might have trouble. But new ones have movementId if they were financial.
-            // Also our mapping logic in loadData put 'id' as payment.id. 
-            // Ideally we need to check if there is a real movement with this ID or linked to it.
-            // For now, let's assume if isFinancial is true, we should try to delete the movement associated.
-            // However, our current mapping in loadData uses payment.id as the movement.id for the display list.
 
-            // Correct approach: The payment object in 'allPayments' has the ID of the PaymentRecord.
-            // We need to check if that PaymentRecord has a 'movementId'.
-            // In loadData we mapped specific props. Let's look at the raw subscription data again?
-            // Actually 'sub' here is the state object which is 'EnhancedSubscription'.
-            // The 'allPayments' array contains objects that look like Movements but come from PaymentRecords.
+            // 2. Refresh Local State Immediately
+            // We need to mirror what loadData does but for this specific subscription only
+            const updatedSubRaw = {
+                ...sub,
+                payments: updatedPayments,
+                nextBillingDate: newNextDate
+            };
 
-            const originalPaymentRecord = (sub.payments || []).find(p => p.id === paymentId);
-            if (originalPaymentRecord && originalPaymentRecord.movementId) {
-                // Delete the financial movement
-                // We need a deleteMovement function in database.ts ideally, using updateMovement to set status deleted or hard delete.
-                // For now, let's just log or assume hard delete if we had the function.
-                // Since we don't have deleteMovement imported efficiently or exposed, we might skip this 
-                // OR we can import { deleteDoc, doc } from firebase/firestore and do it here if needed, 
-                // but better to stick to service layer.
-                // Let's just update the subscription for now as that's the source of truth for "History".
-                // If the user wants to delete the "Financial Movement", they should technically go to Movements page,
-                // but this is a nice shortcut.
+            // Re-process the subscription to get correct paidAmount and movement lists
+            const client = clients.find(c => c.id === sub.clientId) || { id: sub.clientId, name: sub.clientName } as Client;
+            const updatedSubProcessed = processSubscription(updatedSubRaw, client, user.uid);
 
-                // NOTE: We will implement only subscription update for now to avoid side effects on accounting 
-                // unless explicitly requested to sync. The user asked "edit/delete from history".
-                // We warned in the dialog "Si generó movimiento financiero..." so we should try.
-                console.log("Attempting to delete associated movement", originalPaymentRecord.movementId);
-                // Implementation pending strict requirement: for now just remove from internal history.
-            }
+            // Update local subscriptions list
+            setSubscriptions(prev => prev.map(s => s.id === sub.id ? updatedSubProcessed : s));
 
-            // Refresh data
-            await loadData();
+            // Update the detailed view state
+            setSelectedSubscriptionForDetail(updatedSubProcessed);
 
-            // Close dialog if no payments left? No, just refresh the view.
-            // We need to update selectedSubscriptionForDetail to reflect changes immediately in the open dialog.
-            const updatedSub = subscriptions.find(s => s.id === sub.id);
-            if (updatedSub) {
-                // We can't easily find the updated sub because subscriptions state update is async/batched 
-                // and loadData refetches. We can wait for loadData.
-                // For smoother UX, let's locally update the selected sub.
-                setSelectedSubscriptionForDetail({
-                    ...sub,
-                    payments: updatedPayments,
-                    allPayments: sub.allPayments?.filter(p => p.id !== paymentId),
-                    currentMovements: sub.currentMovements?.filter(p => p.id !== paymentId),
-                    paidAmount: (sub.paidAmount || 0) - (paymentToDelete?.amount || 0)
-                });
-            }
+            // Background refresh to ensure sync
+            loadData();
+
         } catch (error) {
             console.error("Error deleting payment:", error);
             alert("Error al eliminar el pago");
@@ -621,6 +637,21 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
     return (
         <div className="space-y-6 h-full flex flex-col">
+            <ClientDetailsDialog
+                client={selectedClientForView}
+                open={clientDetailsOpen}
+                onOpenChange={setClientDetailsOpen}
+                onEditClient={handleEditClientFromDetails}
+            />
+
+            <ClientDialog
+                open={clientDialogOpen}
+                onOpenChange={setClientDialogOpen}
+                client={selectedClientForEdit || undefined}
+                onSuccess={handleClientSave}
+                entityId={entityId || user?.uid} // Fallback entity ID
+            />
+
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between shrink-0 gap-4 md:gap-0">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Gestión de Servicios</h1>
@@ -862,6 +893,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                             onPartialPayment={onPartialPayment}
                             onRevertPayment={handleRevertPayment}
                             onViewPaymentDetails={handleViewPaymentDetails}
+                            onViewClient={handleViewClient}
                             onShowHistory={(sub) => {
                                 setSelectedSubscriptionForDetail(sub);
                                 setHistoryDialogOpen(true);

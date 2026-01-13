@@ -7,7 +7,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, Plus, MoreHorizontal, Archive, Trash2, Edit, CheckCircle2, CircleDollarSign, RotateCcw, Receipt, DollarSign, History } from 'lucide-react';
+import { Clock, Plus, MoreHorizontal, Archive, Trash2, Edit, CheckCircle2, CircleDollarSign, RotateCcw, Receipt, DollarSign, History, Globe, Briefcase } from 'lucide-react';
 import { format, parseISO, getMonth, isPast, isToday, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -25,6 +25,7 @@ interface ServiceKanbanBoardProps {
     onRevertPayment: (sub: EnhancedSubscription) => void;
     onViewPaymentDetails: (sub: EnhancedSubscription) => void;
     onShowHistory: (sub: EnhancedSubscription) => void;
+    onViewClient: (sub: EnhancedSubscription) => void;
 }
 
 const months = [
@@ -61,7 +62,8 @@ export function ServiceKanbanBoard({
     onPartialPayment,
     onRevertPayment,
     onViewPaymentDetails,
-    onShowHistory
+    onShowHistory,
+    onViewClient
 }: ServiceKanbanBoardProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -198,7 +200,7 @@ export function ServiceKanbanBoard({
                             onShowHistory(sub);
                         }}
                     >
-                        <CircleDollarSign className="h-3.5 w-3.5" />
+                        <History className="h-3.5 w-3.5" />
                     </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -208,7 +210,10 @@ export function ServiceKanbanBoard({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(sub); }}>
-                                <Edit className="mr-2 h-4 w-4" /> Editar
+                                <Edit className="mr-2 h-4 w-4" /> Editar Servicio
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewClient(sub); }}>
+                                <Briefcase className="mr-2 h-4 w-4" /> Ver Cliente
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onShowHistory(sub); }}>
                                 <Receipt className="mr-2 h-4 w-4" /> Ver Historial
@@ -233,7 +238,14 @@ export function ServiceKanbanBoard({
 
                 <div className="flex justify-between items-start">
                     {/* Title */}
-                    <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs truncate pr-5 leading-tight">
+                    <div
+                        className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs truncate pr-5 leading-tight hover:text-blue-500 hover:underline cursor-pointer"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onViewClient(sub);
+                        }}
+                        title="Ver cliente"
+                    >
                         {sub.clientName}
                     </div>
                 </div>
@@ -242,6 +254,20 @@ export function ServiceKanbanBoard({
                 <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mb-1">
                     {sub.name}
                 </div>
+
+                {/* Website Link */}
+                {sub.clientWebsite && (
+                    <a
+                        href={sub.clientWebsite.startsWith('http') ? sub.clientWebsite : `https://${sub.clientWebsite}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-[10px] text-zinc-400 hover:text-blue-500 transition-colors mb-2 w-fit"
+                    >
+                        <Globe className="h-2.5 w-2.5" />
+                        <span className="truncate max-w-[150px]">{sub.clientWebsite.replace(/^https?:\/\//, '').replace(/^www\./, '')}</span>
+                    </a>
+                )}
 
                 <div className="flex items-center justify-between mt-0.5">
                     {/* Date Badge */}

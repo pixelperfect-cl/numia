@@ -21,6 +21,8 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<Partial<Client>>({
         name: '',
+        representative: '',
+        website: '',
         email: '',
         phone: '',
         emails: [],
@@ -34,6 +36,7 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
         if (client) {
             setFormData({
                 name: client.name,
+                representative: client.representative || '',
                 email: client.email || '',
                 phone: client.phone || '',
                 emails: client.emails || [],
@@ -45,6 +48,7 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
         } else {
             setFormData({
                 name: '',
+                representative: '',
                 email: '',
                 phone: '',
                 emails: [],
@@ -152,6 +156,26 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 required
+                            />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="representative">Representante</Label>
+                            <Input
+                                id="representative"
+                                placeholder="Ej: Juan Pérez"
+                                value={formData.representative}
+                                onChange={(e) => setFormData({ ...formData, representative: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="website">Sitio Web</Label>
+                            <Input
+                                id="website"
+                                placeholder="Ej: www.empresa.com"
+                                value={formData.website}
+                                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                             />
                         </div>
 

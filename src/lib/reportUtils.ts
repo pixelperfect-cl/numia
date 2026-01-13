@@ -37,6 +37,7 @@ export interface ClientRevenue {
     totalRevenue: number;
     activeServices: number;
     mrr: number;
+    projectedRevenue: number;
 }
 
 export interface ProjectMetrics {
@@ -240,17 +241,19 @@ export function groupByClient(
             .reduce((sum, m) => sum + Math.abs(m.amount), 0);
 
         const mrr = calculateMRR(activeSubs);
+        const projectedRevenue = calculateARR(activeSubs); // Calculate Annual Projected Revenue
 
         clientMap.set(client.id, {
             clientId: client.id,
             clientName: client.name,
             totalRevenue,
             activeServices: activeSubs.length,
-            mrr
+            mrr,
+            projectedRevenue
         });
     });
 
-    return Array.from(clientMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    return Array.from(clientMap.values()).sort((a, b) => b.projectedRevenue - a.projectedRevenue);
 }
 
 /**

@@ -46,6 +46,7 @@ export const mapClient = (userId: string | undefined, data: Partial<Client>) => 
         emails: 'emails',    // Manual map for clarity, matches new DB column
         phones: 'phones',    // Manual map for clarity, matches new DB column
         rut: 'rut',          // Matches new DB column
+        website: 'website',  // Matches new DB column
         status: 'status',    // Matches new DB column
         createdAt: 'created_at',
         updatedAt: 'updated_at'

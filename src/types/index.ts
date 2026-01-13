@@ -271,6 +271,7 @@ export interface Subscription {
 // Enhanced Subscription with client info (for use in components)
 export interface EnhancedSubscription extends Subscription {
   clientName: string;
+  clientWebsite?: string;
   paidAmount?: number;
   currentMovements?: Movement[];
   allPayments?: Movement[];
@@ -310,6 +311,8 @@ export interface Client {
   userId: string;
   entityId: string;
   name: string;
+  representative?: string; // Representante legal o contacto principal
+  website?: string; // Website URL
   email?: string; // Primary email (backward compatibility)
   phone?: string; // Primary phone (backward compatibility)
   emails?: string[]; // Additional emails for notifications

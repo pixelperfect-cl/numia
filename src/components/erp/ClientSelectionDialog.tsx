@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getClients } from '@/lib/firebase/database';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserPlus, Search, Loader2, ArrowRight, Mail, Phone } from 'lucide-react';
+import { UserPlus, Search, Loader2, ArrowRight, Mail, Phone, User } from 'lucide-react';
 import type { Client } from '@/types';
 import { ClientDialog } from './ClientDialog';
 
@@ -47,7 +47,8 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
         return clients.filter(client =>
             client.name.toLowerCase().includes(term) ||
             client.email?.toLowerCase().includes(term) ||
-            client.phone?.includes(term)
+            client.phone?.includes(term) ||
+            client.representative?.toLowerCase().includes(term)
         );
     }, [clients, searchTerm]);
 
@@ -83,7 +84,7 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
                         />
                     </div>
 
-                    <ScrollArea className="flex-1 -mx-6 px-6 max-h-[400px]">
+                    <div className="-mx-6 px-6 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                         <div className="space-y-1 py-2">
                             {/* Create New Client Option */}
                             <div
@@ -160,6 +161,12 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
                                                     {client.phone}
                                                 </span>
                                             )}
+                                            {client.representative && (
+                                                <span className="flex items-center gap-1">
+                                                    <User className="h-3 w-3 shrink-0" />
+                                                    {client.representative}
+                                                </span>
+                                            )}
                                             {!client.email && !client.phone && (
                                                 <span className="italic opacity-60">Sin datos de contacto</span>
                                             )}
@@ -171,7 +178,7 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
                                 </div>
                             ))}
                         </div>
-                    </ScrollArea>
+                    </div>
 
                     {/* Footer with count */}
                     {!loading && (

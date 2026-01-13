@@ -2,18 +2,51 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { getClients, getProjects, getSubscriptions } from '@/lib/firebase/database';
-import { Users, Briefcase, DollarSign, Activity } from 'lucide-react';
-import type { Client, Project } from '@/types';
+import { Users, Briefcase, DollarSign, Activity, CalendarDays, Plus, Edit2, CheckCircle2 } from 'lucide-react';
+import { fetchIndicators } from '@/lib/indicators';
+import { formatCurrency } from '@/lib/utils';
+import { parseISO, subMonths, subYears, isAfter, differenceInDays, getMonth, addMonths, format, isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
+import type { Client, Project, Subscription } from '@/types';
+
+interface MaturityItem {
+    id: string;
+    name: string;
+    clientName: string;
+    amount: number;
+    date: Date;
+    currency: 'CLP' | 'UF';
+    originalAmount: number;
+}
+
+interface ActivityItem {
+    id: string;
+    type: 'payment' | 'client_created' | 'client_updated' | 'project_created' | 'project_updated' | 'subscription_created' | 'subscription_updated';
+    title: string;
+    description: string;
+    date: Date;
+    amount?: number;
+    currency?: 'CLP' | 'UF';
+    icon: any;
+    colorClass: string;
+}
 
 export function ERPDashboard() {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
+    const [ufValue, setUfValue] = useState<number | null>(null);
     const [metrics, setMetrics] = useState({
         mrr: 0,
         activeClients: 0,
         activeProjects: 0,
-        totalProjects: 0
+        totalProjects: 0,
+        pendingCollections: 0
     });
+    const [upcomingMaturities, setUpcomingMaturities] = useState<{
+        annual: MaturityItem[];
+        monthly: MaturityItem[];
+    }>({ annual: [], monthly: [] });
+    const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
     useEffect(() => {
         if (user) {
@@ -26,38 +59,140 @@ export function ERPDashboard() {
             if (!user) return;
             setLoading(true);
 
-            const [clientsData, projectsData] = await Promise.all([
+            const [clientsData, projectsData, indicatorsData] = await Promise.all([
                 getClients(user.uid),
-                getProjects(user.uid)
+                getProjects(user.uid),
+                fetchIndicators()
             ]);
 
-            // Calculate Active Clients & Projects
-            const activeClientsCount = clientsData.filter(c => c.status === 'active').length;
-            const activeProjectsCount = projectsData.filter(p => p.status !== 'completed').length;
+            const currentUf = indicatorsData.uf?.valor || null;
+            setUfValue(currentUf);
 
-            // Calculate MRR
+            // Calculate Active Clients (Status = active)
+            const activeClientsCount = clientsData.filter(c => c.status === 'active').length;
+
+            // Calculate Active Projects (Not completed AND Not archived)
+            const activeProjectsCount = projectsData.filter(p => p.status !== 'completed' && !p.archived).length;
+            const totalProjectsCount = projectsData.filter(p => !p.archived).length;
+
+            // Calculate MRR & Pending Collections & Maturities & Activity
             let totalMrr = 0;
-            // Fetch subscriptions for all clients concurrently
+            let totalPending = 0;
+            const annualMaturities: MaturityItem[] = [];
+            const monthlyMaturities: MaturityItem[] = [];
+            const allActivity: ActivityItem[] = [];
+
+            const nextMonthIndex = (new Date().getMonth() + 1) % 12;
+
             await Promise.all(clientsData.map(async (client) => {
                 const subs = await getSubscriptions(client.id, user.uid);
-                const clientMrr = subs.reduce((sum, sub) => {
-                    // Only count if status is active (if we had status on sub, assuming yes or just all for now)
-                    // If frequency is yearly, divide by 12? For now assume monthly or simple sum 
-                    // and maybe simple heuristic: if yearly, count 1/12.
+
+                subs.forEach(sub => {
+                    // MRR Calculation
                     let amount = Number(sub.amount) || 0;
-                    if (sub.frequency === 'yearly') {
-                        amount = amount / 12;
+                    if (sub.currency === 'UF' && currentUf) {
+                        amount = amount * currentUf;
                     }
-                    return sum + amount;
-                }, 0);
-                totalMrr += clientMrr;
+
+                    if (sub.status === 'active') {
+                        if (sub.frequency === 'yearly') {
+                            totalMrr += amount / 12;
+                        } else {
+                            totalMrr += amount;
+                        }
+
+                        // Maturity Logic
+                        const billingDate = parseISO(sub.nextBillingDate);
+                        const item: MaturityItem = {
+                            id: sub.id,
+                            name: sub.name,
+                            clientName: client.name,
+                            amount: amount,
+                            date: billingDate,
+                            currency: sub.currency || 'CLP',
+                            originalAmount: Number(sub.amount)
+                        };
+
+                        if (sub.frequency === 'yearly') {
+                            // Annual: Only if due NEXT month
+                            if (getMonth(billingDate) === nextMonthIndex) {
+                                annualMaturities.push(item);
+                            }
+                        } else {
+                            // Monthly: All active
+                            monthlyMaturities.push(item);
+                        }
+
+                        // Pending Collections Calculation
+                        if (sub.nextBillingDate) {
+                            const nextDate = parseISO(sub.nextBillingDate);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+
+                            let periodStart = sub.frequency === 'monthly'
+                                ? subMonths(nextDate, 1)
+                                : subYears(nextDate, 1);
+
+                            const validPayments = (sub.payments || []).filter(p => {
+                                const pDate = parseISO(p.date);
+                                return isAfter(pDate, periodStart) && pDate <= nextDate;
+                            });
+
+                            const paidAmount = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+                            let targetAmount = sub.amount;
+                            if (sub.currency === 'UF' && currentUf) {
+                                targetAmount = Math.round(sub.amount * currentUf);
+                            }
+
+                            const remaining = Math.max(0, targetAmount - paidAmount);
+                            const daysUntilDue = differenceInDays(nextDate, today);
+
+                            if (remaining > 10 && (daysUntilDue <= 7)) {
+                                totalPending += remaining;
+                            }
+                        }
+                    }
+
+                    // Activity: Payments
+                    if (sub.payments && sub.payments.length > 0) {
+                        sub.payments.forEach((p, idx) => {
+                            // Assuming payment ID is needed, if missing generate one
+                            const pid = p.id || `pay-${sub.id}-${idx}`;
+                            allActivity.push({
+                                id: pid,
+                                type: 'payment',
+                                title: 'Pago Registrado',
+                                description: `${client.name} - ${sub.name}`,
+                                amount: p.amount,
+                                date: parseISO(p.date),
+                                icon: DollarSign,
+                                colorClass: "text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30"
+                            });
+                        });
+                    }
+                });
             }));
+
+            // Sort Activity by date desc
+            allActivity.sort((a, b) => b.date.getTime() - a.date.getTime());
+            setRecentActivity(allActivity.slice(0, 20)); // Return top 20 events
 
             setMetrics({
                 mrr: totalMrr,
                 activeClients: activeClientsCount,
                 activeProjects: activeProjectsCount,
-                totalProjects: projectsData.length
+                totalProjects: totalProjectsCount,
+                pendingCollections: totalPending
+            });
+
+            // Sort maturities by date
+            annualMaturities.sort((a, b) => a.date.getTime() - b.date.getTime());
+            monthlyMaturities.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+            setUpcomingMaturities({
+                annual: annualMaturities,
+                monthly: monthlyMaturities
             });
 
         } catch (error) {
@@ -70,7 +205,7 @@ export function ERPDashboard() {
     const cards = [
         {
             title: "MRR Estimado",
-            value: new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(metrics.mrr),
+            value: formatCurrency(metrics.mrr),
             description: "Ingresos recurrentes mensuales",
             icon: DollarSign,
             className: "text-emerald-500"
@@ -91,12 +226,19 @@ export function ERPDashboard() {
         },
         {
             title: "Cobros Pendientes",
-            value: "$0",
-            description: "Próximos 7 días (Simulado)",
+            value: formatCurrency(metrics.pendingCollections),
+            description: "Próximos 7 días",
             icon: Activity,
             className: "text-purple-500"
         }
     ];
+
+    const formatMaturityAmount = (item: MaturityItem) => {
+        if (item.currency === 'UF') {
+            return `UF ${item.originalAmount} `;
+        }
+        return formatCurrency(item.amount);
+    };
 
     return (
         <div className="space-y-6">
@@ -112,7 +254,7 @@ export function ERPDashboard() {
                             <CardTitle className="text-sm font-medium">
                                 {card.title}
                             </CardTitle>
-                            <card.icon className={`h-4 w-4 ${card.className}`} />
+                            <card.icon className={`h - 4 w - 4 ${card.className} `} />
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{loading ? "..." : card.value}</div>
@@ -131,15 +273,105 @@ export function ERPDashboard() {
                         <CardTitle>Actividad Reciente</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-muted-foreground">No hay actividad reciente registrada.</p>
+                        {loading ? (
+                            <p className="text-sm text-muted-foreground">Cargando actividad...</p>
+                        ) : recentActivity.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No hay actividad reciente registrada.</p>
+                        ) : (
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                {recentActivity.map((activity, i) => (
+                                    <div key={activity.id || i} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-full ${activity.colorClass}`}>
+                                                <activity.icon className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{activity.title}</p>
+                                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                                    {activity.description}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            {activity.amount !== undefined && (
+                                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                                    +{formatCurrency(activity.amount)}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                {format(activity.date, "d MMM", { locale: es })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
+
                 <Card className="col-span-3">
                     <CardHeader>
-                        <CardTitle>Próximos Vencimientos</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <CalendarDays className="h-5 w-5 text-zinc-500" />
+                            Próximos Vencimientos
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">No hay vencimientos próximos.</p>
+                    <CardContent className="space-y-6">
+                        {loading ? (
+                            <p className="text-sm text-muted-foreground">Cargando...</p>
+                        ) : (upcomingMaturities.annual.length === 0 && upcomingMaturities.monthly.length === 0) ? (
+                            <p className="text-sm text-muted-foreground">No hay vencimientos próximos.</p>
+                        ) : (
+                            <>
+                                {/* Initial Annual Block */}
+                                {upcomingMaturities.annual.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-semibold text-blue-600 uppercase tracking-wider flex items-center gap-2">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                            Anuales (Próximo Mes)
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {upcomingMaturities.annual.map((item) => (
+                                                <div key={item.id} className="flex justify-between items-center text-sm border-l-2 border-blue-200 pl-3 py-1">
+                                                    <div>
+                                                        <div className="font-medium text-zinc-800 dark:text-zinc-200">{item.clientName}</div>
+                                                        <div className="text-xs text-zinc-500">{item.name}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="font-semibold">{formatMaturityAmount(item)}</div>
+                                                        <div className="text-xs text-zinc-500">{format(item.date, "d MMM", { locale: es })}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Monthly Block */}
+                                {upcomingMaturities.monthly.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                            Mensuales
+                                        </h4>
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                            {upcomingMaturities.monthly.map((item) => (
+                                                <div key={item.id} className="flex justify-between items-center text-sm border-l-2 border-emerald-200 pl-3 py-1">
+                                                    <div>
+                                                        <div className="font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[150px]">{item.clientName}</div>
+                                                        <div className="text-xs text-zinc-500 truncate max-w-[150px]">{item.name}</div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <div className="font-semibold">{formatMaturityAmount(item)}</div>
+                                                        <div className="text-xs text-zinc-500">{format(item.date, "d MMM", { locale: es })}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>
