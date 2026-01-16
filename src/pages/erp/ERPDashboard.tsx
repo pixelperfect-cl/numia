@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { getClients, getProjects, getSubscriptions } from '@/lib/firebase/database';
 import { Users, Briefcase, DollarSign, Activity, CalendarDays, Plus, Edit2, CheckCircle2 } from 'lucide-react';
 import { fetchIndicators } from '@/lib/indicators';
@@ -31,8 +32,13 @@ interface ActivityItem {
     colorClass: string;
 }
 
-export function ERPDashboard() {
+export interface ERPDashboardProps {
+    entityId?: string;
+}
+
+export function ERPDashboard({ entityId }: ERPDashboardProps) {
     const { user } = useAuth();
+    const { isBalanceHidden } = usePrivacy();
     const [loading, setLoading] = useState(true);
     const [ufValue, setUfValue] = useState<number | null>(null);
     const [metrics, setMetrics] = useState({
@@ -40,7 +46,14 @@ export function ERPDashboard() {
         activeClients: 0,
         activeProjects: 0,
         totalProjects: 0,
-        pendingCollections: 0
+        totalActiveProjectValue: 0,
+        pendingCollections: 0,
+        breakdown: {
+            monthlyServicesMonthlyAmount: 0,
+            monthlyServicesAnnualAmount: 0,
+            annualServicesAnnualAmount: 0,
+            annualServicesMonthlyAmount: 0
+        }
     });
     const [upcomingMaturities, setUpcomingMaturities] = useState<{
         annual: MaturityItem[];
@@ -52,7 +65,7 @@ export function ERPDashboard() {
         if (user) {
             loadDashboardData();
         }
-    }, [user]);
+    }, [user, entityId]);
 
     const loadDashboardData = async () => {
         try {
@@ -69,22 +82,47 @@ export function ERPDashboard() {
             setUfValue(currentUf);
 
             // Calculate Active Clients (Status = active)
-            const activeClientsCount = clientsData.filter(c => c.status === 'active').length;
+            // Filter by entityId if provided
+            const filteredClients = entityId
+                ? clientsData.filter(c => c.entityId === entityId)
+                : clientsData;
+
+            const activeClientsCount = filteredClients.filter(c => c.status === 'active').length;
 
             // Calculate Active Projects (Not completed AND Not archived)
-            const activeProjectsCount = projectsData.filter(p => p.status !== 'completed' && !p.archived).length;
-            const totalProjectsCount = projectsData.filter(p => !p.archived).length;
+            // Filter by entityId if provided
+            const filteredProjects = entityId
+                ? projectsData.filter(p => p.entityId === entityId)
+                : projectsData;
+
+            let activeProjectsCount = 0;
+            let totalActiveProjectValue = 0;
+
+            filteredProjects.forEach(p => {
+                if (p.status !== 'completed' && !p.archived) {
+                    activeProjectsCount++;
+                    let amount = p.amount || 0;
+                    if (p.currency === 'UF' && currentUf) {
+                        amount = amount * currentUf;
+                    }
+                    totalActiveProjectValue += amount;
+                }
+            });
+
+            const totalProjectsCount = filteredProjects.filter(p => !p.archived).length;
 
             // Calculate MRR & Pending Collections & Maturities & Activity
             let totalMrr = 0;
             let totalPending = 0;
+            let monthlyServicesMonthlyAmount = 0;
+            let annualServicesAnnualAmount = 0;
             const annualMaturities: MaturityItem[] = [];
             const monthlyMaturities: MaturityItem[] = [];
             const allActivity: ActivityItem[] = [];
 
             const nextMonthIndex = (new Date().getMonth() + 1) % 12;
 
-            await Promise.all(clientsData.map(async (client) => {
+            await Promise.all(filteredClients.map(async (client) => {
                 const subs = await getSubscriptions(client.id, user.uid);
 
                 subs.forEach(sub => {
@@ -96,8 +134,10 @@ export function ERPDashboard() {
 
                     if (sub.status === 'active') {
                         if (sub.frequency === 'yearly') {
+                            annualServicesAnnualAmount += amount;
                             totalMrr += amount / 12;
                         } else {
+                            monthlyServicesMonthlyAmount += amount;
                             totalMrr += amount;
                         }
 
@@ -183,7 +223,14 @@ export function ERPDashboard() {
                 activeClients: activeClientsCount,
                 activeProjects: activeProjectsCount,
                 totalProjects: totalProjectsCount,
-                pendingCollections: totalPending
+                totalActiveProjectValue,
+                pendingCollections: totalPending,
+                breakdown: {
+                    monthlyServicesMonthlyAmount,
+                    monthlyServicesAnnualAmount: monthlyServicesMonthlyAmount * 12,
+                    annualServicesAnnualAmount,
+                    annualServicesMonthlyAmount: annualServicesAnnualAmount / 12
+                }
             });
 
             // Sort maturities by date
@@ -234,6 +281,7 @@ export function ERPDashboard() {
     ];
 
     const formatMaturityAmount = (item: MaturityItem) => {
+        if (isBalanceHidden) return '****';
         if (item.currency === 'UF') {
             return `UF ${item.originalAmount} `;
         }
@@ -254,13 +302,40 @@ export function ERPDashboard() {
                             <CardTitle className="text-sm font-medium">
                                 {card.title}
                             </CardTitle>
-                            <card.icon className={`h - 4 w - 4 ${card.className} `} />
+                            <card.icon className={`h-4 w-4 ${card.className} `} />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{loading ? "..." : card.value}</div>
-                            <p className="text-xs text-muted-foreground">
-                                {card.description}
-                            </p>
+                            <div className="text-2xl font-bold">
+                                {loading ? "..." : (index === 0 || index === 3) && isBalanceHidden ? '****' : card.value}
+                            </div>
+
+                            {/* Detailed Breakdown for MRR Card (Index 0) */}
+                            {index === 0 && !loading && !isBalanceHidden && (
+                                <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-muted-foreground">Servicios Mensuales:</span>
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(metrics.breakdown.monthlyServicesMonthlyAmount)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-muted-foreground">Servicios Anuales (Prom):</span>
+                                        <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(metrics.breakdown.annualServicesMonthlyAmount)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Project Value Breakdown (Index 2) */}
+                            {index === 2 && !loading && !isBalanceHidden && metrics.totalActiveProjectValue > 0 && (
+                                <div className="mt-2 text-xs font-medium text-muted-foreground border-t border-border/50 pt-2 flex justify-between items-center">
+                                    <span>Valor Total:</span>
+                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{formatCurrency(metrics.totalActiveProjectValue)}</span>
+                                </div>
+                            )}
+
+                            {index !== 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    {card.description}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 ))}
@@ -295,7 +370,7 @@ export function ERPDashboard() {
                                         <div className="text-right">
                                             {activity.amount !== undefined && (
                                                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                                    +{formatCurrency(activity.amount)}
+                                                    +{isBalanceHidden ? '****' : formatCurrency(activity.amount)}
                                                 </p>
                                             )}
                                             <p className="text-xs text-muted-foreground">

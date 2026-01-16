@@ -5,6 +5,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ interface LoansProps {
 
 export function Loans({ entityId }: LoansProps = {}) {
   const { loans, entities, categories, createLoan, createMovement, updateLoan, deleteLoan, loading } = useData();
+  const { isBalanceHidden } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -374,11 +376,11 @@ export function Loans({ entityId }: LoansProps = {}) {
           {/* Amount */}
           <div>
             <p className={`text-2xl font-bold ${isLent ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {formatCurrency(loan.amount)}
+              {isBalanceHidden ? '****' : formatCurrency(loan.amount)}
             </p>
             {loan.amountPaid > 0 && (
               <p className="text-xs text-muted-foreground">
-                Pagado: {formatCurrency(loan.amountPaid)}
+                Pagado: {isBalanceHidden ? '****' : formatCurrency(loan.amountPaid)}
               </p>
             )}
           </div>
@@ -589,7 +591,7 @@ export function Loans({ entityId }: LoansProps = {}) {
           <CardContent className="space-y-3">
             <div>
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-500">
-                {formatCurrency(totalLent)}
+                {isBalanceHidden ? '****' : formatCurrency(totalLent)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {activeLentLoans.length} préstamos activos
@@ -615,7 +617,7 @@ export function Loans({ entityId }: LoansProps = {}) {
           <CardContent className="space-y-3">
             <div>
               <div className="text-3xl font-bold text-red-600 dark:text-red-500">
-                {formatCurrency(totalOwe)}
+                {isBalanceHidden ? '****' : formatCurrency(totalOwe)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {activeOweLoans.length} préstamos activos
@@ -702,7 +704,7 @@ export function Loans({ entityId }: LoansProps = {}) {
                   Registra un pago {paymentDialogLoan.type === 'lent' ? 'recibido de' : 'realizado a'} {paymentDialogLoan.personName}
                   <br />
                   <span className="font-medium">
-                    Monto pendiente: {formatCurrency(paymentDialogLoan.amount - paymentDialogLoan.amountPaid)}
+                    Monto pendiente: {isBalanceHidden ? '****' : formatCurrency(paymentDialogLoan.amount - paymentDialogLoan.amountPaid)}
                   </span>
                 </>
               )}

@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ type SortDirection = 'asc' | 'desc';
 export function Movements({ entityId }: MovementsProps = {}) {
   const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
+  const { isBalanceHidden } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -650,7 +652,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-500">
-              {formatCurrency(stats.income)}
+              {isBalanceHidden ? '****' : formatCurrency(stats.income)}
             </div>
           </CardContent>
         </Card>
@@ -660,7 +662,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-500">
-              {formatCurrency(stats.expense)}
+              {isBalanceHidden ? '****' : formatCurrency(stats.expense)}
             </div>
           </CardContent>
         </Card>
@@ -670,7 +672,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {formatCurrency(stats.balance)}
+              {isBalanceHidden ? '****' : formatCurrency(stats.balance)}
             </div>
           </CardContent>
         </Card>
@@ -888,7 +890,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
                           </div>
                         </div>
                         <div className={`font-bold whitespace-nowrap flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                          {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                          {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -952,7 +954,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
                       <div className="flex-1 text-xs truncate">{movement.category}</div>
                       <div className="flex-1 text-xs truncate">{entity?.name}</div>
                       <div className={`w-24 text-right font-bold whitespace-nowrap ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                        {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
                       </div>
                       <div className="w-32 flex gap-1">
                         <Button

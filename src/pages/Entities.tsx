@@ -10,7 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
+import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { formatCurrency, calculateSummary } from '@/lib/utils';
 import type { EntityType, Entity } from '@/types';
 import { EntityBoxesDialog } from '@/components/EntityBoxesDialog';
@@ -25,6 +27,7 @@ interface EntitiesProps {
 
 export function Entities({ onEntitySelect, hideHeader = false }: EntitiesProps = {}) {
   const { entities, movements, createEntity, updateEntity, deleteEntity, loading } = useData();
+  const { isBalanceHidden } = usePrivacy();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
@@ -338,16 +341,16 @@ export function Entities({ onEntitySelect, hideHeader = false }: EntitiesProps =
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Balance</span>
                       <span className={`text-lg font-bold ${summary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {formatCurrency(summary.balance)}
+                        {isBalanceHidden ? '****' : formatCurrency(summary.balance)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Ingresos</span>
-                      <span className="text-blue-600 dark:text-blue-500">{formatCurrency(summary.income)}</span>
+                      <span className="text-blue-600 dark:text-blue-500">{isBalanceHidden ? '****' : formatCurrency(summary.income)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Gastos</span>
-                      <span className="text-red-600 dark:text-red-500">{formatCurrency(summary.expenses)}</span>
+                      <span className="text-red-600 dark:text-red-500">{isBalanceHidden ? '****' : formatCurrency(summary.expenses)}</span>
                     </div>
                     <div className="pt-2 border-t">
                       <p className="text-xs text-muted-foreground">

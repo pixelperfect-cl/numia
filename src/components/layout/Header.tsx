@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/theme-provider';
-import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, ArrowLeftRight, Wallet, TrendingUp, Repeat, Bot, Cloud, ChevronDown, ChevronRight, Briefcase, Info } from 'lucide-react';
+import { User, LogOut, Sun, Moon, ChevronsUpDown, Check, Settings, Plus, Menu, ArrowLeftRight, Wallet, TrendingUp, Repeat, Bot, Cloud, ChevronDown, ChevronRight, Briefcase, Info, Eye, EyeOff } from 'lucide-react';
 import { useAI } from '@/contexts/AIContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useData } from '@/contexts/DataContext';
 import { IconComponent } from '@/components/IconPicker';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ import { menuItems } from './Sidebar';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
 import { IndicatorsMarquee } from '@/components/common/IndicatorsMarquee';
 import { QuickActions } from './QuickActions';
+import { ContextualHeader } from './ContextualHeader';
 import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { ConnectionStatusDetail } from '@/components/layout/ConnectionStatusDetail';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -48,6 +50,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
     const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
     const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+    const { isBalanceHidden, togglePrivacy } = usePrivacy();
 
     const handleAssistantToggle = () => {
         if (isOpen) {
@@ -453,6 +456,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                 <div className="hidden md:flex items-center gap-2 ml-4">
                     <EntitySelector />
                     <QuickActions onAction={onQuickAction} />
+
                     <Button
                         variant="ghost"
                         size="icon"
@@ -467,7 +471,10 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                     </Button>
                 </div>
 
-                <div className="flex-1" />
+                {/* Dynamic Contextual Header (Center) */}
+                <div className="flex-1 flex justify-center min-w-0 px-4">
+                    <ContextualHeader selectedEntityId={selectedEntityId} />
+                </div>
 
                 {/* Creating Entity Dialog */}
                 <Dialog open={openCreate} onOpenChange={setOpenCreate}>
@@ -502,6 +509,15 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                         </Button>
                     </div>
 
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hidden md:flex text-header-foreground hover:text-header-foreground hover:bg-slate-700/50 mr-1"
+                        onClick={togglePrivacy}
+                        title={isBalanceHidden ? "Mostrar Saldos" : "Ocultar Saldos"}
+                    >
+                        {isBalanceHidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="hidden md:flex text-header-foreground">

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { formatCurrency, calculateSummary, calculateBoxBalances, getTodayLocalDateString, parseLocalDate } from '@/lib/utils';
 import { IconComponent } from '@/components/IconPicker';
 import { TrendingUp, TrendingDown, ArrowLeft, Edit, History, Trash2, ChevronLeft, ChevronRight, Calendar, ArrowLeftRight, Loader2 } from 'lucide-react';
@@ -30,6 +31,7 @@ interface EntityPanelProps {
 export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDialogClose }: EntityPanelProps) {
   const { entities, movements, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
   const { user } = useAuth();
+  const { isBalanceHidden } = usePrivacy();
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null);
   const [historyMovement, setHistoryMovement] = useState<Movement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null);
@@ -371,7 +373,7 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold break-words ${summary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {formatCurrency(summary.balance)}
+              {isBalanceHidden ? '****' : formatCurrency(summary.balance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1 mb-3">
               Balance actual
@@ -386,7 +388,7 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
                     <span className="font-medium text-muted-foreground">{boxBalance.box}</span>
                     <span className="text-muted-foreground">•</span>
                     <span className={`font-bold ${boxBalance.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                      {formatCurrency(boxBalance.balance)}
+                      {isBalanceHidden ? '****' : formatCurrency(boxBalance.balance)}
                     </span>
                   </div>
                 ))}
@@ -402,7 +404,7 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-500 break-words">
-              {formatCurrency(summary.income)}
+              {isBalanceHidden ? '****' : formatCurrency(summary.income)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total de ingresos
@@ -417,7 +419,7 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-500 break-words">
-              {formatCurrency(summary.expenses)}
+              {isBalanceHidden ? '****' : formatCurrency(summary.expenses)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total de gastos
@@ -523,7 +525,7 @@ export function EntityPanel({ entityId, onBack, openMovementDialog, onMovementDi
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="text-right">
                         <p className={`text-sm font-semibold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                          {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                          {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
                         </p>
                         <p className="text-xs text-muted-foreground whitespace-nowrap">{parseLocalDate(movement.date).toLocaleDateString('es-CL')}</p>
                       </div>

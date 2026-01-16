@@ -5,6 +5,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, calculateSummary, parseLocalDate } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight } from 'lucide-react';
 import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
@@ -15,6 +16,7 @@ import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart'
 
 export function Dashboard() {
   const { movements, entities, categories, loading } = useData();
+  const { isBalanceHidden } = usePrivacy();
 
   // Calculate summary (all time)
   const totalSummary = calculateSummary(movements);
@@ -52,7 +54,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-500 break-words">
-              {formatCurrency(totalSummary.income)}
+              {isBalanceHidden ? '****' : formatCurrency(totalSummary.income)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total acumulado
@@ -67,7 +69,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-500 break-words">
-              {formatCurrency(totalSummary.expenses)}
+              {isBalanceHidden ? '****' : formatCurrency(totalSummary.expenses)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total acumulado
@@ -82,7 +84,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold break-words ${totalSummary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {formatCurrency(totalSummary.balance)}
+              {isBalanceHidden ? '****' : formatCurrency(totalSummary.balance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Balance actual (acumulado)
@@ -152,7 +154,7 @@ export function Dashboard() {
                     </div>
                     <div className="text-right flex-shrink-0 ml-2">
                       <p className={`text-sm font-semibold ${entitySummary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {formatCurrency(entitySummary.balance)}
+                        {isBalanceHidden ? '****' : formatCurrency(entitySummary.balance)}
                       </p>
                     </div>
                   </div>
@@ -189,7 +191,7 @@ export function Dashboard() {
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-semibold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {movement.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(movement.amount))}
+                        {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
                       </p>
                       <p className="text-xs text-muted-foreground">{parseLocalDate(movement.date).toLocaleDateString('es-CL')}</p>
                     </div>

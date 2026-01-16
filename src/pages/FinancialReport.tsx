@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
 import { ReportCard } from '@/components/reports/ReportCard';
@@ -35,6 +36,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
 
 export function FinancialReport() {
     const { movements, categories, entities, loading } = useData();
+    const { isBalanceHidden } = usePrivacy();
     const [trendPeriod, setTrendPeriod] = useState<'this-month' | 'last-month' | 'last-3-months' | 'last-6-months' | 'this-year' | 'last-year'>('last-6-months');
     const [filters, setFilters] = useState<ReportFilterState>(() => {
         const { start, end } = getDateRangePreset('this-month');
@@ -160,7 +162,7 @@ export function FinancialReport() {
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <ReportCard
                     title="Ingresos Totales"
-                    value={formatCurrency(summary.income)}
+                    value={isBalanceHidden ? '****' : formatCurrency(summary.income)}
                     icon={TrendingUp}
                     description="Período seleccionado"
                     loading={loading}
@@ -168,7 +170,7 @@ export function FinancialReport() {
                 />
                 <ReportCard
                     title="Gastos Totales"
-                    value={formatCurrency(summary.expenses)}
+                    value={isBalanceHidden ? '****' : formatCurrency(summary.expenses)}
                     icon={TrendingDown}
                     description="Período seleccionado"
                     loading={loading}
@@ -176,7 +178,7 @@ export function FinancialReport() {
                 />
                 <ReportCard
                     title="Balance"
-                    value={formatCurrency(summary.balance)}
+                    value={isBalanceHidden ? '****' : formatCurrency(summary.balance)}
                     icon={Wallet}
                     description="Período seleccionado"
                     loading={loading}
@@ -227,9 +229,9 @@ export function FinancialReport() {
                                     return `${month}/${year.slice(2)}`;
                                 }}
                             />
-                            <YAxis className="text-xs" tickFormatter={(value) => formatCurrency(value)} />
+                            <YAxis className="text-xs" tickFormatter={(value) => isBalanceHidden ? '' : formatCurrency(value)} />
                             <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
+                                formatter={(value: number) => isBalanceHidden ? '****' : formatCurrency(value)}
                                 labelFormatter={(label) => {
                                     const [year, month] = label.split('-');
                                     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -273,7 +275,7 @@ export function FinancialReport() {
                                                 <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value: number) => isBalanceHidden ? '****' : formatCurrency(value)} />
                                     </RechartsPieChart>
                                 </ResponsiveContainer>
                                 <div className="mt-4">
@@ -314,7 +316,7 @@ export function FinancialReport() {
                                                 <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value: number) => isBalanceHidden ? '****' : formatCurrency(value)} />
                                     </RechartsPieChart>
                                 </ResponsiveContainer>
                                 <div className="mt-4">
@@ -343,8 +345,8 @@ export function FinancialReport() {
                         ]}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                             <XAxis dataKey="categoryName" className="text-xs" />
-                            <YAxis className="text-xs" tickFormatter={(value) => formatCurrency(value)} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <YAxis className="text-xs" tickFormatter={(value) => isBalanceHidden ? '' : formatCurrency(value)} />
+                            <Tooltip formatter={(value: number) => isBalanceHidden ? '****' : formatCurrency(value)} />
                             <Legend />
                             <Bar dataKey="total" fill="#3b82f6" name="Monto" />
                         </BarChart>
@@ -364,7 +366,7 @@ export function FinancialReport() {
                                 <div key={box} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                                     <span className="font-medium">{box}</span>
                                     <span className={`font-bold ${balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                                        {formatCurrency(balance)}
+                                        {isBalanceHidden ? '****' : formatCurrency(balance)}
                                     </span>
                                 </div>
                             ))}
@@ -399,13 +401,13 @@ export function FinancialReport() {
                                     <tr key={year.year} className="border-b">
                                         <td className="py-2 px-4 font-medium">{year.year}</td>
                                         <td className="py-2 px-4 text-right text-blue-600 dark:text-blue-500">
-                                            {formatCurrency(year.income)}
+                                            {isBalanceHidden ? '****' : formatCurrency(year.income)}
                                         </td>
                                         <td className="py-2 px-4 text-right text-red-600 dark:text-red-500">
-                                            {formatCurrency(year.expenses)}
+                                            {isBalanceHidden ? '****' : formatCurrency(year.expenses)}
                                         </td>
                                         <td className={`py-2 px-4 text-right font-semibold ${year.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                                            {formatCurrency(year.balance)}
+                                            {isBalanceHidden ? '****' : formatCurrency(year.balance)}
                                         </td>
                                         <td className="py-2 px-4 text-right">{year.movementCount}</td>
                                     </tr>

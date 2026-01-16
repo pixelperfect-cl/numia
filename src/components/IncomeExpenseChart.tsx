@@ -14,6 +14,7 @@ import type { ChartConfig } from '@/components/ui/chart';
 import type { Movement, DateFilter as DateFilterType } from '@/types';
 import { formatCurrency, getDateRangeFromType, parseLocalDate } from '@/lib/utils';
 import { DateFilter } from '@/components/DateFilter';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface IncomeExpenseChartProps {
   movements: Movement[];
@@ -31,6 +32,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
+  const { isBalanceHidden } = usePrivacy();
   const [dateFilter, setDateFilter] = useState<DateFilterType>({ type: 'THIS_MONTH' });
   const { startDate, endDate } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
 
@@ -157,13 +159,17 @@ export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
               <div className="text-left sm:text-right flex-1 sm:flex-none">
                 <div className="text-xs text-muted-foreground mb-1">Ingresos</div>
                 <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-500">
-                  {formatCurrency(totalIncome)}
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-500">
+                    {isBalanceHidden ? '****' : formatCurrency(totalIncome)}
+                  </div>
                 </div>
               </div>
               <div className="text-left sm:text-right flex-1 sm:flex-none">
                 <div className="text-xs text-muted-foreground mb-1">Gastos</div>
                 <div className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-500">
-                  {formatCurrency(totalExpense)}
+                  <div className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-500">
+                    {isBalanceHidden ? '****' : formatCurrency(totalExpense)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -210,7 +216,7 @@ export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
                   indicator="dot"
                   formatter={(value, name) => (
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{formatCurrency(value as number)}</span>
+                      <span className="font-medium">{isBalanceHidden ? '****' : formatCurrency(value as number)}</span>
                       <span className="text-muted-foreground">
                         {name === 'income' ? 'Ingresos' : 'Gastos'}
                       </span>

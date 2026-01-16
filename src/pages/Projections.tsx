@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, getTodayLocalDateString } from '@/lib/utils';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { IconComponent } from '@/components/IconPicker';
 import type { MovementType, Subscription } from '@/types';
 import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, CheckCircle, RefreshCcw, Briefcase, Wallet } from 'lucide-react';
@@ -25,6 +26,7 @@ interface ProjectionsProps {
 
 export function Projections({ entityId }: ProjectionsProps = {}) {
   const { entities, categories, projections, createProjection, updateProjection, deleteProjection, createMovement, entitySubscriptions, loading: contextLoading } = useData();
+  const { isBalanceHidden } = usePrivacy();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
@@ -350,7 +352,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
             <div className="text-right">
               <span className="text-xs text-muted-foreground block">Balance Disponible</span>
               <span className={`text-3xl font-bold ${balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                {formatCurrency(balance)}
+                {isBalanceHidden ? '****' : formatCurrency(balance)}
               </span>
             </div>
           </div>
@@ -359,10 +361,10 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
           <div className="mt-6 space-y-2">
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="text-blue-600 dark:text-blue-400">
-                Total Ingresos: {formatCurrency(totalIncome)}
+                Total Ingresos: {isBalanceHidden ? '****' : formatCurrency(totalIncome)}
               </span>
               <span className="text-red-600 dark:text-red-400">
-                Total Gastos: {formatCurrency(totalExpenses)}
+                Total Gastos: {isBalanceHidden ? '****' : formatCurrency(totalExpenses)}
               </span>
             </div>
 
@@ -411,7 +413,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                     <Briefcase className="h-4 w-4" />
                     Servicios ERP (Recurrentes)
                   </span>
-                  <span>{formatCurrency(erpIncome)}</span>
+                  <span>{isBalanceHidden ? '****' : formatCurrency(erpIncome)}</span>
                 </CardTitle>
                 <CardDescription>Calculado automáticamente de servicios activos</CardDescription>
               </CardHeader>
@@ -422,7 +424,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                       <div key={sub.id} className="flex justify-between">
                         <span className='truncate max-w-[180px]'>{sub.name}</span>
                         <span>
-                          {sub.currency === 'UF' ? 'UF ' + formatCurrency(Number(sub.amount)) : formatCurrency(Number(sub.amount) / (sub.frequency === 'yearly' ? 12 : 1))}
+                          {isBalanceHidden ? '****' : (sub.currency === 'UF' ? 'UF ' + formatCurrency(Number(sub.amount)) : formatCurrency(Number(sub.amount) / (sub.frequency === 'yearly' ? 12 : 1)))}
                         </span>
                       </div>
                     ))}
@@ -447,7 +449,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                     <div className="text-xs text-muted-foreground">Ajuste Manual</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-blue-600">{formatCurrency(item.amount)}</span>
+                    <span className="font-semibold text-blue-600">{isBalanceHidden ? '****' : formatCurrency(item.amount)}</span>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog('income', projection)}>
                         <Pencil className="h-3 w-3" />
@@ -478,7 +480,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                   <RefreshCcw className="h-4 w-4" />
                   Gastos Recurrentes (Suscripciones)
                 </span>
-                <span>{formatCurrency(automatedExpenses)}</span>
+                <span>{isBalanceHidden ? '****' : formatCurrency(automatedExpenses)}</span>
               </CardTitle>
               <CardDescription>Calculado automáticamente de "Gastos"</CardDescription>
             </CardHeader>
@@ -488,7 +490,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                   {filteredEntitySubscriptions.slice(0, 3).map(sub => (
                     <div key={sub.id} className="flex justify-between">
                       <span className='truncate max-w-[180px]'>{sub.name}</span>
-                      <span>{formatCurrency(Number(sub.amount) / (sub.billingCycle === 'yearly' ? 12 : 1))}</span>
+                      <span>{isBalanceHidden ? '****' : formatCurrency(Number(sub.amount) / (sub.billingCycle === 'yearly' ? 12 : 1))}</span>
                     </div>
                   ))}
                   {filteredEntitySubscriptions.length > 3 && (
@@ -511,7 +513,7 @@ export function Projections({ entityId }: ProjectionsProps = {}) {
                     <div className="text-xs text-muted-foreground">Ajuste Manual</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-red-600">{formatCurrency(item.amount)}</span>
+                    <span className="font-semibold text-red-600">{isBalanceHidden ? '****' : formatCurrency(item.amount)}</span>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog('expense', projection)}>
                         <Pencil className="h-3 w-3" />

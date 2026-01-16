@@ -1,4 +1,5 @@
 import { useIndicators } from '@/hooks/useIndicators';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface IndicatorsMarqueeProps {
 
 export function IndicatorsMarquee({ preferences }: IndicatorsMarqueeProps) {
     const { indicators, loading, error } = useIndicators(preferences);
+    const { isBalanceHidden } = usePrivacy();
 
     if (loading || error || indicators.length === 0) {
         return null;
@@ -17,6 +19,7 @@ export function IndicatorsMarquee({ preferences }: IndicatorsMarqueeProps) {
 
     // Format currency
     const formatValue = (code: string, value: number) => {
+        if (isBalanceHidden) return '****';
         if (code === 'dolar' || code === 'euro' || code === 'uf' || code === 'utm') {
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }

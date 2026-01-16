@@ -12,6 +12,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { DataProvider } from '@/contexts/DataContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { AIProvider } from '@/contexts/AIContext'
+import { PrivacyProvider } from '@/contexts/PrivacyContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -20,9 +21,11 @@ createRoot(document.getElementById('root')!).render(
         <DataProvider>
           <NotificationProvider>
             <AIProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <PrivacyProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </PrivacyProvider>
             </AIProvider>
           </NotificationProvider>
         </DataProvider>

@@ -38,7 +38,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
         description: '',
         dueDate: '',
         progress: 0,
-        checklists: []
+        checklists: [],
+        amount: 0,
+        currency: 'CLP'
     });
 
     useEffect(() => {
@@ -58,7 +60,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                 description: project.description || '',
                 dueDate: project.dueDate || '',
                 progress: project.progress || 0,
-                checklists: project.checklists || []
+                checklists: project.checklists || [],
+                amount: project.amount || 0,
+                currency: project.currency || 'CLP'
             });
         } else {
             setFormData({
@@ -69,7 +73,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                 description: '',
                 dueDate: '',
                 progress: 0,
-                checklists: []
+                checklists: [],
+                amount: 0,
+                currency: 'CLP'
             });
         }
     }, [project, open, entityId, initialStatus]);
@@ -189,6 +195,35 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="amount">Monto</Label>
+                            <Input
+                                id="amount"
+                                type="number"
+                                min="0"
+                                value={formData.amount || ''}
+                                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                                placeholder="0"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="currency">Moneda</Label>
+                            <Select
+                                value={formData.currency || 'CLP'}
+                                onValueChange={(val: 'CLP' | 'UF') => setFormData({ ...formData, currency: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="CLP">CLP</SelectItem>
+                                    <SelectItem value="UF">UF</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

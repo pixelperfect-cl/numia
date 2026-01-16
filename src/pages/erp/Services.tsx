@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,14 +25,14 @@ import { ArchiveServiceDialog } from '@/components/erp/ArchiveServiceDialog';
 import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';
 import { ClientDialog } from '@/components/erp/ClientDialog';
 import { fetchIndicators } from '@/lib/indicators';
-import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText } from 'lucide-react';
+import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText, CalendarRange } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord, EnhancedSubscription } from '@/types';
 import { format, addMonths, addYears, subMonths, subYears, parseISO, isAfter } from 'date-fns';
 
 interface ServicesProps {
     entityId?: string;
-    defaultTab?: 'summary' | 'active' | 'archived';
+    defaultTab?: 'summary' | 'monthly' | 'annual' | 'archived';
     onTabChange?: (tab: string) => void;
 }
 
@@ -617,12 +618,32 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         }
     }, 0);
 
+    const totalMonthlyServicesAmount = activeSubs
+        .filter(s => s.frequency === 'monthly')
+        .reduce((acc, curr) => {
+            const amountInClp = curr.currency === 'UF' && ufValue ? curr.amount * ufValue : curr.amount;
+            return acc + amountInClp;
+        }, 0);
+
+    const totalAnnualServicesAmount = activeSubs
+        .filter(s => s.frequency === 'yearly')
+        .reduce((acc, curr) => {
+            const amountInClp = curr.currency === 'UF' && ufValue ? curr.amount * ufValue : curr.amount;
+            return acc + amountInClp;
+        }, 0);
+
     const monthlyAverage = totalAnnual / 12;
 
     const activeCount = activeSubs.length;
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get('tab') || defaultTab;
+    const tabParam = searchParams.get('tab');
+    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' => {
+        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived';
+    };
+    const activeTab = isValidTab(tabParam)
+        ? tabParam
+        : (defaultTab === 'monthly' || defaultTab === 'annual' ? defaultTab : 'monthly');
 
     const handleTabChange = (val: string) => {
         setSearchParams(prev => {
@@ -636,7 +657,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     }
 
     return (
-        <div className="space-y-6 h-full flex flex-col">
+        <div className="space-y-6 h-[calc(100vh-10rem)] flex flex-col">
             <ClientDetailsDialog
                 client={selectedClientForView}
                 open={clientDetailsOpen}
@@ -652,30 +673,9 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 entityId={entityId || user?.uid} // Fallback entity ID
             />
 
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between shrink-0 gap-4 md:gap-0">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Gestión de Servicios</h1>
-                    <p className="text-muted-foreground">Administra las suscripciones y servicios recurrentes</p>
-                </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={handleGenerateBilling} disabled={generating} size="icon" className={`md:w-auto md:px-4 md:py-2 ${generating ? "w-full md:w-auto" : ""}`}>
-                        {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                        <span className="hidden md:ml-2 md:inline">Generar Cobros</span>
-                    </Button>
-                    <Button onClick={() => handleCreate()} size="icon" className="md:w-auto md:px-4 md:py-2">
-                        <Plus className="h-4 w-4" />
-                        <span className="hidden md:ml-2 md:inline">Asignar Servicio</span>
-                    </Button>
-                </div>
-            </div>
+
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 flex-1 flex flex-col">
-                <TabsList className="w-full justify-start overflow-x-auto no-scrollbar flex-nowrap">
-                    <TabsTrigger value="summary">Resumen</TabsTrigger>
-                    <TabsTrigger value="active">Activos</TabsTrigger>
-                    <TabsTrigger value="archived">Archivados</TabsTrigger>
-                </TabsList>
-
 
 
                 <TabsContent value="summary" className="space-y-4 flex-1 flex flex-col h-full">
@@ -712,14 +712,19 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                         <div className="h-2 w-2 rounded-full bg-emerald-500" />
                                         Servicios Mensuales
                                     </CardTitle>
-                                    <Badge variant="outline" className="bg-background">
-                                        {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length}
-                                    </Badge>
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 font-mono">
+                                            ${Math.round(totalMonthlyServicesAmount).toLocaleString()}
+                                        </Badge>
+                                        <Badge variant="outline" className="bg-background">
+                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length}
+                                        </Badge>
+                                    </div>
                                 </div>
                                 <CardDescription>Recurrencia mensual indefinida</CardDescription>
                             </CardHeader>
                             <CardContent className="p-0">
-                                <div className="border-t">
+                                <div className="border-t max-h-[384px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                     <Table>
                                         <TableHeader>
                                             <TableRow className="hover:bg-transparent">
@@ -787,14 +792,19 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                         <div className="h-2 w-2 rounded-full bg-blue-500" />
                                         Servicios Anuales
                                     </CardTitle>
-                                    <Badge variant="outline" className="bg-background">
-                                        {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length}
-                                    </Badge>
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-mono">
+                                            ${Math.round(totalAnnualServicesAmount).toLocaleString()}
+                                        </Badge>
+                                        <Badge variant="outline" className="bg-background">
+                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length}
+                                        </Badge>
+                                    </div>
                                 </div>
                                 <CardDescription>Pagos anuales y periodicidad larga</CardDescription>
                             </CardHeader>
                             <CardContent className="p-0">
-                                <div className="border-t">
+                                <div className="border-t max-h-[384px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                     <Table>
                                         <TableHeader>
                                             <TableRow className="hover:bg-transparent">
@@ -856,32 +866,12 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                     </div>
                 </TabsContent>
 
-                <TabsContent value="active" className="space-y-4 flex-1 flex flex-col h-full">
-                    <div className="flex flex-col gap-4 shrink-0">
-                        <div className="flex items-center justify-between shrink-0">
-                            <div className="relative w-64">
-                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Buscar servicio o cliente..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-8"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground px-1">
-                            <div className="flex items-center gap-2">
-                                <TrendingUp className="h-3.5 w-3.5" />
-                                <span>Mensual: <span className="font-medium text-foreground">${Math.round(monthlyAverage).toLocaleString()}</span></span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <DollarSign className="h-3.5 w-3.5" />
-                                <span>Anual: <span className="font-medium text-foreground">${Math.round(totalAnnual).toLocaleString()}</span></span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="flex-1 overflow-hidden min-h-[500px]">
+
+
+
+                <TabsContent value="monthly" className="space-y-4 flex-1 flex flex-col h-full">
+                    <div className="flex-1 overflow-hidden h-full">
                         <ServiceKanbanBoard
                             subscriptions={filteredSubscriptions}
                             onEdit={handleEdit}
@@ -898,6 +888,30 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                 setSelectedSubscriptionForDetail(sub);
                                 setHistoryDialogOpen(true);
                             }}
+                            mode="monthly"
+                        />
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="annual" className="space-y-4 flex-1 flex flex-col h-full">
+                    <div className="flex-1 overflow-hidden h-full">
+                        <ServiceKanbanBoard
+                            subscriptions={filteredSubscriptions}
+                            onEdit={handleEdit}
+                            onCreate={handleCreate}
+                            onArchive={handleArchive}
+                            onDelete={handleDelete}
+                            ufValue={ufValue}
+                            onMarkPaid={onMarkPaid}
+                            onPartialPayment={onPartialPayment}
+                            onRevertPayment={handleRevertPayment}
+                            onViewPaymentDetails={handleViewPaymentDetails}
+                            onViewClient={handleViewClient}
+                            onShowHistory={(sub) => {
+                                setSelectedSubscriptionForDetail(sub);
+                                setHistoryDialogOpen(true);
+                            }}
+                            mode="annual"
                         />
                     </div>
                 </TabsContent>
@@ -1015,6 +1029,8 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 </TabsContent>
 
 
+
+
             </Tabs>
 
             <ServiceSelectionDialog
@@ -1091,6 +1107,37 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 subscription={subscriptionToArchive}
                 onConfirm={handleArchiveConfirm}
             />
+
+            {/* Floating Bottom Menu */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                <div className="bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md shadow-lg border border-white/10 p-1.5 rounded-full flex items-center gap-1">
+                    <button
+                        onClick={() => handleTabChange('monthly')}
+                        className={cn(
+                            "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                            activeTab === 'monthly'
+                                ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                        )}
+                    >
+                        <LayoutGrid className="h-4 w-4" />
+                        <span>Mensuales</span>
+                    </button>
+                    <div className="w-px h-6 bg-white/10 mx-1" />
+                    <button
+                        onClick={() => handleTabChange('annual')}
+                        className={cn(
+                            "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                            activeTab === 'annual'
+                                ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                        )}
+                    >
+                        <CalendarRange className="h-4 w-4" />
+                        <span>Anuales</span>
+                    </button>
+                </div>
+            </div>
         </div >
     );
 }

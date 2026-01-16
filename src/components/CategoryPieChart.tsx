@@ -14,6 +14,7 @@ import type { ChartConfig } from '@/components/ui/chart';
 import type { Movement, MovementType, DateFilter as DateFilterType, Category } from '@/types';
 import { formatCurrency, getDateRangeFromType, parseLocalDate } from '@/lib/utils';
 import { DateFilter } from '@/components/DateFilter';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface CategoryPieChartProps {
   movements: Movement[];
@@ -58,6 +59,7 @@ const renderActiveShape = (props: any) => {
 };
 
 export function CategoryPieChart({ movements, categories, type }: CategoryPieChartProps) {
+  const { isBalanceHidden } = usePrivacy();
   const [dateFilter, setDateFilter] = useState<DateFilterType>({ type: 'THIS_MONTH' });
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const { startDate, endDate } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
@@ -163,7 +165,7 @@ export function CategoryPieChart({ movements, categories, type }: CategoryPieCha
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => [
-                    `${formatCurrency(value as number)} (${((value as number / total) * 100).toFixed(1)}%)`,
+                    isBalanceHidden ? '****' : `${formatCurrency(value as number)} (${((value as number / total) * 100).toFixed(1)}%)`,
                     name,
                   ]}
                 />
@@ -207,7 +209,7 @@ export function CategoryPieChart({ movements, categories, type }: CategoryPieCha
               />
               <span className="truncate">{item.category}</span>
               <span className="ml-auto text-muted-foreground">
-                {formatCurrency(item.amount)}
+                {isBalanceHidden ? '****' : formatCurrency(item.amount)}
               </span>
             </div>
           ))}
@@ -218,7 +220,7 @@ export function CategoryPieChart({ movements, categories, type }: CategoryPieCha
           <div className="flex justify-between items-center font-semibold">
             <span>Total</span>
             <span className={type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}>
-              {formatCurrency(total)}
+              {isBalanceHidden ? '****' : formatCurrency(total)}
             </span>
           </div>
         </div>

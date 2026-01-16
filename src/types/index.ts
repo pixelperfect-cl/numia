@@ -357,6 +357,8 @@ export interface Project {
   clientId: string;
   name: string;
   status: ProjectStatus;
+  amount?: number;
+  currency?: 'CLP' | 'UF';
   description?: string;
   dueDate?: string; // ISO date
   progress: number; // 0-100

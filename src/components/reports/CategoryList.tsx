@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import type { CategoryBreakdown } from '@/lib/reportUtils';
 
 interface CategoryListProps {
@@ -17,6 +18,7 @@ interface CategoryListProps {
 export function CategoryList({ categories, colors }: CategoryListProps) {
     const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
     const [currentPage, setCurrentPage] = useState(1);
+    const { isBalanceHidden } = usePrivacy();
 
     if (categories.length === 0) {
         return null;
@@ -55,7 +57,7 @@ export function CategoryList({ categories, colors }: CategoryListProps) {
                                 <span className="truncate">{cat.categoryName}</span>
                                 <span className="text-muted-foreground text-xs">({cat.percentage.toFixed(1)}%)</span>
                             </div>
-                            <span className="font-semibold ml-2">{formatCurrency(cat.total)}</span>
+                            <span className="font-semibold ml-2">{isBalanceHidden ? '****' : formatCurrency(cat.total)}</span>
                         </div>
                     );
                 })}

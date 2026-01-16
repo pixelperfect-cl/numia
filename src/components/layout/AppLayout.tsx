@@ -151,7 +151,7 @@ export function AppLayout({ selectedEntityId, onEntityChange }: AppLayoutProps) 
                 />
 
                 <main ref={mainRef} className="flex-1 overflow-y-auto bg-muted/10 p-4 pb-14 md:p-6 lg:p-8 no-scrollbar">
-                    <div className="mx-auto max-w-7xl space-y-6">
+                    <div className="mx-auto max-w-screen-2xl space-y-6">
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <Outlet />
                         </div>

@@ -114,7 +114,9 @@ function App() {
           <Route path="/account-settings" element={<div className="p-6 bg-card rounded-lg m-6"><AccountSettings /></div>} />
 
           {/* ERP Modules */}
-          <Route path="/erp/dashboard" element={<ERPDashboard />} />
+          <Route path="/erp/dashboard" element={
+            selectedEntityId ? <ERPDashboard entityId={selectedEntityId} /> : <Navigate to="/entity-selection" />
+          } />
           <Route path="/erp/clients" element={
             selectedEntityId ? <Clients entityId={selectedEntityId} /> : <Navigate to="/entity-selection" />
           } />

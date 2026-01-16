@@ -18,7 +18,9 @@ import type { Movement, DateFilterType } from '@/types';
 import { formatCurrency, parseLocalDate, getDateRangeFromType } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+
 import { Label } from '@/components/ui/label';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface InteractiveCashFlowChartProps {
   movements: Movement[];
@@ -36,6 +38,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChartProps) {
+  const { isBalanceHidden } = usePrivacy();
   // Period filter state
   const [periodType, setPeriodType] = useState<DateFilterType>('THIS_MONTH');
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -263,13 +266,13 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Ingresos</p>
             <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {formatCurrency(totalIncome)}
+              {isBalanceHidden ? '****' : formatCurrency(totalIncome)}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Gastos</p>
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(totalExpense)}
+              {isBalanceHidden ? '****' : formatCurrency(totalExpense)}
             </p>
           </div>
           <div className="space-y-1">
@@ -278,7 +281,7 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
               className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                 }`}
             >
-              {formatCurrency(balance)}
+              {isBalanceHidden ? '****' : formatCurrency(balance)}
             </p>
           </div>
         </div>
@@ -339,7 +342,7 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+              tickFormatter={(value) => isBalanceHidden ? '' : `$${(value / 1000).toFixed(0)}k`}
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             />
             <ChartTooltip
@@ -362,8 +365,8 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
                   formatter={(value, name) => (
                     <div className="flex min-w-[130px] items-center text-xs text-muted-foreground">
                       <div className="ml-auto flex items-baseline gap-0.5 font-mono font-medium tabular-nums text-foreground">
-                        <span className="font-normal text-muted-foreground">$</span>
-                        {(value as number).toLocaleString('es-CL')}
+                        <span className="font-normal text-muted-foreground">{isBalanceHidden ? '' : '$'}</span>
+                        {isBalanceHidden ? '****' : (value as number).toLocaleString('es-CL')}
                       </div>
                     </div>
                   )}

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Entity, Box } from '@/types';
 import { useData } from '@/contexts/DataContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { formatCurrency, calculateBoxBalances, getCurrencySymbol } from '@/lib/utils';
 
 interface EntityBoxesDialogProps {
@@ -20,6 +21,7 @@ interface EntityBoxesDialogProps {
 
 export function EntityBoxesDialog({ entity, open, onOpenChange }: EntityBoxesDialogProps) {
   const { movements, updateEntity } = useData();
+  const { isBalanceHidden } = usePrivacy();
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
   const [newBoxName, setNewBoxName] = useState('');
   const [newBoxCurrency, setNewBoxCurrency] = useState('CLP');
@@ -193,7 +195,7 @@ export function EntityBoxesDialog({ entity, open, onOpenChange }: EntityBoxesDia
                             </div>
                             <p className="text-sm text-muted-foreground">
                               Balance: <span className={balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}>
-                                {formatCurrency(balance, boxData.currency || 'CLP')}
+                                {isBalanceHidden ? '****' : formatCurrency(balance, boxData.currency || 'CLP')}
                               </span>
                             </p>
                           </div>

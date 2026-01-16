@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { ReportCard } from '@/components/reports/ReportCard';
 import { ReportFilters, type ReportFilterState } from '@/components/reports/ReportFilters';
 import { formatCurrency } from '@/lib/utils';
@@ -37,6 +38,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
 
 export function ERPReport() {
     const { user } = useAuth();
+    const { isBalanceHidden } = usePrivacy();
     const { movements, entities, loading: dataLoading } = useData();
     const [loading, setLoading] = useState(true);
     const [clients, setClients] = useState<Client[]>([]);
@@ -214,7 +216,7 @@ export function ERPReport() {
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <ReportCard
                     title="MRR"
-                    value={formatCurrency(metrics.mrr)}
+                    value={isBalanceHidden ? '****' : formatCurrency(metrics.mrr)}
                     icon={DollarSign}
                     description="Ingresos recurrentes mensuales"
                     loading={loading || dataLoading}
@@ -255,7 +257,7 @@ export function ERPReport() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-500">
-                            {formatCurrency(metrics.arr)}
+                            {isBalanceHidden ? '****' : formatCurrency(metrics.arr)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                             Ingresos recurrentes anuales
@@ -285,7 +287,7 @@ export function ERPReport() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {formatCurrency(metrics.averageServiceValue)}
+                            {isBalanceHidden ? '****' : formatCurrency(metrics.averageServiceValue)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                             Por servicio activo
@@ -387,9 +389,9 @@ export function ERPReport() {
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={metrics.clientRevenue} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                    <XAxis type="number" className="text-xs" tickFormatter={(value) => formatCurrency(value)} />
+                                    <XAxis type="number" className="text-xs" tickFormatter={(value) => isBalanceHidden ? '' : formatCurrency(value)} />
                                     <YAxis type="category" dataKey="clientName" className="text-xs" width={120} />
-                                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                    <Tooltip formatter={(value: number) => isBalanceHidden ? '****' : formatCurrency(value)} />
                                     <Bar dataKey="projectedRevenue" fill="#10b981" name="Ingresos Anuales (Est.)" />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -411,10 +413,10 @@ export function ERPReport() {
                                                     <td className="py-2 px-4 font-medium">{client.clientName}</td>
                                                     <td className="py-2 px-4 text-right">{client.activeServices}</td>
                                                     <td className="py-2 px-4 text-right text-emerald-600 dark:text-emerald-500">
-                                                        {formatCurrency(client.mrr)}
+                                                        {isBalanceHidden ? '****' : formatCurrency(client.mrr)}
                                                     </td>
                                                     <td className="py-2 px-4 text-right font-semibold">
-                                                        {formatCurrency(client.projectedRevenue)}
+                                                        {isBalanceHidden ? '****' : formatCurrency(client.projectedRevenue)}
                                                     </td>
                                                 </tr>
                                             ))}

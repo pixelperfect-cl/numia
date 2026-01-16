@@ -99,7 +99,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: 'erp-dashboard',
-    label: 'ERP: Control',
+    label: 'ERP: Dashboard ERP',
     icon: Briefcase,
     path: '/erp/dashboard',
     erpRequired: true
@@ -121,14 +121,14 @@ export const menuItems: MenuItem[] = [
       {
         id: 'services-summary',
         label: 'Resumen',
-        icon: ListIcon,
+        icon: FileText,
         path: '/erp/services?tab=summary'
       },
       {
         id: 'services-active',
         label: 'Activos',
         icon: LayoutGrid,
-        path: '/erp/services?tab=active'
+        path: '/erp/services?tab=monthly'
       },
       {
         id: 'services-archived',
