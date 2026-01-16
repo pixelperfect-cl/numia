@@ -23,6 +23,7 @@ const Subscriptions = lazy(() => import('@/pages/Subscriptions').then(module => 
 const Services = lazy(() => import('@/pages/erp/Services').then(module => ({ default: module.Services })));
 const Clients = lazy(() => import('@/pages/erp/Clients').then(module => ({ default: module.Clients })));
 const Projects = lazy(() => import('@/pages/erp/Projects').then(module => ({ default: module.Projects })));
+const ProjectDetails = lazy(() => import('@/pages/erp/ProjectDetails').then(module => ({ default: module.ProjectDetails })));
 const ERPDashboard = lazy(() => import('@/pages/erp/ERPDashboard').then(module => ({ default: module.ERPDashboard })));
 const EntitySelection = lazy(() => import('@/pages/EntitySelection').then(module => ({ default: module.EntitySelection })));
 const FinancialReport = lazy(() => import('@/pages/FinancialReport').then(module => ({ default: module.FinancialReport })));
@@ -125,6 +126,9 @@ function App() {
           } />
           <Route path="/erp/projects" element={
             selectedEntityId ? <Projects entityId={selectedEntityId} /> : <Navigate to="/entity-selection" />
+          } />
+          <Route path="/erp/projects/:projectId" element={
+            selectedEntityId ? <ProjectDetails /> : <Navigate to="/entity-selection" />
           } />
         </Route>
 

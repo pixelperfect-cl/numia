@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Import Tabs
 
 import { Network, GripVertical, Save, Briefcase, Mail } from 'lucide-react';
-import { MigrationPanel } from './MigrationPanel';
 import { ModulesPanel } from './ModulesPanel'; // Import ModulesPanel
 import { SMTPPanel } from './SMTPPanel'; // Import SMTPPanel
 import { Entity } from '@/types'; // Import Entity type
@@ -285,7 +284,7 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
                     </CardFooter>
                 </Card>
 
-                <MigrationPanel />
+
             </TabsContent>
 
             <TabsContent value="modules">

@@ -75,6 +75,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       });
       setNotifications(notificationsData);
       setLoading(false);
+    }, (error) => {
+      console.warn("Notifications listener error:", error);
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -143,9 +146,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       try {
         const userDocRef = doc(db, 'users', user.uid);
         // We use referencing to the user document for preferences
-        // Ideally we would use onSnapshot here too if we want real-time updates across devices
-        // For now, let's just fetch it.
-        // Actually, let's use onSnapshot to be consistent with notifications
         const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
           if (docSnapshot.exists()) {
             const data = docSnapshot.data();
@@ -153,6 +153,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               setPreferences(data.notificationPreferences);
             }
           }
+        }, (error) => {
+          console.warn("User preferences listener error:", error);
         });
         return unsubscribe;
       } catch (error) {

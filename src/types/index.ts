@@ -88,6 +88,7 @@ export interface Movement {
   subscriptionId?: string; // Link to Specific Subscription
   billingPeriod?: string; // The specific billing cycle date this payment applies to (YYYY-MM-DD)
   isFinancial?: boolean; // Indicates if this movement is backed by a financial record
+  projectId?: string; // Link to Project
   history?: MovementHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
@@ -368,4 +369,24 @@ export interface Project {
   archiveDate?: string; // ISO date
   createdAt: Date;
   updatedAt: Date;
+  // Enhanced Fields
+  // Enhanced Fields
+  milestones?: { title: string; status: 'pending' | 'active' | 'completed'; date?: string }[];
+  links?: { title: string; url: string; type: 'github' | 'figma' | 'url' }[];
+  environments?: {
+    name: 'production' | 'staging' | 'dev';
+    status: 'healthy' | 'degraded' | 'down';
+    url?: string;
+    uptime?: number;
+    version?: string;
+  }[];
+
+  // Refined Fields
+  team?: { name: string; role: string; email?: string }[];
+  credentials?: { id: string; title: string; username?: string; password?: string; url?: string }[];
+  techDetails?: {
+    stack?: string[]; // e.g. ["React", "Node.js"]
+    repoUrl?: string;
+    hosting?: string;
+  };
 }

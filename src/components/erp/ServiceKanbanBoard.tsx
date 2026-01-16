@@ -492,9 +492,11 @@ export function ServiceKanbanBoard({
                                                 </div>
                                             )}
 
+                                        </div>
+                                        <div className="p-2 pt-0 sticky bottom-0 bg-transparent flex-none">
                                             <Button
                                                 variant="ghost"
-                                                className="justify-start text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 h-8 text-xs px-2 font-normal mt-1 shrink-0"
+                                                className="w-full justify-start text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 h-8 text-xs px-2 font-normal shrink-0"
                                                 onClick={() => onCreate({
                                                     frequency: 'yearly',
                                                     monthIndex: originalIndex

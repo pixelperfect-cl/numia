@@ -284,6 +284,12 @@ export function Movements({ entityId }: MovementsProps = {}) {
       // Box filter
       if (filterBox !== 'all' && movement.box !== filterBox) return false;
 
+      // Box filter
+      if (filterBox !== 'all' && movement.box !== filterBox) return false;
+
+      // Filter out non-financial movements (e.g. project history only)
+      if (movement.isFinancial === false) return false;
+
       return true;
     });
 

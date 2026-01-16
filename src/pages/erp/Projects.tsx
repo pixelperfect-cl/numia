@@ -20,6 +20,7 @@ import {
 import { KanbanColumn } from '@/components/erp/KanbanColumn';
 import { SortableProjectCard } from '@/components/erp/SortableProjectCard';
 import { ProjectListDialog } from '@/components/erp/ProjectListDialog';
+import { ProjectCreationWizard } from '@/components/erp/ProjectCreationWizard';
 import { getProjectLists, createProjectList, updateProjectList, deleteProjectList, initializeDefaultProjectLists } from '@/lib/firebase/database';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -170,12 +171,12 @@ export function Projects({ entityId }: ProjectsProps = {}) {
         }
     };
 
-    const [initialStatus, setInitialStatus] = useState<ProjectStatus>('incoming');
+    const [wizardOpen, setWizardOpen] = useState(false);
 
     const handleAddNew = (status: ProjectStatus) => {
-        setEditingProject(undefined);
-        setInitialStatus(status);
-        setDialogOpen(true);
+        // We might want to pass status to the wizard, but for now it starts with client selection
+        // The wizard defaults to 'incoming' or we can add that prop later if needed
+        setWizardOpen(true);
     };
 
     const handleEditList = (listId: string) => {
@@ -379,8 +380,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                                     clients={clients}
                                     loading={loading}
                                     onEdit={(project) => {
-                                        setEditingProject(project);
-                                        setDialogOpen(true);
+                                        navigate(`/erp/projects/${project.id}`);
                                     }}
                                     onDelete={(projectId) => {
                                         const project = projects.find(p => p.id === projectId);
@@ -416,14 +416,10 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         </DragOverlay>
                     </DndContext>
 
-                    <ProjectDialog
-                        open={dialogOpen}
-                        onOpenChange={setDialogOpen}
-                        project={editingProject}
+                    <ProjectCreationWizard
+                        open={wizardOpen}
+                        onOpenChange={setWizardOpen}
                         onSuccess={loadData}
-                        entityId={entityId}
-                        initialStatus={initialStatus}
-                        lists={projectLists}
                     />
 
                     <ProjectListDialog

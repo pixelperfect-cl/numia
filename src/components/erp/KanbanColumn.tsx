@@ -74,7 +74,7 @@ export function KanbanColumn({
             {/* Column Content */}
             <div
                 ref={setNodeRef}
-                className="p-2 overflow-y-auto custom-scrollbar max-h-[calc(100vh-220px)] min-h-[100px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                className="flex-1 p-2 overflow-y-auto overflow-x-hidden custom-scrollbar max-h-[calc(100vh-220px)] min-h-[100px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
                 {loading ? (
                     <div className="flex justify-center py-4">
@@ -98,11 +98,13 @@ export function KanbanColumn({
                         </div>
                     </SortableContext>
                 )}
+            </div>
 
-                {/* Add Button */}
+            {/* Column Footer - Add Button */}
+            <div className="p-2 border-t border-inherit bg-background/50 backdrop-blur rounded-b-lg">
                 <Button
                     variant="ghost"
-                    className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-background/50 h-9 font-normal mt-2"
+                    className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-background/50 h-9 font-normal"
                     onClick={() => onAdd(id)}
                 >
                     <Plus className="mr-2 h-4 w-4" /> Añadir Proyecto

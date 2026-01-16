@@ -118,7 +118,10 @@ export const mapProject = (userId: string | undefined, data: Partial<Project>) =
 
 export const mapMovement = (userId: string | undefined, data: Partial<Movement>) => {
     const obj: any = { ...data };
+
     if (userId) obj.userId = userId;
+    // Remove category legacy field if present to avoid Supabase schema error
+    if (obj.category) delete obj.category;
 
     const mapped = mapObject(obj, {
         userId: 'user_id',

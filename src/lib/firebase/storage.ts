@@ -52,3 +52,33 @@ export async function deleteEntityLogo(logoUrl: string): Promise<void> {
     // Don't throw error if logo doesn't exist
   }
 }
+
+/**
+ * Upload project asset (e.g., description images) to Firebase Storage
+ * @param file - File to upload
+ * @param projectId - Project ID
+ * @returns Download URL of uploaded file
+ */
+export async function uploadProjectAsset(
+  file: File,
+  projectId: string
+): Promise<string> {
+  // Validate file size (max 5MB for assets)
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('El archivo no debe superar 5MB');
+  }
+
+  // Create storage reference
+  // Use timestamp to prevent collisions
+  const timestamp = Date.now();
+  const validName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+  const storageRef = ref(storage, `projects/${projectId}/assets/${timestamp}_${validName}`);
+
+  // Upload file
+  await uploadBytes(storageRef, file);
+
+  // Get download URL
+  const downloadURL = await getDownloadURL(storageRef);
+
+  return downloadURL;
+}

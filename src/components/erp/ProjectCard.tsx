@@ -62,25 +62,22 @@ export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCa
                     </div>
                 </div>
 
-                {/* Description (Optional) */}
-                {project.description && (
-                    <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
-                        {project.description}
-                    </p>
-                )}
+
 
                 {/* Stats / Progress */}
-                <div className="space-y-1">
-                    <div className="flex justify-between text-[10px]">
-                        <span className="text-muted-foreground">Progreso</span>
-                        <span className="font-medium">{project.progress}%</span>
+                {(project.checklists && project.checklists.length > 0) ? (
+                    <div className="space-y-1">
+                        <div className="flex justify-between text-[10px]">
+                            <span className="text-muted-foreground">Progreso</span>
+                            <span className="font-medium">{project.progress}%</span>
+                        </div>
+                        <Progress
+                            value={project.progress}
+                            className="h-1"
+                            indicatorClassName="bg-[#008bff] shadow-[0_0_8px_#008bff]"
+                        />
                     </div>
-                    <Progress
-                        value={project.progress}
-                        className="h-1"
-                        indicatorClassName="bg-[#008bff] shadow-[0_0_8px_#008bff]"
-                    />
-                </div>
+                ) : null}
 
                 {/* Footer: Date & Avatar (Simulated) */}
                 <div className="flex items-center justify-between pt-1">

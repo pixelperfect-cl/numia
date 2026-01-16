@@ -1,0 +1,7 @@
+/* Add global styles if not present, or just use tailwind classes */
+.rich-editor-content p {
+  margin-bottom: 0.75em;
+}
+.rich-editor-content p:last-child {
+  margin-bottom: 0;
+}

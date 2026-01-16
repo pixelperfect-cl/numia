@@ -17,6 +17,7 @@ import {
   QueryConstraint,
   writeBatch,
   deleteField,
+  onSnapshot,
 } from 'firebase/firestore';
 
 // ========== ENTITIES ==========
@@ -144,13 +145,14 @@ export const deleteEntity = async (entityId: string): Promise<void> => {
 
 export const getMovements = async (
   userId: string,
-  options?: string | { entityId?: string; startDate?: string; endDate?: string }
+  options?: string | { entityId?: string; startDate?: string; endDate?: string; projectId?: string }
 ): Promise<Movement[]> => {
   const constraints: QueryConstraint[] = [where('userId', '==', userId)];
 
   let entityId: string | undefined;
   let startDate: string | undefined;
   let endDate: string | undefined;
+  let projectId: string | undefined;
 
   // Normalize options
   if (typeof options === 'string') {
@@ -159,6 +161,7 @@ export const getMovements = async (
     entityId = options.entityId;
     startDate = options.startDate;
     endDate = options.endDate;
+    projectId = options.projectId;
   }
 
   if (entityId) {
@@ -173,14 +176,23 @@ export const getMovements = async (
     constraints.push(where('date', '<=', endDate));
   }
 
+  // if (projectId) {
+  //   constraints.push(where('projectId', '==', projectId));
+  // }
+
   constraints.push(orderBy('date', 'desc'));
 
   const q = query(collection(db, 'movements'), ...constraints);
   const snapshot = await getDocs(q);
-  const movements = snapshot.docs.map(doc => ({
+  let movements = snapshot.docs.map(doc => ({
     id: doc.id,
     ...convertTimestamps(doc.data()),
   })) as Movement[];
+
+  // Filter by projectId in-memory to avoid composite index requirements
+  if (projectId) {
+    movements = movements.filter(m => m.projectId === projectId);
+  }
 
   // Sort by date (desc) first, then by createdAt (desc) for same-day movements
   movements.sort((a, b) => {
@@ -518,6 +530,16 @@ export const createClient = async (userId: string, data: Omit<Client, 'id' | 'us
   return docRef.id;
 };
 
+// Add getClient before updateClient
+export const getClient = async (clientId: string): Promise<Client | null> => {
+  const docRef = doc(db, 'clients', clientId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return { id: snap.id, ...convertTimestamps(snap.data()) } as Client;
+  }
+  return null;
+};
+
 export const updateClient = async (clientId: string, data: Partial<Client>): Promise<void> => {
   const docRef = doc(db, 'clients', clientId);
   await updateDoc(docRef, {
@@ -766,6 +788,27 @@ export const updateProject = async (projectId: string, data: Partial<Project>): 
     updatedAt: Timestamp.now(),
   });
   sb.syncProject('', projectId, { ...data, updatedAt: new Date() });
+};
+
+export const getProject = async (projectId: string): Promise<Project | null> => {
+  const docRef = doc(db, 'projects', projectId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return { id: snap.id, ...convertTimestamps(snap.data()) } as Project;
+  }
+  return null;
+};
+
+// Real-time subscription to a project
+export const subscribeToProject = (projectId: string, callback: (project: Project | null) => void) => {
+  const docRef = doc(db, 'projects', projectId);
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      callback({ id: snap.id, ...convertTimestamps(snap.data()) } as Project);
+    } else {
+      callback(null);
+    }
+  });
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
