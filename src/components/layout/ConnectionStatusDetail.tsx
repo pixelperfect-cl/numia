@@ -51,25 +51,12 @@ export function ConnectionStatusDetail() {
             <div className="space-y-3">
                 <h4 className="text-sm font-medium text-muted-foreground">Estado de Bases de Datos</h4>
 
-                {/* Firebase */}
-                <div className="flex items-center gap-3 p-3 rounded-lg border">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                        <div className="font-medium text-sm">Firebase</div>
-                        <div className="text-xs text-muted-foreground">Base de datos principal</div>
-                    </div>
-                    <div className={cn(
-                        "h-3 w-3 rounded-full",
-                        details.firebase ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"
-                    )} />
-                </div>
-
                 {/* Supabase */}
                 <div className="flex items-center gap-3 p-3 rounded-lg border">
                     <Cloud className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1">
                         <div className="font-medium text-sm">Supabase</div>
-                        <div className="text-xs text-muted-foreground">Base de datos de respaldo</div>
+                        <div className="text-xs text-muted-foreground">Base de datos principal</div>
                     </div>
                     <div className={cn(
                         "h-3 w-3 rounded-full",

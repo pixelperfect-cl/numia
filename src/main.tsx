@@ -4,7 +4,7 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -16,15 +16,15 @@ import { PrivacyProvider } from '@/contexts/PrivacyContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="numia-ui-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="entity-ui-theme">
       <AuthProvider>
         <DataProvider>
           <NotificationProvider>
             <AIProvider>
               <PrivacyProvider>
-                <BrowserRouter>
+                <HashRouter>
                   <App />
-                </BrowserRouter>
+                </HashRouter>
               </PrivacyProvider>
             </AIProvider>
           </NotificationProvider>

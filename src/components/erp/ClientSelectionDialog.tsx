@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getClients } from '@/lib/firebase/database';
+import { getClients } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPlus, Search, Loader2, ArrowRight, Mail, Phone, User } from 'lucide-react';
 import type { Client } from '@/types';
@@ -30,10 +30,18 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
             setSearchTerm('');
             getClients(user.uid)
                 .then(data => {
+                    console.log('🔍 ClientSelectionDialog: entityId prop:', entityId);
+                    console.log('🔍 ClientSelectionDialog: Total clients fetched:', data.length);
+                    if (data.length > 0) {
+                        console.log('🔍 ClientSelectionDialog: Sample client:', data[0]);
+                    }
+
                     // Filter by entity if provided
                     const filtered = entityId
                         ? data.filter(c => c.entityId === entityId)
                         : data;
+
+                    console.log('🔍 ClientSelectionDialog: Filtered clients count:', filtered.length);
                     setClients(filtered);
                 })
                 .catch(console.error)
@@ -61,6 +69,13 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
         setClientDialogOpen(false);
     };
 
+    console.log('🔄 ClientSelectionDialog RENDER:', {
+        open,
+        loading,
+        clientsCount: clients.length,
+        filteredCount: filteredClients.length
+    });
+
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,7 +91,7 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Buscar por nombre, email o teléfono..."
+                            placeholder="Buscar por nombre, email o telÃ©fono..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"
@@ -199,3 +214,4 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
         </>
     );
 }
+

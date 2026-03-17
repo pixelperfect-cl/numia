@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, User, Plus, Loader2, ArrowRight } from 'lucide-react';
-import { getClients } from '@/lib/firebase/database';
+import { getClients } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Client } from '@/types';
 
@@ -47,7 +47,7 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
             <div className="flex items-center gap-2 relative">
                 <Search className="h-4 w-4 absolute left-3 text-muted-foreground" />
                 <Input
-                    placeholder="Buscar por nombre, email o teléfono..."
+                    placeholder="Buscar por nombre, email o telÃ©fono..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-9"
@@ -112,3 +112,4 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
         </div>
     );
 }
+

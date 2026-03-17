@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
-import { updateEntity, updateBox } from '@/lib/firebase/database';
+import { updateEntity, updateBox } from '@/lib/supabase/database';
 import type { Entity, Box } from '@/types';
 
 interface BoxDialogProps {
@@ -140,7 +140,7 @@ export function BoxDialog({ open, onOpenChange, entity, editingBox, onSuccess }:
                         <div className="space-y-0.5">
                             <Label>Caja por defecto</Label>
                             <p className="text-xs text-muted-foreground">
-                                Se seleccionará automáticamente al crear movimientos
+                                Se seleccionarÃ¡ automÃ¡ticamente al crear movimientos
                             </p>
                         </div>
                         <Switch
@@ -163,3 +163,4 @@ export function BoxDialog({ open, onOpenChange, entity, editingBox, onSuccess }:
         </Dialog>
     );
 }
+

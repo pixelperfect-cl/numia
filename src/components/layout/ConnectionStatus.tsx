@@ -56,12 +56,8 @@ export function ConnectionStatus({ onClick }: ConnectionStatusProps) {
                     </div>
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <div className={cn("h-1.5 w-1.5 rounded-full", details.firebase ? "bg-green-500" : "bg-red-500")} />
-                            <span>Firebase (Principal)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
                             <div className={cn("h-1.5 w-1.5 rounded-full", details.supabase ? "bg-green-500" : "bg-red-500")} />
-                            <span>Supabase (Backup)</span>
+                            <span>Supabase Cloud</span>
                         </div>
                     </div>
                     {status === 'disconnected' && (

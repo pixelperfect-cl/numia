@@ -1,4 +1,4 @@
-# Numia v1.0 - Lista de Funcionalidades Implementadas
+# [E]ntity v1.0 - Lista de Funcionalidades Implementadas
 
 ## ✅ Funcionalidades Completadas
 

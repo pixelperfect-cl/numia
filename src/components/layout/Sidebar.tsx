@@ -131,10 +131,22 @@ export const menuItems: MenuItem[] = [
         path: '/erp/services?tab=monthly'
       },
       {
+        id: 'services-catalog',
+        label: 'Catálogo',
+        icon: FileText,
+        path: '/erp/services?tab=catalog'
+      },
+      {
         id: 'services-archived',
         label: 'Archivados',
         icon: Archive,
         path: '/erp/services?tab=archived'
+      },
+      {
+        id: 'services-settings',
+        label: 'Configuración',
+        icon: Settings,
+        path: '/erp/services?tab=settings'
       }
     ]
   },
@@ -162,6 +174,12 @@ export const menuItems: MenuItem[] = [
         label: 'Archivados',
         icon: Archive,
         path: '/erp/projects?tab=archived'
+      },
+      {
+        id: 'projects-settings',
+        label: 'Configuración',
+        icon: Settings,
+        path: '/erp/projects?tab=settings'
       }
     ]
   },
@@ -477,7 +495,7 @@ export function Sidebar({ selectedEntityId }: SidebarProps) {
 
                 {/* Version Item */}
                 <button
-                  onClick={() => handleNavigate('/configuration?tab=changelog')}
+                  onClick={() => handleNavigate('/changelog')}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 >
                   <Info className="h-3 w-3" />

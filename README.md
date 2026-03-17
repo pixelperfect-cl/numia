@@ -1,6 +1,6 @@
-# Numia v1.0
+# [E]ntity v1.0
 
-Aplicación de gestión financiera personal y empresarial construida con React, TypeScript, Shadcn UI y Firebase.
+Aplicación de gestión financiera personal y empresarial construida con React, TypeScript, Shadcn UI y Supabase.
 
 ## 🚀 Tecnologías
 
@@ -81,7 +81,7 @@ Abrir [http://localhost:5173](http://localhost:5173)
 ## 📁 Estructura del Proyecto
 
 ```
-numiashad/
+entity/
 ├── src/
 │   ├── components/
 │   │   ├── ui/              # Shadcn components

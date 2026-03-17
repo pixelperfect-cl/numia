@@ -57,7 +57,7 @@ const generateSystemPrompt = (
     .reduce((sum, m) => sum + Math.abs(m.amount), 0);
   const balance = totalIncome - totalExpense;
 
-  return `Eres el asistente financiero de Numia, una app de gestión financiera personal y de negocios.
+  return `Eres el asistente financiero de [E]ntity, una app de gestión financiera personal y de negocios.
 
 **TU PERSONALIDAD:**
 - Amigable, cercano y fácil de entender
@@ -377,8 +377,8 @@ export const processDocument = async (
     const prompt = documentType === 'receipt'
       ? 'Analiza esta boleta o recibo. Extrae: fecha, comercio/tienda, monto total, items comprados, y sugiere una categoría de gasto apropiada. Responde en formato JSON.'
       : documentType === 'bank_statement'
-      ? 'Analiza esta cartola bancaria. Extrae todos los movimientos que encuentres con: fecha, descripción, monto, tipo (cargo o abono). Responde en formato JSON con un array de movimientos.'
-      : 'Analiza esta factura. Extrae: número de factura, fecha, proveedor, monto total, items. Responde en formato JSON.';
+        ? 'Analiza esta cartola bancaria. Extrae todos los movimientos que encuentres con: fecha, descripción, monto, tipo (cargo o abono). Responde en formato JSON con un array de movimientos.'
+        : 'Analiza esta factura. Extrae: número de factura, fecha, proveedor, monto total, items. Responde en formato JSON.';
 
     const response = await client.chat.completions.create({
       model: 'gpt-4-vision-preview',

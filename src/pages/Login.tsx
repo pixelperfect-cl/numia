@@ -1,5 +1,5 @@
 /**
- * Numia v1.0 - Login Page
+ * [E]ntity v1.0 - Login Page
  */
 
 import { useState } from 'react';
@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import numiaLogo from '@/assets/numialogo.png';
 import { Mail, Lock, User } from 'lucide-react';
 
 export function Login() {
@@ -131,7 +130,7 @@ export function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <img src={numiaLogo} alt="Numia" className="h-11 w-auto" />
+            <img src="/logo.png" alt="[E]ntity" className="h-11 w-auto" />
           </div>
           <CardDescription>Gestión financiera personal y empresarial</CardDescription>
         </CardHeader>

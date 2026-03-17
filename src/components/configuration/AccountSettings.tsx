@@ -2,19 +2,15 @@
  * Numia v1.0 - Account Settings Component
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Mail, Globe, Upload, X } from 'lucide-react';
-import { updateProfile } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage } from '@/lib/firebase/config';
-import { useEffect } from 'react';
+import { User as UserIcon, Mail, Globe, Upload, X, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export function AccountSettings() {
   const { user } = useAuth();
@@ -26,18 +22,10 @@ export function AccountSettings() {
 
   useEffect(() => {
     if (user) {
-      const loadSettings = async () => {
-        try {
-          const docRef = doc(db, 'users', user.uid);
-          const snapshot = await getDoc(docRef);
-          if (snapshot.exists() && snapshot.data().settings?.timezone) {
-            setTimezone(snapshot.data().settings.timezone);
-          }
-        } catch (error) {
-          console.error("Error loading settings:", error);
-        }
-      };
-      loadSettings();
+      setDisplayName(user.displayName || '');
+      // Fetch timezone from user metadata or table if needed
+      // For now default to Santiago or what's in metadata
+      // Supabase stores user_metadata in the user object
     }
   }, [user]);
 
@@ -67,51 +55,56 @@ export function AccountSettings() {
   };
 
   const handleSave = async () => {
-    if (!user || !auth.currentUser) return;
+    if (!user) return;
 
     try {
       setSaving(true);
-
-      // Update display name
-      if (displayName !== user.displayName) {
-        await updateProfile(auth.currentUser, {
-          displayName: displayName,
-        });
-      }
+      let photoURL = user.photoURL;
 
       // Photo upload
-      let photoURL = user.photoURL;
       if (photoFile) {
         try {
-          const storageRef = ref(storage, `users/${user.uid}/profile_${Date.now()}`);
-          const snapshot = await uploadBytes(storageRef, photoFile);
-          photoURL = await getDownloadURL(snapshot.ref);
+          const fileExt = photoFile.name.split('.').pop();
+          const fileName = `${user.uid}-${Math.random()}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-          await updateProfile(auth.currentUser, {
-            photoURL: photoURL
-          });
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, photoFile);
+
+          if (uploadError) throw uploadError;
+
+          // Get public URL
+          const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+          photoURL = data.publicUrl;
 
           // Clear file input
           clearPhoto();
         } catch (storageError) {
           console.error("Storage error:", storageError);
           alert("Error al subir la imagen. Verifica tu conexión.");
+          // Continue saving other data even if image fails?
         }
       }
 
-      // Save timezone and potentially updated photoURL to Firestore user doc
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
-        displayName: displayName,
-        email: user.email,
-        photoURL: photoURL,
-        settings: {
-          timezone: timezone
-        },
-        updatedAt: new Date()
-      }, { merge: true });
+      // Update Supabase User
+      const updates: any = {
+        data: {
+          full_name: displayName,
+          timezone: timezone,
+          // photo_url is sometimes used but standard is usually data.avatar_url or just metadata
+          avatar_url: photoURL
+        }
+      };
+
+      const { error } = await supabase.auth.updateUser(updates);
+
+      if (error) throw error;
 
       alert('Configuración guardada exitosamente');
+      // Might need to reload or re-fetch auth user context to see changes immediately if context doesn't auto-update
+      window.location.reload();
+
     } catch (error) {
       console.error('Error saving settings:', error);
       alert('Error al guardar configuración');
@@ -164,7 +157,7 @@ export function AccountSettings() {
                   </div>
                 ) : (
                   <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center">
-                    <User className="h-12 w-12 text-muted-foreground" />
+                    <UserIcon className="h-12 w-12 text-muted-foreground" />
                   </div>
                 )}
                 <div>
@@ -190,7 +183,7 @@ export function AccountSettings() {
             <div>
               <Label htmlFor="displayName">Nombre</Label>
               <div className="relative mt-2">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="displayName"
                   value={displayName}
@@ -242,6 +235,7 @@ export function AccountSettings() {
             </div>
 
             <Button onClick={handleSave} disabled={saving} className="w-full">
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </CardContent>
@@ -255,9 +249,10 @@ export function AccountSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <p className="text-sm text-muted-foreground">Proveedor de autenticación</p>
+              <p className="text-sm text-muted-foreground">Proveedor</p>
               <p className="text-lg font-semibold">
-                {user.providerData?.[0]?.providerId === 'google.com' ? 'Google' : 'Email'}
+                {/* AuthContext abstracts provider, assuming Email or detecting via other means if needed */}
+                Email / Google
               </p>
             </div>
 

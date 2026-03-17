@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getProjects } from '@/lib/firebase/database';
+import { getProjects } from '@/lib/supabase/database';
 
 export function useProjectMetrics(selectedEntityId: string) {
     const { user } = useAuth();

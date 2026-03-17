@@ -28,6 +28,7 @@ const ERPDashboard = lazy(() => import('@/pages/erp/ERPDashboard').then(module =
 const EntitySelection = lazy(() => import('@/pages/EntitySelection').then(module => ({ default: module.EntitySelection })));
 const FinancialReport = lazy(() => import('@/pages/FinancialReport').then(module => ({ default: module.FinancialReport })));
 const ERPReport = lazy(() => import('@/pages/ERPReport').then(module => ({ default: module.ERPReport })));
+const ChangelogPage = lazy(() => import('@/pages/ChangelogPage').then(module => ({ default: module.ChangelogPage })));
 
 // Loading Component
 const PageLoading = () => (
@@ -39,12 +40,12 @@ const PageLoading = () => (
 function App() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => localStorage.getItem('numia-entity-id'));
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => localStorage.getItem('entity-entity-id'));
 
   // Persist entity selection
   useEffect(() => {
-    if (selectedEntityId) localStorage.setItem('numia-entity-id', selectedEntityId);
-    else localStorage.removeItem('numia-entity-id');
+    if (selectedEntityId) localStorage.setItem('entity-entity-id', selectedEntityId);
+    else localStorage.removeItem('entity-entity-id');
   }, [selectedEntityId]);
 
   if (loading) {
@@ -113,6 +114,9 @@ function App() {
           {/* Settings */}
           <Route path="/notifications" element={<div className="p-6"><NotificationSettings /></div>} />
           <Route path="/account-settings" element={<div className="p-6 bg-card rounded-lg m-6"><AccountSettings /></div>} />
+          <Route path="/changelog" element={
+            selectedEntityId ? <ChangelogPage /> : <Navigate to="/entity-selection" />
+          } />
 
           {/* ERP Modules */}
           <Route path="/erp/dashboard" element={

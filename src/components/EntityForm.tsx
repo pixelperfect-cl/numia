@@ -1,15 +1,14 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { initializeDefaultCategories } from '@/lib/firebase/database';
+import { initializeDefaultCategories } from '@/lib/supabase/database';
 import { Loader2, Upload } from 'lucide-react';
 import type { EntityType } from '@/types';
 import { DialogFooter } from '@/components/ui/dialog';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
+import { uploadEntityLogo } from '@/lib/supabase/storage';
 
 interface EntityFormProps {
     onSuccess: () => void;
@@ -44,17 +43,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
         try {
             // Temporary ID for upload
             const tempId = `temp_${Date.now()}`;
-            const extension = file.name.split('.').pop() || 'png';
-            const storageRef = ref(storage, `entities/${tempId}/logo.${extension}`);
-
-            // Add timeout race
-            const uploadPromise = uploadBytes(storageRef, file);
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Upload timed out')), 10000)
-            );
-
-            await Promise.race([uploadPromise, timeoutPromise]);
-            const downloadURL = await getDownloadURL(storageRef);
+            const downloadURL = await uploadEntityLogo(file, tempId);
 
             setFormData({ ...formData, logoUrl: downloadURL });
         } catch (error) {
@@ -72,7 +61,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
         if (!user || !formData.name) return;
 
         setLoading(true);
-        console.log('🚀 Starting entity creation...', formData);
+        console.log('ðŸš€ Starting entity creation...', formData);
         try {
             // Create using DataContext to update global state
             const entityId = await createEntity({
@@ -91,7 +80,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
             // Note: In a future refactor, this logic should probably move to the backend or DataContext
             const defaultCategories = [
                 { name: 'Sueldo', type: 'income', icon: 'Wallet', color: '#22c55e' },
-                { name: 'Alimentación', type: 'expense', icon: 'ShoppingCart', color: '#ef4444' },
+                { name: 'AlimentaciÃ³n', type: 'expense', icon: 'ShoppingCart', color: '#ef4444' },
                 { name: 'Transporte', type: 'expense', icon: 'Car', color: '#f97316' },
                 { name: 'Vivienda', type: 'expense', icon: 'Home', color: '#3b82f6' },
                 { name: 'Servicios', type: 'expense', icon: 'Zap', color: '#eab308' },
@@ -101,10 +90,10 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
             ];
 
             await initializeDefaultCategories(user.uid, defaultCategories);
-            console.log('✅ Entity created successfully, id:', entityId);
+            console.log('âœ… Entity created successfully, id:', entityId);
             onSuccess();
         } catch (error) {
-            console.error('❌ Error creating entity detailed:', error);
+            console.error('âŒ Error creating entity detailed:', error);
             alert('Error al crear entidad: ' + (error instanceof Error ? error.message : String(error)));
         } finally {
             setLoading(false);
@@ -151,7 +140,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
                         onChange={handleLogoUpload}
                     />
                     <p className="text-xs text-muted-foreground">
-                        200x100 píxeles (JPG, PNG o WebP)
+                        200x100 pÃ­xeles (JPG, PNG o WebP)
                     </p>
                 </div>
             </div>
@@ -178,3 +167,4 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
         </form>
     );
 }
+

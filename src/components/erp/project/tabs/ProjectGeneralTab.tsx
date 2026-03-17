@@ -1,4 +1,4 @@
-import type { Project, Client } from "@/types";
+﻿import type { Project, Client } from "@/types";
 import { ProjectOverview } from "../ProjectOverview";
 
 import { CredentialsWidget } from "../widgets/CredentialsWidget";
@@ -31,7 +31,7 @@ export function ProjectGeneralTab({ project, onUpdate, client }: ProjectGeneralT
 
         try {
             // Import database functions dynamically to avoid circular dependencies if any
-            const { updateProject } = await import('@/lib/firebase/database');
+            const { updateProject } = await import('@/lib/supabase/database');
             await updateProject(project.id, { clientId: newClient.id });
 
             // Notify parent to refresh/set local state
@@ -56,7 +56,7 @@ export function ProjectGeneralTab({ project, onUpdate, client }: ProjectGeneralT
 
     const handleTeamUpdate = async (newTeam: any[]) => {
         try {
-            const { updateProject } = await import('@/lib/firebase/database');
+            const { updateProject } = await import('@/lib/supabase/database');
             await updateProject(project.id, { team: newTeam });
             onUpdate({ ...project, team: newTeam });
         } catch (error) {
@@ -66,7 +66,7 @@ export function ProjectGeneralTab({ project, onUpdate, client }: ProjectGeneralT
 
     const handleCredentialsUpdate = async (newCreds: any[]) => {
         try {
-            const { updateProject } = await import('@/lib/firebase/database');
+            const { updateProject } = await import('@/lib/supabase/database');
             await updateProject(project.id, { credentials: newCreds });
             onUpdate({ ...project, credentials: newCreds });
         } catch (error) {
@@ -90,3 +90,4 @@ export function ProjectGeneralTab({ project, onUpdate, client }: ProjectGeneralT
         </div>
     );
 }
+

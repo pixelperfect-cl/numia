@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { updateEntity, deleteEntityCascade } from '@/lib/firebase/database';
+import { updateEntity, deleteEntityCascade } from '@/lib/supabase/database';
 
 import { Loader2, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';

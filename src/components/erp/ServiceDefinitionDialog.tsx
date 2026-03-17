@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { createServiceDefinition, updateServiceDefinition } from '@/lib/firebase/database';
-import type { ServiceDefinition } from '@/types';
+import { createServiceDefinition, updateServiceDefinition, getCategories } from '@/lib/supabase/database';
+import type { ServiceDefinition, Category } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { CategorySelect } from '@/components/CategorySelect';
 
 interface ServiceDefinitionDialogProps {
     open: boolean;
@@ -20,23 +21,35 @@ interface ServiceDefinitionDialogProps {
 export function ServiceDefinitionDialog({ open, onOpenChange, definition, onSuccess }: ServiceDefinitionDialogProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [categories, setCategories] = useState<Category[]>([]);
 
     const [formData, setFormData] = useState<Partial<ServiceDefinition>>({
         name: '',
         description: '',
         amount: 0,
         currency: 'CLP',
-        frequency: 'monthly'
+        frequency: 'monthly',
+        categoryId: undefined
     });
 
     useEffect(() => {
+        // Load categories
+        if (user && open) {
+            getCategories(user.uid).then(cats => {
+                // Filter to only income categories
+                const incomeCategories = cats.filter(c => c.type === 'income');
+                setCategories(incomeCategories);
+            });
+        }
+
         if (definition) {
             setFormData({
                 name: definition.name,
                 description: definition.description || '',
                 amount: definition.amount,
                 currency: definition.currency,
-                frequency: definition.frequency
+                frequency: definition.frequency,
+                categoryId: definition.categoryId
             });
         } else {
             setFormData({
@@ -44,10 +57,11 @@ export function ServiceDefinitionDialog({ open, onOpenChange, definition, onSucc
                 description: '',
                 amount: 0,
                 currency: 'CLP',
-                frequency: 'monthly'
+                frequency: 'monthly',
+                categoryId: undefined
             });
         }
-    }, [definition, open]);
+    }, [definition, open, user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -148,6 +162,20 @@ export function ServiceDefinitionDialog({ open, onOpenChange, definition, onSucc
                         </Select>
                     </div>
 
+                    <div className="grid gap-2">
+                        <Label htmlFor="category">Categoría de Ingreso (Opcional)</Label>
+                        <CategorySelect
+                            value={formData.categoryId || ''}
+                            onValueChange={(val) => setFormData({ ...formData, categoryId: val || undefined })}
+                            categories={categories}
+                            type="income"
+                            placeholder="Sin categoría"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Los pagos de este servicio se categorizarán automáticamente
+                        </p>
+                    </div>
+
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancelar
@@ -162,3 +190,4 @@ export function ServiceDefinitionDialog({ open, onOpenChange, definition, onSucc
         </Dialog>
     );
 }
+

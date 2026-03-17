@@ -12,8 +12,7 @@ import { Bell, Trash2, CheckCheck, Info, AlertTriangle, CheckCircle, Settings } 
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { supabase } from '@/lib/supabase';
 
 interface NotificationPreferences {
   loans: boolean;
@@ -32,16 +31,17 @@ export function NotificationSettings() {
   const [saving, setSaving] = useState(false);
 
   // Load preferences from Firestore
+  // Load preferences from Supabase Auth Metadata
   useEffect(() => {
     const loadPreferences = async () => {
       if (!user) return;
 
       try {
-        const docRef = doc(db, 'users', user.uid, 'preferences', 'notifications');
-        const docSnap = await getDoc(docRef);
+        const { data } = await supabase.auth.getUser();
+        const prefs = data.user?.user_metadata?.preferences?.notifications;
 
-        if (docSnap.exists()) {
-          setPreferences(docSnap.data() as NotificationPreferences);
+        if (prefs) {
+          setPreferences(prefs);
         }
       } catch (error) {
         console.error('Error loading notification preferences:', error);
@@ -56,8 +56,15 @@ export function NotificationSettings() {
 
     try {
       setSaving(true);
-      const docRef = doc(db, 'users', user.uid, 'preferences', 'notifications');
-      await setDoc(docRef, preferences);
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          preferences: {
+            notifications: preferences
+          }
+        }
+      });
+
+      if (error) throw error;
       alert('Preferencias guardadas exitosamente');
     } catch (error) {
       console.error('Error saving preferences:', error);
@@ -126,9 +133,8 @@ export function NotificationSettings() {
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${
-                    notification.read ? 'bg-background' : 'bg-blue-500/5 border-blue-500/20'
-                  }`}
+                  className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${notification.read ? 'bg-background' : 'bg-blue-500/5 border-blue-500/20'
+                    }`}
                 >
                   <div className="mt-0.5">{getNotificationIcon(notification.type)}</div>
 

@@ -1,207 +1,265 @@
+
 /**
- * Numia v1.0 - Dashboard Page
+ * Numia v2.0 - Enhanced Command Center Dashboard
+ * Dark theme with cyan accents
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import { formatCurrency, calculateSummary, parseLocalDate } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight } from 'lucide-react';
-import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
-import { MovementsAreaChart } from '@/components/MovementsAreaChart';
-import { CategoryPieChart } from '@/components/CategoryPieChart';
-import { IconComponent } from '@/components/IconPicker';
-import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
+import { PlusCircle, UserPlus, Briefcase } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+// New Dashboard Components
+import { MetricsOverview } from '@/components/dashboard/MetricsOverview';
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
+import { AnnualRevenueWaveChart } from '@/components/dashboard/AnnualRevenueWaveChart';
+import { YearlyServiceHeatmap } from '@/components/dashboard/YearlyServiceHeatmap';
+import { RecentMovementsWidget } from '@/components/dashboard/RecentMovementsWidget';
+import { MonthlyRevenueChart } from '@/components/dashboard/MonthlyRevenueChart';
+
+// Data Fetching
+import { getClients, getProjects, getSubscriptions } from '@/lib/supabase/database';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Subscription, Project, Client } from '@/types';
+import { differenceInDays, parseISO, isAfter, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 export function Dashboard() {
-  const { movements, entities, categories, loading } = useData();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { movements, entities, loading: loadingData } = useData();
   const { isBalanceHidden } = usePrivacy();
 
-  // Calculate summary (all time)
+  // Local State for ERP Data
+  const [loadingErp, setLoadingErp] = useState(true);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+
+  // Load ERP Data
+  useEffect(() => {
+    async function loadErp() {
+      if (!user) return;
+      setLoadingErp(true);
+      try {
+        const [clientsData, projectsData] = await Promise.all([
+          getClients(user.uid),
+          getProjects(user.uid)
+        ]);
+
+        setClients(clientsData);
+        setProjects(projectsData);
+
+        // Get Subscriptions for all clients
+        const allSubsPromises = clientsData.map(c => getSubscriptions(c.id, user.uid));
+        const allSubsResults = await Promise.all(allSubsPromises);
+        const allSubs = allSubsResults.flat();
+        setSubscriptions(allSubs);
+
+      } catch (e) {
+        console.error("Error loading ERP data for dashboard", e);
+      } finally {
+        setLoadingErp(false);
+      }
+    }
+    loadErp();
+  }, [user]);
+
+  // Calculate Financial Metrics from Context
   const totalSummary = calculateSummary(movements);
+
+  // Calculate comprehensive metrics
+  const metrics = useMemo(() => {
+    const now = new Date();
+    const currentMonthStart = startOfMonth(now);
+    const currentMonthEnd = endOfMonth(now);
+
+    // Projects
+    const activeProjs = projects.filter(p => p.status !== 'completed' && !p.archived);
+    const riskyProjs = activeProjs.filter(p => {
+      if (p.dueDate && isAfter(now, parseISO(p.dueDate))) return true;
+      return false;
+    });
+
+    // Collections (Overdue vs Pending)
+    let pending = 0;
+    let overdue = 0;
+
+    subscriptions.forEach(sub => {
+      if (sub.status !== 'active') return;
+      const nextDate = parseISO(sub.nextBillingDate);
+      const diff = differenceInDays(nextDate, now);
+
+      if (diff < 0) {
+        overdue += sub.amount;
+      } else if (diff <= 7) {
+        pending += sub.amount;
+      }
+    });
+
+    // Monthly Revenue (current month projected)
+    const monthlyRevenue = movements
+      .filter(m => {
+        const date = parseLocalDate(m.date);
+        return m.type === 'income' && date >= currentMonthStart && date <= currentMonthEnd;
+      })
+      .reduce((sum, m) => sum + m.amount, 0);
+
+    // Monthly Expenses
+    const monthlyExpenses = movements
+      .filter(m => {
+        const date = parseLocalDate(m.date);
+        return m.type === 'expense' && date >= currentMonthStart && date <= currentMonthEnd;
+      })
+      .reduce((sum, m) => sum + Math.abs(m.amount), 0);
+
+    // Calculate ARR (Annual Recurring Revenue) - ONLY yearly services
+    const UF_VALUE = 37500; // Estimated
+    const yearlySubs = subscriptions.filter(s => s.status === 'active' && s.frequency !== 'monthly');
+
+    const arrCLP = yearlySubs
+      .filter(s => s.currency !== 'UF')
+      .reduce((sum, sub) => sum + sub.amount, 0);
+
+    const arrUF = yearlySubs
+      .filter(s => s.currency === 'UF')
+      .reduce((sum, sub) => sum + sub.amount, 0);
+
+    const arr = arrCLP + (arrUF * UF_VALUE);
+
+    // Calculate changes (simplified - compare with previous month)
+    // In production, you'd calculate actual previous month values
+    const balanceChange = 12.4; // Mock
+    const revenueChange = 8.2; // Mock
+    const expensesChange = -3.1; // Mock
+    const arrChange = 15.6; // Mock
+
+    return {
+      balance: totalSummary.balance,
+      balanceChange,
+      monthlyRevenue,
+      revenueChange,
+      monthlyExpenses,
+      expensesChange,
+      arr,
+      arrChange,
+      pendingCollections: pending,
+      overdueAmount: overdue,
+    };
+  }, [movements, subscriptions, totalSummary.balance]);
+
+  const loading = loadingData || loadingErp;
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-64 mt-2" />
+        <div className="flex gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 w-full max-w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Resumen global de todas tus finanzas</p>
+    <div className="space-y-6 w-full max-w-full pb-8">
+
+      {/* Header & Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+
+            {entities[0]?.logoUrl && (
+              <img
+                src={entities[0].logoUrl}
+                alt={entities[0].name}
+                className="h-10 w-auto object-contain"
+              />
+            )}
+            <h1 className="text-3xl font-bold tracking-tight">
+              {entities[0]?.name || 'Centro de Mando'}
+            </h1>
+          </div>
+          <p className="text-muted-foreground">{new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => navigate('/movements?action=create')}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Movimiento
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate('/erp/clients')}>
+            <UserPlus className="mr-2 h-4 w-4" /> Cliente
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate('/erp/projects')}>
+            <Briefcase className="mr-2 h-4 w-4" /> Proyecto
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-500 flex-shrink-0" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-500 break-words">
-              {isBalanceHidden ? '****' : formatCurrency(totalSummary.income)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total acumulado
-            </p>
-          </CardContent>
-        </Card>
+      {/* Main Layout Grid - 3 columns on large screens */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
 
-        <Card className="min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos Totales</CardTitle>
-            <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-500 break-words">
-              {isBalanceHidden ? '****' : formatCurrency(totalSummary.expenses)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total acumulado
-            </p>
-          </CardContent>
-        </Card>
+        {/* Left Column - Main Content */}
+        <div className="space-y-6">
 
-        <Card className="min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Balance Total</CardTitle>
-            <Wallet className={`h-5 w-5 flex-shrink-0 ${totalSummary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold break-words ${totalSummary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {isBalanceHidden ? '****' : formatCurrency(totalSummary.balance)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Balance actual (acumulado)
-            </p>
-          </CardContent>
-        </Card>
+          {/* Top Metrics Overview */}
+          <MetricsOverview
+            balance={metrics.balance}
+            balanceChange={metrics.balanceChange}
+            monthlyRevenue={metrics.monthlyRevenue}
+            revenueChange={metrics.revenueChange}
+            monthlyExpenses={metrics.monthlyExpenses}
+            expensesChange={metrics.expensesChange}
+            arr={metrics.arr}
+            arrChange={metrics.arrChange}
+            pendingCollections={metrics.pendingCollections}
+            overdueAmount={metrics.overdueAmount}
+            isBalanceHidden={isBalanceHidden}
+            subscriptions={subscriptions}
+          />
 
-        <Card className="min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Movimientos</CardTitle>
-            <ArrowLeftRight className="h-5 w-5 text-purple-600 dark:text-purple-500 flex-shrink-0" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-500 break-words">
-              {movements.length}
+          {/* Annual Revenue Wave Chart */}
+          <div className="bg-card/40 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+            <AnnualRevenueWaveChart subscriptions={subscriptions} />
+          </div>
+
+          {/* Recent Financial Movements */}
+          <div className="bg-card/40 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden h-96">
+            <RecentMovementsWidget movements={movements} limit={10} />
+          </div>
+
+          {/* Two Column Grid for Heatmap and Bar Chart */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Yearly Service Heatmap */}
+            <div className="bg-card/40 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+              <YearlyServiceHeatmap subscriptions={subscriptions} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Registros totales
-            </p>
-          </CardContent>
-        </Card>
+
+            {/* Monthly Revenue Bar Chart */}
+            <div className="bg-card/40 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+              <MonthlyRevenueChart subscriptions={subscriptions} />
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Sidebar */}
+        <div className="xl:block">
+          <div className="sticky top-6">
+            <DashboardSidebar
+              subscriptions={subscriptions}
+              isBalanceHidden={isBalanceHidden}
+              onCreateService={() => navigate('/erp/clients')}
+            />
+          </div>
+        </div>
+
       </div>
 
-      {/* Interactive Cash Flow Chart - NEW */}
-      <InteractiveCashFlowChart movements={movements} />
-
-      {/* Income/Expense Chart */}
-      <IncomeExpenseChart movements={movements} />
-
-      {/* Movements Activity Chart */}
-      <MovementsAreaChart movements={movements} />
-
-      {/* Category Distribution Charts */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-        <CategoryPieChart movements={movements} categories={categories} type="income" />
-        <CategoryPieChart movements={movements} categories={categories} type="expense" />
-      </div>
-
-      {/* Entities Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Entidades</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {entities.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay entidades creadas. Crea tu primera entidad para comenzar.
-            </p>
-          ) : (
-            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {entities.map((entity) => {
-                const entityMovements = movements.filter(m => m.entityId === entity.id);
-                const entitySummary = calculateSummary(entityMovements);
-                return (
-                  <div key={entity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="p-1.5 rounded-md flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${entity.color}20`, color: entity.color || '#3b82f6' }}
-                      >
-                        <IconComponent iconKey={entity.icon} className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{entity.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{entity.type}</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0 ml-2">
-                      <p className={`text-sm font-semibold ${entitySummary.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {isBalanceHidden ? '****' : formatCurrency(entitySummary.balance)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {movements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay movimientos registrados.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {movements.slice(0, 10).map((movement) => {
-                const entity = entities.find(e => e.id === movement.entityId);
-                const Icon = movement.type === 'income' ? TrendingUp : TrendingDown;
-                return (
-                  <div key={movement.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`h-4 w-4 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`} />
-                      <div>
-                        <p className="text-sm font-medium">{movement.description}</p>
-                        <p className="text-xs text-muted-foreground">{entity?.name || 'N/A'} • {movement.box}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-semibold ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{parseLocalDate(movement.date).toLocaleDateString('es-CL')}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

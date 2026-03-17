@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import { getClients, getProjects, getSubscriptions } from '@/lib/firebase/database';
+import { getClients, getProjects, getSubscriptions } from '@/lib/supabase/database';
 import { Users, Briefcase, DollarSign, Activity, CalendarDays, Plus, Edit2, CheckCircle2 } from 'lucide-react';
 import { fetchIndicators } from '@/lib/indicators';
 import { formatCurrency } from '@/lib/utils';

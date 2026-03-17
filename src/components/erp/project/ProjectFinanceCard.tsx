@@ -1,4 +1,4 @@
-
+﻿
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { createMovement, getMovements, updateMovement, deleteMovement } from '@/lib/firebase/database';
+import { createMovement, getMovements, updateMovement, deleteMovement } from '@/lib/supabase/database';
 import { logProjectActivity } from '@/lib/activityUtils';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -147,7 +147,7 @@ export function ProjectFinanceCard({ project }: ProjectFinanceCardProps) {
     };
 
     const handleDelete = async (movementId: string) => {
-        if (!confirm('¿Estás seguro de eliminar este pago? Esta acción no se puede deshacer.')) return;
+        if (!confirm('Â¿EstÃ¡s seguro de eliminar este pago? Esta acciÃ³n no se puede deshacer.')) return;
 
         try {
             await deleteMovement(movementId);
@@ -295,7 +295,7 @@ export function ProjectFinanceCard({ project }: ProjectFinanceCardProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Descripción (Opcional)</Label>
+                                    <Label>DescripciÃ³n (Opcional)</Label>
                                     <Textarea
                                         value={description}
                                         onChange={e => setDescription(e.target.value)}
@@ -382,3 +382,4 @@ export function ProjectFinanceCard({ project }: ProjectFinanceCardProps) {
         </Card>
     );
 }
+

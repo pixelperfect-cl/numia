@@ -18,7 +18,6 @@ import { IconComponent } from '@/components/IconPicker';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog';
 import { EntityForm } from '@/components/EntityForm';
-import numiaLogo from '@/assets/numialogo.png';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { menuItems } from './Sidebar';
 import { NotificationDropdown } from '@/components/NotificationDropdown';
@@ -223,7 +222,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                     <SheetContent side="left" className="w-[300px] flex flex-col p-6">
                         <SheetHeader className="mb-6">
                             <SheetTitle className="flex items-center gap-2">
-                                <img src={numiaLogo} alt="Numia" className="h-8" />
+                                <img src="/logo.png" alt="[E]ntity" className="h-8" />
                             </SheetTitle>
                         </SheetHeader>
 
@@ -449,7 +448,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                     className="flex items-center gap-1 md:gap-2 font-semibold md:text-lg cursor-pointer flex-1 md:flex-none min-w-0"
                     onClick={() => navigate(selectedEntityId ? '/dashboard' : '/entity-selection')}
                 >
-                    <img src={numiaLogo} alt="Numia" className="h-6 md:h-8 flex-shrink-0 object-contain" />
+                    <img src="/logo.png" alt="[E]ntity" className="h-6 md:h-8 flex-shrink-0 object-contain" />
                 </div>
 
                 {/* Quick Actions & Entity Switcher (Desktop) */}
@@ -518,31 +517,16 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                     >
                         {isBalanceHidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hidden md:flex text-header-foreground">
-                                {theme === 'light' ? <Sun className="h-5 w-5" /> : theme === 'dark' ? <Moon className="h-5 w-5" /> : <Cloud className="h-5 w-5" />}
-                                <span className="sr-only">Seleccionar tema</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setTheme('light')} className="gap-2 cursor-pointer">
-                                <Sun className="h-4 w-4" />
-                                <span>Modo Claro</span>
-                                {theme === 'light' && <Check className="h-4 w-4 ml-auto" />}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setTheme('dark')} className="gap-2 cursor-pointer">
-                                <Moon className="h-4 w-4" />
-                                <span>Modo Oscuro</span>
-                                {theme === 'dark' && <Check className="h-4 w-4 ml-auto" />}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setTheme('cloudy')} className="gap-2 cursor-pointer">
-                                <Cloud className="h-4 w-4" />
-                                <span>Modo Nublado</span>
-                                {theme === 'cloudy' && <Check className="h-4 w-4 ml-auto" />}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hidden md:flex text-header-foreground hover:text-header-foreground hover:bg-slate-700/50"
+                        onClick={cycleTheme}
+                        title={getThemeLabel()}
+                    >
+                        {theme === 'light' ? <Sun className="h-5 w-5" /> : theme === 'dark' ? <Moon className="h-5 w-5" /> : <Cloud className="h-5 w-5" />}
+                        <span className="sr-only">Cambiar tema</span>
+                    </Button>
 
                     {/* Notification Dropdown wrapper to override button styles */}
                     <div className="flex items-center justify-center">

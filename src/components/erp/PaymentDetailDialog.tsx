@@ -64,7 +64,18 @@ export function PaymentDetailDialog({
 
                         <div className="font-medium text-muted-foreground">Próximo Vencimiento</div>
                         <div className="text-right font-semibold">
-                            {format(new Date(subscription.nextBillingDate + 'T00:00:00'), "PPP", { locale: es })}
+                            {(() => {
+                                try {
+                                    if (!subscription.nextBillingDate) return 'N/A';
+                                    const d = subscription.nextBillingDate;
+                                    const dateObj = typeof d === 'string' && !d.includes('T')
+                                        ? new Date(d + 'T00:00:00')
+                                        : new Date(d);
+                                    return format(dateObj, "PPP", { locale: es });
+                                } catch (e) {
+                                    return 'Fecha inválida';
+                                }
+                            })()}
                         </div>
                     </div>
 

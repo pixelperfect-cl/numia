@@ -8,49 +8,36 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { db } from "@/lib/firebase/config";
-import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
-import { logProjectActivity, ActivityLog } from "@/lib/activityUtils";
+import { logProjectActivity, ActivityLog, getProjectActivities } from "@/lib/activityUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface ActivityWidgetProps {
     projectId: string;
+    hideComments?: boolean;
+    className?: string;
 }
 
-export function ActivityWidget({ projectId }: ActivityWidgetProps) {
+export function ActivityWidget({ projectId, hideComments, className }: ActivityWidgetProps) {
     const { user } = useAuth();
     const [comment, setComment] = useState("");
     const [activities, setActivities] = useState<ActivityLog[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const loadActivities = async () => {
         if (!projectId) return;
-
-        const q = query(
-            collection(db, `projects/${projectId}/activities`),
-            // orderBy("createdAt", "desc"), // Removing to avoid index requirement block
-            limit(50)
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const items: ActivityLog[] = [];
-            snapshot.forEach((doc) => {
-                items.push({ id: doc.id, ...doc.data() } as ActivityLog);
-            });
-            // Client-side sort
-            items.sort((a, b) => {
-                const dateA = a.createdAt?.seconds || 0;
-                const dateB = b.createdAt?.seconds || 0;
-                return dateB - dateA;
-            });
-            setActivities(items);
+        try {
+            const data = await getProjectActivities(projectId);
+            setActivities(data);
+        } catch (error) {
+            console.error("Failed to load activities", error);
+        } finally {
             setLoading(false);
-        }, (error) => {
-            console.warn("Error listening to activities:", error);
-            setLoading(false);
-        });
+        }
+    };
 
-        return () => unsubscribe();
+    useEffect(() => {
+        loadActivities();
     }, [projectId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -67,6 +54,9 @@ export function ActivityWidget({ projectId }: ActivityWidgetProps) {
             user.uid,
             user.displayName || user.email?.split('@')[0] || 'Usuario'
         );
+
+        // Refresh list
+        loadActivities();
     };
 
     const getActivityIcon = (type: string) => {
@@ -110,7 +100,7 @@ export function ActivityWidget({ projectId }: ActivityWidgetProps) {
                         )}
                     </p>
                     <span className="text-[10px] text-muted-foreground">
-                        {item.createdAt?.seconds ? format(new Date(item.createdAt.seconds * 1000), "d MMM, HH:mm", { locale: es }) : 'Reciente'}
+                        {item.createdAt ? format(new Date(item.createdAt), "d MMM, HH:mm", { locale: es }) : 'Reciente'}
                     </span>
                 </div>
                 <div className="text-sm text-foreground/90 leading-relaxed text-balance">
@@ -124,8 +114,28 @@ export function ActivityWidget({ projectId }: ActivityWidgetProps) {
         </div>
     );
 
+    if (hideComments) {
+        return (
+            <Card className={cn("flex flex-col h-[500px] overflow-hidden border-none shadow-none bg-muted/20", className)}>
+                <CardContent className="p-0 flex-1 min-h-0 relative">
+                    <ScrollArea className="h-full">
+                        <div className="p-4 space-y-6">
+                            {loading ? (
+                                <p className="text-xs text-muted-foreground text-center">Cargando actividad...</p>
+                            ) : history.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center italic">No hay actividad reciente.</p>
+                            ) : (
+                                history.map((item) => <ActivityItem key={item.id} item={item} />)
+                            )}
+                        </div>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
-        <Card className="flex flex-col h-[500px] overflow-hidden">
+        <Card className={cn("flex flex-col h-[500px] overflow-hidden", className)}>
             <Tabs defaultValue="comments" className="flex flex-col h-full w-full">
                 <div className="border-b px-4 bg-muted/20">
                     <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-6">

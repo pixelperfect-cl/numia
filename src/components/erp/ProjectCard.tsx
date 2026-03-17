@@ -4,7 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Calendar, User, CheckSquare, Eye } from 'lucide-react';
 import type { Project } from '@/types';
-import { format, isPast, parseISO } from 'date-fns';
+import { format, isPast, parseISO, differenceInDays } from 'date-fns';
 
 interface ProjectCardProps {
     project: Project;
@@ -97,7 +97,21 @@ export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCa
                         </div>
                     )}
                 </div>
+
+                {/* Time Tracking Bar */}
+                {project.dueDate && (
+                    <div className="pt-1">
+                        <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+                            <div
+                                className={`h-full ${isOverdue ? 'bg-destructive' : 'bg-blue-400/70'}`}
+                                style={{ width: `${Math.min(Math.max((differenceInDays(new Date(), project.createdAt ? parseISO(project.createdAt.toString()) : new Date()) / differenceInDays(parseISO(project.dueDate), project.createdAt ? parseISO(project.createdAt.toString()) : new Date())) * 100, 0), 100)}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
 }
+
+

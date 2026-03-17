@@ -49,7 +49,10 @@ export function getCurrencySymbol(currency: string = 'CLP'): string {
  * This prevents timezone issues when converting date strings
  */
 export function parseLocalDate(dateString: string): Date {
-  const [year, month, day] = dateString.split('-').map(Number);
+  if (!dateString) return new Date();
+  const parts = dateString.split('-');
+  if (parts.length !== 3) return new Date(); // Fallback for invalid formats
+  const [year, month, day] = parts.map(Number);
   return new Date(year, month - 1, day);
 }
 
@@ -156,9 +159,18 @@ export function getDateRangeFromType(type: DateFilterType, startDate?: string, e
       end = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
       break;
 
+    case 'ALL':
+      start = new Date(0); // Epoch
+      end = new Date(2100, 11, 31, 23, 59, 59); // Far future
+      break;
+
     case 'CUSTOM':
-      start = startDate ? new Date(startDate) : new Date(0);
-      end = endDate ? new Date(endDate) : now;
+      start = startDate ? parseLocalDate(startDate) : new Date(0);
+      end = endDate ? parseLocalDate(endDate) : now;
+      if (endDate) {
+        // Set end date to end of day if explicitly provided
+        end.setHours(23, 59, 59, 999);
+      }
       break;
 
     default:
@@ -200,4 +212,96 @@ export function calculateBoxBalances(movements: Movement[]): Record<string, numb
   });
 
   return balances;
+}
+/**
+ * Generate a deterministic UUID from a string (v4-like format)
+ * Use this to migrate Firebase IDs to Supabase UUIDs consistently
+ */
+export function stringToUuid(str: string): string {
+  // If explicitly already a UUID, return it
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(str)) return str;
+
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+
+  // Seed for pseudo-random
+  const seed = Math.abs(hash);
+  const rng = (i: number) => {
+    const x = Math.sin(seed + i) * 10000;
+    return Math.floor((x - Math.floor(x)) * 256);
+  };
+
+  const b = Array.from({ length: 16 }, (_, i) => rng(i));
+
+  // Set version (4) and variant (8, 9, a, b)
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+
+  const hex = b.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.substr(0, 8)}-${hex.substr(8, 4)}-${hex.substr(12, 4)}-${hex.substr(16, 4)}-${hex.substr(20)}`;
+}
+
+/**
+ * Add period (months/years) to a date string (YYYY-MM-DD) avoiding timezone issues.
+ * Ensures strict calendar addition (e.g. adding 1 month to Jan 1st always results in Feb 1st).
+ */
+export function addPeriodToDateString(dateStr: string, frequency: 'monthly' | 'yearly', amount: number = 1): string {
+  if (!dateStr || !dateStr.includes('-')) return dateStr;
+
+  // Split date parts
+  const [yearStr, monthStr, dayStr] = dateStr.split('T')[0].split('-');
+  let year = parseInt(yearStr);
+  let month = parseInt(monthStr); // 1-12
+  const day = parseInt(dayStr);
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return dateStr;
+
+  if (frequency === 'monthly') {
+    month += amount;
+
+    // Handle positive overflow
+    while (month > 12) {
+      month -= 12;
+      year += 1;
+    }
+    // Handle negative overflow (subtracting months)
+    while (month < 1) {
+      month += 12;
+      year -= 1;
+    }
+  } else if (frequency === 'yearly') {
+    year += amount;
+  }
+
+  // Handle day overflow (e.g. Jan 31 + 1 month -> Feb 28)
+  // We want the result to be valid.
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const newDay = Math.min(day, daysInMonth);
+
+  // Format
+  // Format
+  const m = month.toString().padStart(2, '0');
+  const d = newDay.toString().padStart(2, '0');
+  return `${year}-${m}-${d}`;
+}
+
+/**
+ * Parses a "YYYY-MM-DD" string into a Date object at local midnight.
+ * This prevents the timezone offset issues caused by `new Date("YYYY-MM-DD")` (which creates UTC date)
+ * or `parseISO("YYYY-MM-DD")` (which also defaults to UTC for dates).
+ */
+export function parseLocalDateString(dateStr: string): Date {
+  if (!dateStr) return new Date(); // Fallback
+  // Ensure we only look at the date part if it's an ISO string
+  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+
+  const [year, month, day] = cleanStr.split('-').map(Number);
+
+  // Note: Month is 0-indexed in Date constructor
+  return new Date(year, month - 1, day);
 }

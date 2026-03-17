@@ -181,7 +181,48 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Improve calendar selected date visibility across all themes */
+  [data-selected-single="true"] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 700 !important;
+    border: 2px solid hsl(var(--primary)) !important;
+  }
+
+  [data-range-start="true"],
+  [data-range-end="true"] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 700 !important;
+    border: 2px solid hsl(var(--primary)) !important;
+  }
+
+  [data-range-middle="true"] {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+    font-weight: 600 !important;
+  }
+
+  /* Ensure today's date is also visible */
+  .rdp-day_button[data-today="true"] {
+    font-weight: 600;
+    position: relative;
+  }
+
+  .rdp-day_button[data-today="true"]:not([data-selected-single="true"]):not([data-range-start="true"]):not([data-range-end="true"])::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: hsl(var(--primary));
+  }
 }
+
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {

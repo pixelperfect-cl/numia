@@ -2,7 +2,7 @@
  * Numia v1.0 - Movements Page (Advanced Search & Audit)
  */
 
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -15,18 +15,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, getTodayLocalDateString, parseLocalDate } from '@/lib/utils';
+import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType } from '@/lib/utils';
 import type { Movement, MovementType, MovementHistoryEntry } from '@/types';
-import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock } from 'lucide-react';
+import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { BulkUploadWizard } from '@/components/movements/BulkUploadWizard';
+
 import { CategorySelect } from '@/components/CategorySelect';
 import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart';
+import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
+import { MovementsAreaChart } from '@/components/MovementsAreaChart';
+import { CategoryPieChart } from '@/components/CategoryPieChart';
 
 interface MovementsProps {
   entityId?: string;
@@ -36,12 +39,12 @@ type SortField = 'date' | 'amount' | 'description' | 'category';
 type SortDirection = 'asc' | 'desc';
 
 export function Movements({ entityId }: MovementsProps = {}) {
-  const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading } = useData();
+  const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading, dateFilter } = useData();
   const { user } = useAuth();
   const { isBalanceHidden } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
-  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Handle URL action params
   useEffect(() => {
@@ -120,9 +123,82 @@ export function Movements({ entityId }: MovementsProps = {}) {
   const [selectedMovements, setSelectedMovements] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  // --- Month Navigation Logic ---
+  const { setDateFilter } = useData(); // Needed to update global filter
+
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    // Determine current center date from global filter or today
+    let currentCenterDate = new Date();
+    if (dateFilter.startDate) {
+      // If filter exists, center on the start date
+      currentCenterDate = parseLocalDate(dateFilter.startDate);
+    }
+
+    const newDate = direction === 'prev' ? subMonths(currentCenterDate, 1) : addMonths(currentCenterDate, 1);
+
+    // Set to full month
+    const start = startOfMonth(newDate);
+    const end = endOfMonth(newDate);
+
+    setDateFilter({
+      type: 'CUSTOM',
+      startDate: format(start, 'yyyy-MM-dd'),
+      endDate: format(end, 'yyyy-MM-dd')
+    });
+  };
+
+  const handleMonthSelect = (monthStr: string) => {
+    // monthStr is yyyy-MM
+    const [year, month] = monthStr.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+
+    const start = startOfMonth(date);
+    const end = endOfMonth(date);
+
+    setDateFilter({
+      type: 'CUSTOM',
+      startDate: format(start, 'yyyy-MM-dd'),
+      endDate: format(end, 'yyyy-MM-dd')
+    });
+  };
+
+  // Generate last 24 months for dropdown
+  const monthOptions = useMemo(() => {
+    const options = [];
+    const today = new Date();
+    for (let i = 0; i < 24; i++) {
+      const date = subMonths(today, i);
+      const value = format(date, 'yyyy-MM');
+      const label = format(date, 'MMMM yyyy', { locale: es });
+      options.push({ value, label });
+    }
+    return options;
+  }, []);
+
+  const currentMonthValue = useMemo(() => {
+    if (dateFilter.type === 'CUSTOM' && dateFilter.startDate) {
+      const date = parseLocalDate(dateFilter.startDate);
+      return format(date, 'yyyy-MM');
+    }
+    return format(new Date(), 'yyyy-MM');
+  }, [dateFilter]);
+
+  const currentMonthLabel = useMemo(() => {
+    if (dateFilter.type === 'CUSTOM' && dateFilter.startDate) {
+      const date = parseLocalDate(dateFilter.startDate);
+      return format(date, 'MMMM yyyy', { locale: es });
+    }
+    // Fallback logic
+    const range = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
+    if (range.startDate) {
+      return format(range.startDate, 'MMMM yyyy', { locale: es });
+    }
+    return 'Todos los movimientos';
+  }, [dateFilter]);
+
+  // Pagination state removed
+  // const [currentPage, setCurrentPage] = useState(1);
+  // const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const handleEdit = (movement: Movement) => {
     setEditingMovement(movement);
@@ -262,15 +338,22 @@ export function Movements({ entityId }: MovementsProps = {}) {
   // Filtered and sorted movements
   const filteredMovements = useMemo(() => {
     let result = movements.filter((movement) => {
-      // Search text filter
-      if (searchText) {
-        const searchLower = searchText.toLowerCase();
-        const matchesSearch =
-          movement.description.toLowerCase().includes(searchLower) ||
-          movement.category?.toLowerCase().includes(searchLower) ||
-          movement.subcategory?.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
+      // Date filter
+      const { startDate, endDate } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
+      const movementDate = parseLocalDate(movement.date);
+      if (movementDate < startDate || movementDate > endDate) {
+        return false;
       }
+
+      // Search text filter
+      const searchLower = searchText.toLowerCase();
+      const matchesSearch =
+        movement.description.toLowerCase().includes(searchLower) ||
+        (movement.category || '').toLowerCase().includes(searchLower) ||
+        (movement.subcategory || '').toLowerCase().includes(searchLower) ||
+        movement.box.toLowerCase().includes(searchLower);
+
+      if (!matchesSearch) return false;
 
       // Entity filter
       if (filterEntity !== 'all' && movement.entityId !== filterEntity) return false;
@@ -280,9 +363,6 @@ export function Movements({ entityId }: MovementsProps = {}) {
 
       // Category filter
       if (filterCategory !== 'all' && movement.categoryId !== filterCategory) return false;
-
-      // Box filter
-      if (filterBox !== 'all' && movement.box !== filterBox) return false;
 
       // Box filter
       if (filterBox !== 'all' && movement.box !== filterBox) return false;
@@ -316,18 +396,60 @@ export function Movements({ entityId }: MovementsProps = {}) {
     });
 
     return result;
-  }, [movements, searchText, filterEntity, filterType, filterCategory, filterBox, sortField, sortDirection]);
+  }, [movements, searchText, filterEntity, filterType, filterCategory, filterBox, sortField, sortDirection, dateFilter]);
 
-  // Pagination
-  const paginatedMovements = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredMovements.slice(start, end);
-  }, [filteredMovements, currentPage, itemsPerPage]);
+  // Movements for Chart (IGNORES Date Filter, but keeps others)
+  const movementsForChart = useMemo(() => {
+    return movements.filter((movement) => {
+      // Search text filter
+      const searchLower = searchText.toLowerCase();
+      const matchesSearch =
+        movement.description.toLowerCase().includes(searchLower) ||
+        (movement.category || '').toLowerCase().includes(searchLower) ||
+        (movement.subcategory || '').toLowerCase().includes(searchLower) ||
+        movement.box.toLowerCase().includes(searchLower);
 
-  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
+      if (!matchesSearch) return false;
 
-  // Statistics
+      // Entity filter
+      if (filterEntity !== 'all' && movement.entityId !== filterEntity) return false;
+
+      // Type filter
+      if (filterType !== 'all' && movement.type !== filterType) return false;
+
+      // Category filter
+      if (filterCategory !== 'all' && movement.categoryId !== filterCategory) return false;
+
+      // Box filter
+      if (filterBox !== 'all' && movement.box !== filterBox) return false;
+
+      // Filter out non-financial movements
+      if (movement.isFinancial === false) return false;
+
+      return true;
+    });
+  }, [movements, searchText, filterEntity, filterType, filterCategory, filterBox]);
+
+  // Group filtered movements by month
+  const groupedMovements = useMemo(() => {
+    const groups: Record<string, Movement[]> = {};
+
+    // Sort all filtered movements by date descending
+    const sorted = [...filteredMovements].sort((a, b) => {
+      return parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime();
+    });
+
+    sorted.forEach(movement => {
+      const date = parseLocalDate(movement.date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(movement);
+    });
+
+    return groups;
+  }, [filteredMovements]);
+
+  // Statistics (Filtered)
   const stats = useMemo(() => {
     const totalIncome = filteredMovements
       .filter(m => m.type === 'income')
@@ -344,6 +466,18 @@ export function Movements({ entityId }: MovementsProps = {}) {
       balance: totalIncome - totalExpense,
     };
   }, [filteredMovements]);
+
+  // Global Balance (All Time)
+  // Global Balance (All Time)
+  const globalBalance = useMemo(() => {
+    const totalIncome = movementsForChart
+      .filter(m => m.type === 'income')
+      .reduce((sum, m) => sum + m.amount, 0);
+    const totalExpense = movementsForChart
+      .filter(m => m.type === 'expense')
+      .reduce((sum, m) => sum + Math.abs(m.amount), 0);
+    return totalIncome - totalExpense;
+  }, [movementsForChart]);
 
   // Get boxes from selected entity
   const selectedEntity = entities.find(e => e.id === formData.entityId);
@@ -380,27 +514,41 @@ export function Movements({ entityId }: MovementsProps = {}) {
     return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
   };
 
-  const handleSelectAll = () => {
-    if (selectedMovements.size === paginatedMovements.length) {
-      setSelectedMovements(new Set());
-      setLastSelectedId(null);
+  const handleSelectAll = (movementsToSelect: Movement[]) => {
+    const allSelected = movementsToSelect.every(m => selectedMovements.has(m.id));
+
+    if (allSelected) {
+      // Deselect all
+      const newSelected = new Set(selectedMovements);
+      movementsToSelect.forEach(m => newSelected.delete(m.id));
+      setSelectedMovements(newSelected);
     } else {
-      setSelectedMovements(new Set(paginatedMovements.map(m => m.id)));
-      setLastSelectedId(null);
+      // Select all
+      const newSelected = new Set(selectedMovements);
+      movementsToSelect.forEach(m => newSelected.add(m.id));
+      setSelectedMovements(newSelected);
     }
+    setLastSelectedId(null);
   };
 
-  const handleSelectMovement = (id: string, shiftKey: boolean = false) => {
+  // Helper to checking if a group is fully selected
+  const isGroupSelected = (groupMovements: Movement[]) => {
+    return groupMovements.length > 0 && groupMovements.every(m => selectedMovements.has(m.id));
+  };
+
+
+  const handleSelectMovement = (id: string, shiftKey: boolean = false, visibleMovements: Movement[] = []) => {
     const newSelected = new Set(selectedMovements);
 
-    if (shiftKey && lastSelectedId) {
-      const lastIndex = paginatedMovements.findIndex(m => m.id === lastSelectedId);
-      const currentIndex = paginatedMovements.findIndex(m => m.id === id);
+    if (shiftKey && lastSelectedId && visibleMovements.length > 0) {
+      // Find dynamic index in the flat list of what's currently visible
+      const lastIndex = visibleMovements.findIndex(m => m.id === lastSelectedId);
+      const currentIndex = visibleMovements.findIndex(m => m.id === id);
 
       if (lastIndex !== -1 && currentIndex !== -1) {
         const start = Math.min(lastIndex, currentIndex);
         const end = Math.max(lastIndex, currentIndex);
-        const range = paginatedMovements.slice(start, end + 1);
+        const range = visibleMovements.slice(start, end + 1);
 
         range.forEach(m => newSelected.add(m.id));
       }
@@ -489,6 +637,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
     }
   };
 
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -498,32 +647,10 @@ export function Movements({ entityId }: MovementsProps = {}) {
         </div>
 
         <div className="flex gap-2">
-          <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="px-2 md:px-4">
-                <Upload className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Carga Masiva</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Carga Masiva de Movimientos</DialogTitle>
-                <DialogDescription>
-                  Importa movimientos desde cartolas bancarias (BCI - Histórica o Detallada)
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-auto p-1">
-                <BulkUploadWizard
-                  onClose={() => setIsBulkUploadOpen(false)}
-                  onSaveSuccess={() => {
-                    setIsBulkUploadOpen(false);
-                    alert('Movimientos importados correctamente');
-                  }}
-                  initialEntityId={entityId}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" className="px-2 md:px-4" onClick={() => navigate('/mass-upload')}>
+            <Upload className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Carga Masiva</span>
+          </Button>
 
           <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
@@ -677,15 +804,33 @@ export function Movements({ entityId }: MovementsProps = {}) {
             <CardTitle className="text-sm font-medium text-muted-foreground">Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {isBalanceHidden ? '****' : formatCurrency(stats.balance)}
+            <div className={`text-2xl font-bold ${globalBalance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+              {isBalanceHidden ? '****' : formatCurrency(globalBalance)}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Balance total historico</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Interactive Cash Flow Chart */}
-      <InteractiveCashFlowChart movements={filteredMovements} />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">Resumen Visual</h2>
+
+        {/* Interactive Cash Flow Chart */}
+        <InteractiveCashFlowChart movements={movementsForChart} />
+
+        {/* Income/Expense Chart */}
+        <IncomeExpenseChart movements={movementsForChart} />
+
+        {/* Movements Activity Chart */}
+        <MovementsAreaChart movements={movementsForChart} />
+
+        {/* Category Distribution Charts */}
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+          <CategoryPieChart movements={movementsForChart} categories={categories} type="income" />
+          <CategoryPieChart movements={movementsForChart} categories={categories} type="expense" />
+        </div>
+
+      </div>
 
       {/* Filters */}
       <Card>
@@ -818,13 +963,61 @@ export function Movements({ entityId }: MovementsProps = {}) {
             )}
           </CardContent>
         </Card>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       ) : (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Historial ({filteredMovements.length} movimientos)</CardTitle>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="capitalize">
+                  {currentMonthLabel}
+                </CardTitle>
+                <Badge variant="outline" className="ml-2">
+                  {filteredMovements.length} movimientos
+                </Badge>
+              </div>
+
+              {/* Month Navigator */}
+              <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMonthChange('prev')}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <Select value={currentMonthValue} onValueChange={handleMonthSelect}>
+                  <SelectTrigger className="h-8 border-0 bg-transparent focus:ring-0 w-[180px] text-center font-medium capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value} className="capitalize">
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMonthChange('next')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
               {selectedMovements.size > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ml-auto">
                   <Badge variant="secondary">{selectedMovements.size} seleccionados</Badge>
                   <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -835,13 +1028,13 @@ export function Movements({ entityId }: MovementsProps = {}) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {/* Table Header */}
+            <div className="space-y-4">
+              {/* Table Header (Desktop) */}
               <div className="hidden md:flex items-center gap-2 pb-2 border-b text-sm font-medium text-muted-foreground">
                 <div className="w-8">
                   <Checkbox
-                    checked={selectedMovements.size === paginatedMovements.length && paginatedMovements.length > 0}
-                    onCheckedChange={handleSelectAll}
+                    checked={selectedMovements.size === filteredMovements.length && filteredMovements.length > 0}
+                    onCheckedChange={() => handleSelectAll(filteredMovements)}
                   />
                 </div>
                 <div className="flex-1 flex items-center gap-1 cursor-pointer" onClick={() => handleSort('date')}>
@@ -865,179 +1058,153 @@ export function Movements({ entityId }: MovementsProps = {}) {
                 <div className="w-32">Acciones</div>
               </div>
 
-              {/* Table Rows */}
-              {paginatedMovements.map((movement) => {
-                const entity = entities.find(e => e.id === movement.entityId);
-                const hasHistory = movement.history && movement.history.length > 0;
-                const isEdited = hasHistory;
+              {/* Grouped Movements */}
+              {Object.entries(groupedMovements).map(([monthKey, groupMovements]) => (
+                <div key={monthKey} className="space-y-2">
+                  <div className="flex items-center gap-2 py-2 bg-muted/20 px-3 rounded-md">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold capitalize text-foreground/80">
+                      {format(parseLocalDate(groupMovements[0].date), 'MMMM yyyy', { locale: es })}
+                    </h3>
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-auto md:ml-2">
+                      {groupMovements.length}
+                    </Badge>
+                  </div>
 
-                return (
-                  <div key={movement.id} className="flex items-start gap-2 p-3 rounded-lg hover:bg-muted/50 border text-sm md:items-center md:p-2">
-                    {/* Checkbox */}
-                    <div className="w-8 flex-shrink-0 pt-0.5 md:pt-0">
-                      <Checkbox
-                        checked={selectedMovements.has(movement.id)}
-                        onCheckedChange={() => { }}
-                        onClick={(e) => handleSelectMovement(movement.id, e.shiftKey)}
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    {groupMovements.map((movement) => {
+                      const entity = entities.find(e => e.id === movement.entityId);
+                      const hasHistory = movement.history && movement.history.length > 0;
+                      const isEdited = hasHistory;
 
-                    {/* Mobile Layout - Card Style */}
-                    <div className="flex-1 min-w-0 md:hidden">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-lg flex-shrink-0">{movement.type === 'income' ? '↗️' : '↙️'}</span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
-                              {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
+                      return (
+                        <div key={movement.id} className="flex items-start gap-2 p-3 rounded-lg hover:bg-muted/50 border text-sm md:items-center md:p-2 ml-0 md:ml-2">
+                          {/* Checkbox */}
+                          <div className="w-8 flex-shrink-0 pt-0.5 md:pt-0">
+                            <Checkbox
+                              checked={selectedMovements.has(movement.id)}
+                              onCheckedChange={() => { }}
+                              onClick={(e) => handleSelectMovement(movement.id, e.shiftKey, filteredMovements)}
+                            />
+                          </div>
+
+                          {/* Mobile Layout - Card Style */}
+                          <div className="flex-1 min-w-0 md:hidden">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-lg flex-shrink-0">{movement.type === 'income' ? '↗️' : '↙️'}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
+                                    {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">{entity?.name}</div>
+                                </div>
+                              </div>
+                              <div className={`font-bold whitespace-nowrap flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+                                {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground truncate">{entity?.name}</div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                {/* Mobile Date */}
+                                <span>{parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}</span>
+                                <span>•</span>
+                                <span className="truncate">{movement.box}</span>
+                                {movement.category && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{movement.category}</span>
+                                  </>
+                                )}
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0 ml-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleEdit(movement)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                {hasHistory && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => setHistoryMovement(movement)}
+                                  >
+                                    <Clock className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout - Table Style */}
+                          <div className="hidden md:contents">
+                            <div className="flex-1">
+                              {parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </div>
+                            <div className="w-12">
+                              <span className="text-xl">{movement.type === 'income' ? '↗️' : '↙️'}</span>
+                            </div>
+                            <div className="flex-[2] min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
+                                {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">{movement.box}</div>
+                            </div>
+                            <div className="flex-1 text-xs truncate">{movement.category}</div>
+                            <div className="flex-1 text-xs truncate">{entity?.name}</div>
+                            <div className={`w-24 text-right font-bold whitespace-nowrap ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
+                              {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
+                            </div>
+                            <div className="w-32 flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleEdit(movement)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {hasHistory && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => setHistoryMovement(movement)}
+                                >
+                                  <Clock className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                        <div className={`font-bold whitespace-nowrap flex-shrink-0 ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                          {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <span>{parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}</span>
-                          <span>•</span>
-                          <span className="truncate">{movement.box}</span>
-                          {movement.category && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate">{movement.category}</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0 ml-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            onClick={() => handleEdit(movement)}
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          {hasHistory && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setHistoryMovement(movement)}
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout - Table Style */}
-                    <div className="hidden md:contents">
-                      <div className="flex-1">
-                        {parseLocalDate(movement.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
-                      </div>
-                      <div className="w-12">
-                        <span className="text-xl">{movement.type === 'income' ? '↗️' : '↙️'}</span>
-                      </div>
-                      <div className="flex-[2] min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{movement.description || 'Sin descripción'}</span>
-                          {isEdited && <Badge variant="outline" className="text-xs flex-shrink-0">Editado</Badge>}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">{movement.box}</div>
-                      </div>
-                      <div className="flex-1 text-xs truncate">{movement.category}</div>
-                      <div className="flex-1 text-xs truncate">{entity?.name}</div>
-                      <div className={`w-24 text-right font-bold whitespace-nowrap ${movement.type === 'income' ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {isBalanceHidden ? '****' : `${movement.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(movement.amount))}`}
-                      </div>
-                      <div className="w-32 flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleEdit(movement)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {hasHistory && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={() => setHistoryMovement(movement)}
-                          >
-                            <Clock className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(movement.id, movement.description || 'Sin descripción')}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="items-per-page" className="text-sm">Mostrar:</Label>
-                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-                    setItemsPerPage(parseInt(value));
-                    setCurrentPage(1);
-                  }}>
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}

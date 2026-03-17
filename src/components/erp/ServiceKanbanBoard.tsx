@@ -8,9 +8,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Clock, Plus, MoreHorizontal, Archive, Trash2, Edit, CheckCircle2, CircleDollarSign, RotateCcw, Receipt, History, Globe, Briefcase, LayoutGrid, CalendarRange } from 'lucide-react';
-import { format, parseISO, getMonth, isPast, isToday, differenceInDays } from 'date-fns';
+import { format, parseISO, getMonth, isPast, isToday, differenceInDays, differenceInCalendarMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, parseLocalDateString } from '@/lib/utils';
 import type { EnhancedSubscription } from '@/pages/erp/Services';
 
 interface ServiceKanbanBoardProps {
@@ -82,15 +82,33 @@ export function ServiceKanbanBoard({
 
             if (sub.frequency === 'monthly') {
                 cols[0].push(sub);
-            } else if (sub.frequency === 'yearly') {
+            } else {
+                // Treat everything else as annual/periodic
                 try {
-                    const date = parseISO(sub.nextBillingDate);
+                    if (!sub.nextBillingDate) return;
+                    // Use parseLocalDateString to avoid timezone conversion issues
+                    const date = parseLocalDateString(sub.nextBillingDate);
+                    // Check if date is valid
+                    if (isNaN(date.getTime())) return;
+
                     const monthIndex = getMonth(date) + 1; // 1-12
-                    cols[monthIndex].push(sub);
+                    if (cols[monthIndex]) {
+                        cols[monthIndex].push(sub);
+                    }
                 } catch (e) {
                     console.error("Invalid date for sub", sub);
                 }
             }
+        });
+
+        // Stable sort for every column to prevent jumping cards
+        Object.keys(cols).forEach(key => {
+            const index = Number(key);
+            cols[index].sort((a, b) => {
+                const nameA = a.clientName || '';
+                const nameB = b.clientName || '';
+                return nameA.localeCompare(nameB);
+            });
         });
 
         return cols;
@@ -118,7 +136,7 @@ export function ServiceKanbanBoard({
     };
 
     const renderCard = (sub: EnhancedSubscription) => {
-        const date = parseISO(sub.nextBillingDate);
+        const date = parseLocalDateString(sub.nextBillingDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -129,23 +147,77 @@ export function ServiceKanbanBoard({
         if (sub.currency === 'UF' && ufValue) totalAmount = Math.round(sub.amount * ufValue);
 
         const isFullyPaidByAmount = totalAmount > 0 && paidAmount >= (totalAmount - 10);
-        const isPaidStatus = isFullyPaidByAmount || daysUntilDue > 15;
+        let isWithinNoticePeriod = false;
+        if (sub.frequency === 'yearly') {
+            isWithinNoticePeriod = differenceInCalendarMonths(date, today) <= 1;
+        } else {
+            isWithinNoticePeriod = daysUntilDue <= 7;
+        }
+
+        const isPaidStatus = !isWithinNoticePeriod;
+
+        // Calculate overdue months and total debt
+        let overdueMonths = 0;
+        let displayAmount = sub.amount;
+        let displayCLP = sub.currency === 'UF' && ufValue ? Math.round(sub.amount * ufValue) : sub.amount;
+
+        if (isOverdue && sub.frequency === 'monthly') {
+            // Count start month + difference
+            overdueMonths = differenceInCalendarMonths(today, date) + 1;
+            if (overdueMonths > 1) {
+                displayAmount = sub.amount * overdueMonths;
+                if (sub.currency === 'UF' && ufValue) {
+                    displayCLP = Math.round(displayAmount * ufValue);
+                } else {
+                    displayCLP = displayAmount;
+                }
+            }
+        }
 
         const displayValue = () => {
+            const showTotalDebt = isOverdue && overdueMonths > 1;
+
             if (sub.currency === 'UF') {
-                const clpValue = ufValue ? Math.round(sub.amount * ufValue) : 0;
                 return (
                     <div className="flex flex-col items-end leading-tight">
-                        <span className="font-semibold text-sm">{isBalanceHidden ? '****' : `UF ${sub.amount}`}</span>
-                        {ufValue && <span className="text-[10px] text-muted-foreground">{isBalanceHidden ? '****' : formatCurrency(clpValue)}</span>}
+                        {showTotalDebt && (
+                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-0.5">Total Deuda</span>
+                        )}
+                        <span className={cn("font-semibold text-sm", showTotalDebt ? "text-red-600" : "")}>
+                            {isBalanceHidden ? '****' : `UF ${Number.isInteger(displayAmount) ? displayAmount : displayAmount.toFixed(2)}`}
+                        </span>
+                        {ufValue && (
+                            <span className={cn("text-[10px]", showTotalDebt ? "text-red-400" : "text-muted-foreground")}>
+                                {isBalanceHidden ? '****' : formatCurrency(displayCLP)}
+                            </span>
+                        )}
+                        {showTotalDebt && (
+                            <span className="text-[10px] text-muted-foreground mt-0.5 border-t border-zinc-200 dark:border-zinc-700 pt-0.5">
+                                Mensual: {isBalanceHidden ? '****' : `UF ${sub.amount}`}
+                            </span>
+                        )}
                     </div>
                 );
             } else {
-                const ufEquivalent = ufValue ? (sub.amount / ufValue).toFixed(2) : 0;
+                const ufEquivalent = ufValue ? (displayAmount / ufValue).toFixed(2) : 0;
                 return (
                     <div className="flex flex-col items-end leading-tight">
-                        <span className="font-semibold text-sm">{isBalanceHidden ? '****' : formatCurrency(sub.amount)}</span>
-                        {ufValue && <span className="text-[10px] text-muted-foreground">{isBalanceHidden ? '****' : `UF ${ufEquivalent}`}</span>}
+                        {showTotalDebt && (
+                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-0.5">Total Deuda</span>
+                        )}
+                        <span className={cn("font-semibold text-sm", showTotalDebt ? "text-red-600" : "")}>
+                            {isBalanceHidden ? '****' : formatCurrency(displayAmount)}
+                        </span>
+                        {ufValue && (
+                            <span className={cn("text-[10px]", showTotalDebt ? "text-red-400" : "text-muted-foreground")}>
+                                {isBalanceHidden ? '****' : `UF ${ufEquivalent}`}
+                            </span>
+                        )}
+                        {showTotalDebt && (
+                            <span className="text-[10px] text-muted-foreground mt-0.5 border-t border-zinc-200 dark:border-zinc-700 pt-0.5">
+                                Mensual: {isBalanceHidden ? '****' : formatCurrency(sub.amount)}
+                            </span>
+                        )}
                     </div>
                 );
             }
@@ -163,15 +235,8 @@ export function ServiceKanbanBoard({
         return (
             <div
                 key={sub.id}
-                onClick={(e) => {
-                    if (isDragging) {
-                        e.stopPropagation();
-                        return;
-                    }
-                    onEdit(sub);
-                }}
                 className={cn(
-                    "group relative flex flex-col gap-1 rounded-lg bg-white dark:bg-zinc-800 p-3 shadow-sm border border-zinc-200 dark:border-white/5 transition-all hover:shadow-md cursor-pointer",
+                    "group relative flex flex-col gap-1 rounded-lg bg-white dark:bg-zinc-800 p-3 shadow-sm border border-zinc-200 dark:border-white/5 transition-all hover:shadow-md",
                     mode === 'monthly' ? "h-full" : "h-auto"
                 )}
             >

@@ -31,7 +31,7 @@ import {
     PieChart as PieChartIcon
 } from 'lucide-react';
 import { Bar, BarChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
-import { getClients, getProjects, getSubscriptions } from '@/lib/firebase/database';
+import { getClients, getProjects, getSubscriptions } from '@/lib/supabase/database';
 import type { Client, Project, Subscription } from '@/types';
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];

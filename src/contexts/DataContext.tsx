@@ -5,10 +5,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import type { Entity, Movement, Loan, Projection, Category, DateFilter, EntitySubscription } from '@/types';
-import * as db from '@/lib/firebase/database';
+import * as db from '@/lib/supabase/database';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db as firestore } from '@/lib/firebase/config';
 
 interface DataContextType {
   entities: Entity[];
@@ -30,7 +28,8 @@ interface DataContextType {
   createMovement: (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateMovement: (id: string, data: Partial<Movement>) => Promise<void>;
   deleteMovement: (id: string) => Promise<void>;
-  createBatchMovements: (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
+  createBatchMovements: (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]) => Promise<{ inserted: number; skipped: number }>;
+  getExistingBankTransactionIds: (entityId: string) => Promise<Set<string>>;
   // Transfer methods
   createTransfer: (data: {
     fromEntityId: string;
@@ -48,6 +47,7 @@ interface DataContextType {
   // Category methods
   createCategory: (data: Omit<Category, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateCategory: (id: string, data: Partial<Category>) => Promise<void>;
+  updateCategoryOrder: (categories: { id: string; order: number }[]) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   // Projection methods
   createProjection: (data: Omit<Projection, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
@@ -78,18 +78,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     try {
-      await addDoc(collection(firestore, 'notifications'), {
-        userId: user.uid,
+      await db.createNotification(user.uid, {
         title,
         message,
         read: false,
-        date: new Date().toISOString(),
         type,
-        createdAt: Timestamp.now(),
       });
     } catch (error) {
-      // Silently fail - notifications are non-critical
-      // Las notificaciones requieren reglas de Firestore adicionales
+      console.warn("Error creating notification:", error);
     }
   };
 
@@ -264,15 +260,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createBatchMovements = async (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]) => {
     if (!user) throw new Error('User not authenticated');
 
-    await db.createBatchMovements(user.uid, data);
+    const result = await db.createBatchMovements(user.uid, data);
+
+    const parts = [];
+    if (result.inserted > 0) parts.push(`${result.inserted} importados`);
+    if (result.skipped > 0) parts.push(`${result.skipped} omitidos por duplicado`);
 
     await createNotification(
       'Carga Masiva Completada',
-      `Se han importado ${data.length} movimientos exitosamente`,
+      `Resultado: ${parts.join(', ')}`,
       'success'
     );
 
     await refreshData();
+    return result;
+  };
+
+  const getExistingBankTransactionIds = async (entityId: string) => {
+    if (!user) throw new Error('User not authenticated');
+    return db.getExistingBankTransactionIds(user.uid, entityId);
   };
 
   // Transfer methods
@@ -444,6 +450,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateCategoryOrder = async (categoriesToUpdate: { id: string; order: number }[]) => {
+    // Optimistic update
+    setCategories(prev => {
+      const newCategories = [...prev];
+      categoriesToUpdate.forEach(u => {
+        const index = newCategories.findIndex(c => c.id === u.id);
+        if (index !== -1) {
+          newCategories[index] = { ...newCategories[index], order: u.order };
+        }
+      });
+      return newCategories.sort((a, b) => (a.order || 0) - (b.order || 0));
+    });
+
+    try {
+      await db.updateCategoryOrder(user?.uid || '', categoriesToUpdate);
+    } catch (error) {
+      console.error('Error updating category order:', error);
+      await refreshData();
+    }
+  };
+
   // Projection methods
   const createProjection = async (data: Omit<Projection, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
     if (!user) throw new Error('User not authenticated');
@@ -531,12 +558,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateMovement,
         deleteMovement,
         createBatchMovements,
+        getExistingBankTransactionIds,
         createTransfer,
         createLoan,
         updateLoan,
         deleteLoan,
         createCategory,
         updateCategory,
+        updateCategoryOrder,
         deleteCategory,
         createProjection,
         updateProjection,

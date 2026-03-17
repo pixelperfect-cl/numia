@@ -19,7 +19,17 @@ async function deploy() {
         const localDist = path.join(__dirname, 'dist');
         const remoteRoot = 'public_html';
 
+
         console.log(`Uploading ${localDist} to ${remoteRoot}...`);
+
+        // SPA 404 Hack for Nginx/Static servers: Copy index.html to 404.html
+        // This ensures that if the server returns 404, it serves the app, and React Router takes over.
+        const fs = require('fs');
+        const indexHtml = path.join(localDist, 'index.html');
+        const notFoundHtml = path.join(localDist, '404.html');
+        fs.copyFileSync(indexHtml, notFoundHtml);
+        console.log('Created 404.html fallback.');
+
 
         // Custom filter to skip uploading .htaccess if it was in dist (it shouldn't be, but good practice)
         // Actually uploadDir uploads everything.

@@ -29,7 +29,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { logProjectActivity } from "@/lib/activityUtils";
 
-interface TeamMember {
+export interface TeamMember {
     name: string;
     role: string;
     email?: string;

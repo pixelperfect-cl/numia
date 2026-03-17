@@ -21,7 +21,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { logProjectActivity } from "@/lib/activityUtils";
 
-interface Credential {
+export interface Credential {
     id: string;
     title: string;
     username?: string;

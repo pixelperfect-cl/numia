@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { cn, addPeriodToDateString } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getClients, getSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/firebase/database';
+import { getClients, getSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/supabase/database';
 import { checkAndGenerateSubscriptionMovements } from '@/lib/erp/billing';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { ServiceDialog } from '@/components/erp/ServiceDialog';
 import { ServiceKanbanBoard } from '@/components/erp/ServiceKanbanBoard';
+import { ServiceCatalogPanel } from '@/components/erp/ServiceCatalogPanel';
+import { ServiceSettingsPanel } from '@/components/erp/ServiceSettingsPanel';
 
 import { ServiceSelectionDialog } from '@/components/erp/ServiceSelectionDialog';
 import { ClientSelectionDialog } from '@/components/erp/ClientSelectionDialog';
@@ -25,14 +27,14 @@ import { ArchiveServiceDialog } from '@/components/erp/ArchiveServiceDialog';
 import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';
 import { ClientDialog } from '@/components/erp/ClientDialog';
 import { fetchIndicators } from '@/lib/indicators';
-import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText, CalendarRange } from 'lucide-react';
+import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText, CalendarRange, Activity } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord, EnhancedSubscription } from '@/types';
 import { format, addMonths, addYears, subMonths, subYears, parseISO, isAfter } from 'date-fns';
 
 interface ServicesProps {
     entityId?: string;
-    defaultTab?: 'summary' | 'monthly' | 'annual' | 'archived';
+    defaultTab?: 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog';
     onTabChange?: (tab: string) => void;
 }
 
@@ -110,7 +112,8 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [subscriptions, setSubscriptions] = useState<EnhancedSubscription[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const searchTerm = searchParams.get('search') || '';
     const [generating, setGenerating] = useState(false);
     const [ufValue, setUfValue] = useState<number | null>(null);
 
@@ -463,14 +466,11 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             };
 
             if (paymentMode === 'full') {
-                const currentNextDate = parseISO(selectedSubscriptionForPayment.nextBillingDate);
-                let nextDate = currentNextDate;
-                if (selectedSubscriptionForPayment.frequency === 'monthly') {
-                    nextDate = addMonths(currentNextDate, 1);
-                } else {
-                    nextDate = addYears(currentNextDate, 1);
-                }
-                updatePayload.nextBillingDate = format(nextDate, 'yyyy-MM-dd');
+                updatePayload.nextBillingDate = addPeriodToDateString(
+                    selectedSubscriptionForPayment.nextBillingDate,
+                    selectedSubscriptionForPayment.frequency,
+                    1
+                );
             }
 
             await updateSubscription(selectedSubscriptionForPayment.id, {
@@ -506,11 +506,11 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
             // If we are deleting the latest payment, we should revert the date
             if (latestPayment && latestPayment.id === paymentId) {
-                const currentNext = parseISO(sub.nextBillingDate);
-                const revertedDate = sub.frequency === 'monthly'
-                    ? subMonths(currentNext, 1)
-                    : subYears(currentNext, 1);
-                newNextDate = format(revertedDate, 'yyyy-MM-dd');
+                newNextDate = addPeriodToDateString(
+                    sub.nextBillingDate,
+                    sub.frequency,
+                    -1
+                );
                 console.log(`Reverting date from ${sub.nextBillingDate} to ${newNextDate}`);
             }
 
@@ -636,10 +636,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
     const activeCount = activeSubs.length;
 
-    const [searchParams, setSearchParams] = useSearchParams();
+    // const [searchParams, setSearchParams] = useSearchParams(); // Already defined above
     const tabParam = searchParams.get('tab');
-    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' => {
-        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived';
+    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog' | 'settings' => {
+        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived' || tab === 'catalog' || tab === 'settings';
     };
     const activeTab = isValidTab(tabParam)
         ? tabParam
@@ -655,6 +655,18 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             onTabChange(val);
         }
     }
+
+    const handleSearchChange = (term: string) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            if (term) {
+                newParams.set('search', term);
+            } else {
+                newParams.delete('search');
+            }
+            return newParams;
+        });
+    };
 
     return (
         <div className="space-y-6 h-[calc(100vh-10rem)] flex flex-col">
@@ -676,6 +688,12 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 flex-1 flex flex-col">
+                <TabsContent value="catalog" className="h-full overflow-y-auto">
+                    <ServiceCatalogPanel />
+                </TabsContent>
+                <TabsContent value="settings" className="h-full overflow-y-auto">
+                    <ServiceSettingsPanel entityId={entityId || entities[0]?.id} />
+                </TabsContent>
 
 
                 <TabsContent value="summary" className="space-y-4 flex-1 flex flex-col h-full">
@@ -686,7 +704,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                 <Input
                                     placeholder="Buscar servicio o cliente..."
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
                                     className="pl-8"
                                 />
                             </div>
@@ -699,6 +717,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                             <div className="flex items-center gap-2">
                                 <DollarSign className="h-3.5 w-3.5" />
                                 <span>Anual: <span className="font-medium text-foreground">${Math.round(totalAnnual).toLocaleString()}</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-3.5 w-3.5" />
+                                <span>Diario: <span className="font-medium text-foreground">${Math.round(totalAnnual / 365).toLocaleString()}</span></span>
                             </div>
                         </div>
                     </div>
@@ -713,9 +735,17 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                         Servicios Mensuales
                                     </CardTitle>
                                     <div className="flex items-center gap-4">
-                                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 font-mono">
-                                            ${Math.round(totalMonthlyServicesAmount).toLocaleString()}
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 font-mono" title="Mensual">
+                                                Mes: ${Math.round(totalMonthlyServicesAmount).toLocaleString()}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Proyección Anual">
+                                                Anual: ${Math.round(totalMonthlyServicesAmount * 12).toLocaleString()}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Diario">
+                                                Diario: ${Math.round((totalMonthlyServicesAmount * 12) / 365).toLocaleString()}
+                                            </Badge>
+                                        </div>
                                         <Badge variant="outline" className="bg-background">
                                             {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length}
                                         </Badge>
@@ -747,36 +777,50 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').map((sub) => (
-                                                    <TableRow key={sub.id}>
-                                                        <TableCell className="font-medium">
-                                                            <div className="flex flex-col">
-                                                                <span>{sub.name}</span>
-                                                                {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                                <Briefcase className="h-3 w-3" />
-                                                                <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">{format(new Date(sub.nextBillingDate + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
-                                                        <TableCell className="text-right">
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
-                                                                    <Edit className="h-4 w-4 text-zinc-500" />
-                                                                </Button>
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
-                                                                    <Archive className="h-4 w-4 text-zinc-500" />
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
+                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').map((sub) => {
+                                                    let formattedDate = '-';
+                                                    try {
+                                                        const dateStr = sub.nextBillingDate;
+                                                        // Safe parsing: if it already includes time, don't append T00:00:00
+                                                        const dateObj = dateStr.includes('T') || dateStr.includes(' ')
+                                                            ? new Date(dateStr)
+                                                            : new Date(dateStr + 'T00:00:00');
+                                                        formattedDate = format(dateObj, 'dd/MM/yyyy');
+                                                    } catch (e) {
+                                                        console.warn('Invalid date:', sub.nextBillingDate);
+                                                    }
+
+                                                    return (
+                                                        <TableRow key={sub.id}>
+                                                            <TableCell className="font-medium">
+                                                                <div className="flex flex-col">
+                                                                    <span>{sub.name}</span>
+                                                                    {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                                    <Briefcase className="h-3 w-3" />
+                                                                    <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">{formattedDate}</TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
+                                                                        <Edit className="h-4 w-4 text-zinc-500" />
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
+                                                                        <Archive className="h-4 w-4 text-zinc-500" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })
                                             )}
                                         </TableBody>
                                     </Table>
@@ -793,11 +837,19 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                         Servicios Anuales
                                     </CardTitle>
                                     <div className="flex items-center gap-4">
-                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-mono">
-                                            ${Math.round(totalAnnualServicesAmount).toLocaleString()}
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Promedio Mensual">
+                                                Mes: ${Math.round(totalAnnualServicesAmount / 12).toLocaleString()}
+                                            </Badge>
+                                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-mono" title="Anual">
+                                                Anual: ${Math.round(totalAnnualServicesAmount).toLocaleString()}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Diario">
+                                                Diario: ${Math.round(totalAnnualServicesAmount / 365).toLocaleString()}
+                                            </Badge>
+                                        </div>
                                         <Badge variant="outline" className="bg-background">
-                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length}
+                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').length}
                                         </Badge>
                                     </div>
                                 </div>
@@ -820,43 +872,56 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell>
                                                 </TableRow>
-                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').length === 0 ? (
+                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                                         No hay servicios anuales.
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency !== 'monthly').map((sub) => (
-                                                    <TableRow key={sub.id}>
-                                                        <TableCell className="font-medium">
-                                                            <div className="flex flex-col">
-                                                                <span>{sub.name}</span>
-                                                                {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                                <Briefcase className="h-3 w-3" />
-                                                                <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">{format(new Date(sub.nextBillingDate + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
-                                                        <TableCell className="text-right">
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
-                                                                    <Edit className="h-4 w-4 text-zinc-500" />
-                                                                </Button>
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
-                                                                    <Archive className="h-4 w-4 text-zinc-500" />
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
+                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').map((sub) => {
+                                                    let formattedDate = '-';
+                                                    try {
+                                                        const dateStr = sub.nextBillingDate;
+                                                        const dateObj = dateStr.includes('T') || dateStr.includes(' ')
+                                                            ? new Date(dateStr)
+                                                            : new Date(dateStr + 'T00:00:00');
+                                                        formattedDate = format(dateObj, 'dd/MM/yyyy');
+                                                    } catch (e) {
+                                                        console.warn('Invalid date:', sub.nextBillingDate);
+                                                    }
+
+                                                    return (
+                                                        <TableRow key={sub.id}>
+                                                            <TableCell className="font-medium">
+                                                                <div className="flex flex-col">
+                                                                    <span>{sub.name}</span>
+                                                                    {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                                    <Briefcase className="h-3 w-3" />
+                                                                    <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">{formattedDate}</TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
+                                                                        <Edit className="h-4 w-4 text-zinc-500" />
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
+                                                                        <Archive className="h-4 w-4 text-zinc-500" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })
                                             )}
                                         </TableBody>
                                     </Table>
@@ -923,7 +988,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                             <Input
                                 placeholder="Buscar servicio archivado..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => handleSearchChange(e.target.value)}
                                 className="pl-8"
                             />
                         </div>
@@ -1088,7 +1153,11 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 onOpenChange={setHistoryDialogOpen}
                 movements={selectedSubscriptionForDetail?.currentMovements || []}
                 allPayments={selectedSubscriptionForDetail?.allPayments || []}
-                totalAmount={selectedSubscriptionForDetail?.amount || 0}
+                totalAmount={
+                    selectedSubscriptionForDetail?.currency === 'UF' && ufValue
+                        ? (selectedSubscriptionForDetail?.amount || 0) * ufValue
+                        : (selectedSubscriptionForDetail?.amount || 0)
+                }
                 currency={selectedSubscriptionForDetail?.currency || 'CLP'}
                 onDelete={handleDeletePayment}
                 onEdit={openEditDialog}
@@ -1109,8 +1178,8 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             />
 
             {/* Floating Bottom Menu */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-                <div className="bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md shadow-lg border border-white/10 p-1.5 rounded-full flex items-center gap-1">
+            <div className="fixed bottom-12 w-full z-50 flex justify-center pointer-events-none md:bottom-6 md:w-auto md:pointer-events-auto md:left-1/2 md:-translate-x-1/2 md:justify-start">
+                <div className="bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md shadow-lg border border-white/10 p-1.5 rounded-full flex items-center gap-1 pointer-events-auto mr-20 md:mr-0">
                     <button
                         onClick={() => handleTabChange('monthly')}
                         className={cn(

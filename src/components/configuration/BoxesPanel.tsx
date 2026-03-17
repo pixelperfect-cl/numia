@@ -1,9 +1,9 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { BoxDialog } from '@/components/BoxDialog';
-import { deleteBox, updateBox } from '@/lib/firebase/database';
+import { deleteBox, updateBox } from '@/lib/supabase/database';
 import { Edit, Trash2, Star } from 'lucide-react';
 import type { Entity } from '@/types';
 
@@ -19,11 +19,11 @@ export function BoxesPanel({ entity, onUpdate }: BoxesPanelProps) {
     const handleDelete = async (boxKey: string) => {
         const boxCount = Object.keys(entity.boxes || {}).length;
         if (boxCount <= 1) {
-            alert('No puedes eliminar la última caja');
+            alert('No puedes eliminar la Ãºltima caja');
             return;
         }
 
-        if (!confirm(`¿Estás seguro de eliminar la caja "${boxKey}"?`)) return;
+        if (!confirm(`Â¿EstÃ¡s seguro de eliminar la caja "${boxKey}"?`)) return;
 
         try {
             await deleteBox(entity.id, boxKey);
@@ -59,7 +59,7 @@ export function BoxesPanel({ entity, onUpdate }: BoxesPanelProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Gestión de Cajas</CardTitle>
+                    <CardTitle>GestiÃ³n de Cajas</CardTitle>
                     <CardDescription>Administra las cajas/cuentas disponibles para esta entidad</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -131,3 +131,4 @@ export function BoxesPanel({ entity, onUpdate }: BoxesPanelProps) {
         </div>
     );
 }
+

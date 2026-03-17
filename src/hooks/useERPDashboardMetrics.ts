@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getClients, getSubscriptions } from '@/lib/firebase/database';
+import { getClients, getSubscriptions } from '@/lib/supabase/database';
 import { fetchIndicators } from '@/lib/indicators';
 import { parseISO, subMonths, subYears, isAfter, differenceInDays } from 'date-fns';
 

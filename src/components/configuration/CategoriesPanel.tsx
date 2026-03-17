@@ -1,26 +1,171 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 // getCategoryMovementCount removed as we calculate locally
-import { Edit, Trash2, Search, Plus } from 'lucide-react';
+import { Edit, Trash2, Search, Plus, GripVertical } from 'lucide-react';
 import { CategoryDialog } from '@/components/CategoryDialog';
 import { CategoryDeleteDialog } from '@/components/CategoryDeleteDialog';
 import { SubcategoryDeleteDialog } from '@/components/SubcategoryDeleteDialog';
 import { Input } from '@/components/ui/input';
 import type { Category } from '@/types';
 
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragOverlay,
+    defaultDropAnimationSideEffects,
+    DropAnimation
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 interface CategoriesPanelProps {
     entityId: string;
 }
 
+interface SortableCategoryItemProps {
+    category: Category;
+    movementCount: number;
+    onEdit: (category: Category) => void;
+    onDelete: (category: Category) => void;
+    getSubcategoryMovementCount: (categoryId: string, subName: string) => number;
+    handleRenameSubcategory: (category: Category, oldName: string) => void;
+    handleDeleteSubcategory: (category: Category, subName: string) => void;
+}
+
+function SortableCategoryItem({
+    category,
+    movementCount,
+    onEdit,
+    onDelete,
+    getSubcategoryMovementCount,
+    handleRenameSubcategory,
+    handleDeleteSubcategory
+}: SortableCategoryItemProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: category.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div className="p-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3 flex-1">
+                    <div {...attributes} {...listeners} className="cursor-grab hover:text-primary">
+                        <GripVertical className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div
+                        className="w-10 h-10 rounded-md cursor-pointer hover:ring-2 hover:ring-primary transition-all flex items-center justify-center text-white font-bold"
+                        style={{ backgroundColor: category.color }}
+                        onClick={() => onEdit(category)}
+                        title="Click para editar color"
+                    >
+                        {category.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div className="font-semibold text-lg">{category.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                            {movementCount || 0} movimientos total
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit(category)}
+                        title="Editar Categoría"
+                    >
+                        <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDelete(category)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                        title="Eliminar Categoría"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            {/* Subcategories Branch */}
+            {category.subcategories && category.subcategories.length > 0 && (
+                <div className="border-t bg-muted/20 pb-2">
+                    <div className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-12 flex items-center gap-2">
+                        <span className="h-px bg-border flex-1"></span>
+                        Subcategorías
+                        <span className="h-px bg-border flex-1"></span>
+                    </div>
+                    <div className="space-y-1 pl-12 pr-3">
+                        {category.subcategories.map(sub => (
+                            <div key={sub} className="group flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-background hover:shadow-sm transition-all text-sm border border-transparent hover:border-border">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 group-hover:bg-primary transition-colors"></div>
+                                    <span className="font-medium">{sub}</span>
+                                </div>
+                                <div className="flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-xs text-muted-foreground bg-muted group-hover:bg-muted/50 px-2 py-0.5 rounded-full">
+                                        {getSubcategoryMovementCount(category.id, sub)} movs
+                                    </span>
+                                    <div className="flex items-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => handleRenameSubcategory(category, sub)}
+                                            title="Renombrar Subcategoría"
+                                        >
+                                            <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-red-500 hover:text-red-700"
+                                            onClick={() => handleDeleteSubcategory(category, sub)}
+                                            title="Eliminar Subcategoría"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
     const { user } = useAuth();
-    const { categories, updateCategory, movements, loading: dataLoading } = useData();
-    // Removed local loading state for counts, relying on dataLoading from context if needed, 
-    // but honestly for categories we usually have them cached or fast.
+    const { categories, updateCategory, updateCategoryOrder, movements, loading: dataLoading } = useData();
 
     // Calculate counts locally
     const movementCounts = useMemo(() => {
@@ -39,9 +184,60 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState<'income' | 'expense'>('income');
+    const [activeDragItem, setActiveDragItem] = useState<Category | null>(null);
 
     // State for subcategory deletion dialog
     const [subToDelete, setSubToDelete] = useState<{ category: Category; name: string } | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragStart = (event: any) => {
+        const { active } = event;
+        const item = categories.find(c => c.id === active.id);
+        if (item) setActiveDragItem(item);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveDragItem(null);
+
+        if (active.id !== over?.id) {
+            // Find current list based on type of dragged item
+            // We assume dragging only happens within the filtered list
+            const activeCategory = categories.find(c => c.id === active.id);
+            if (!activeCategory) return;
+
+            const relevantCategories = categories.filter(c => c.type === activeCategory.type);
+            const oldIndex = relevantCategories.findIndex(c => c.id === active.id);
+            const newIndex = relevantCategories.findIndex(c => c.id === over?.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newOrderList = arrayMove(relevantCategories, oldIndex, newIndex);
+                // Update order for ALL items in this list to ensure consistency
+                const updates = newOrderList.map((c, index) => ({
+                    id: c.id,
+                    order: index
+                }));
+                updateCategoryOrder(updates);
+            }
+        }
+    };
+
+    const dropAnimation: DropAnimation = {
+        sideEffects: defaultDropAnimationSideEffects({
+            styles: {
+                active: {
+                    opacity: '0.5',
+                },
+            },
+        }),
+    };
 
     // Subcategory movement count helper
     const getSubcategoryMovementCount = (categoryId: string, subName: string) => {
@@ -72,7 +268,7 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
 
         try {
             // 1. Update movements
-            await import('@/lib/firebase/database').then(mod =>
+            await import('@/lib/supabase/database').then(mod =>
                 mod.renameSubcategoryInMovements(user!.uid, category.id, oldName, newName)
             );
 
@@ -120,96 +316,43 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
             );
         }
 
-        return (
-            <div className="space-y-4">
-                {filtered.map(category => (
-                    <div key={category.id} className="rounded-lg border bg-card text-card-foreground shadow-sm">
-                        <div className="p-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div
-                                    className="w-10 h-10 rounded-md cursor-pointer hover:ring-2 hover:ring-primary transition-all flex items-center justify-center text-white font-bold"
-                                    style={{ backgroundColor: category.color }}
-                                    onClick={() => handleEdit(category)}
-                                    title="Click para editar color"
-                                >
-                                    {category.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-lg">{category.name}</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {movementCounts[category.id] || 0} movimientos total
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleEdit(category)}
-                                    title="Editar Categoría"
-                                >
-                                    <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDelete(category)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                    title="Eliminar Categoría"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
+        // Only enable Drag & Drop if NOT searching
+        if (searchTerm) {
+            return (
+                <div className="space-y-4">
+                    {filtered.map(category => (
+                        <SortableCategoryItem
+                            key={category.id}
+                            category={category}
+                            movementCount={movementCounts[category.id] || 0}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            getSubcategoryMovementCount={getSubcategoryMovementCount}
+                            handleRenameSubcategory={handleRenameSubcategory}
+                            handleDeleteSubcategory={handleDeleteSubcategory}
+                        />
+                    ))}
+                </div>
+            )
+        }
 
-                        {/* Subcategories Branch */}
-                        {category.subcategories && category.subcategories.length > 0 && (
-                            <div className="border-t bg-muted/20 pb-2">
-                                <div className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-12 flex items-center gap-2">
-                                    <span className="h-px bg-border flex-1"></span>
-                                    Subcategorías
-                                    <span className="h-px bg-border flex-1"></span>
-                                </div>
-                                <div className="space-y-1 pl-12 pr-3">
-                                    {category.subcategories.map(sub => (
-                                        <div key={sub} className="group flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-background hover:shadow-sm transition-all text-sm border border-transparent hover:border-border">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 group-hover:bg-primary transition-colors"></div>
-                                                <span className="font-medium">{sub}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                <span className="text-xs text-muted-foreground bg-muted group-hover:bg-muted/50 px-2 py-0.5 rounded-full">
-                                                    {getSubcategoryMovementCount(category.id, sub)} movs
-                                                </span>
-                                                <div className="flex items-center">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => handleRenameSubcategory(category, sub)}
-                                                        title="Renombrar Subcategoría"
-                                                    >
-                                                        <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-red-500 hover:text-red-700"
-                                                        onClick={() => handleDeleteSubcategory(category, sub)}
-                                                        title="Eliminar Subcategoría"
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+        return (
+            <SortableContext items={filtered.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                    {filtered.map(category => (
+                        <SortableCategoryItem
+                            key={category.id}
+                            category={category}
+                            movementCount={movementCounts[category.id] || 0}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            getSubcategoryMovementCount={getSubcategoryMovementCount}
+                            handleRenameSubcategory={handleRenameSubcategory}
+                            handleDeleteSubcategory={handleDeleteSubcategory}
+                        />
+                    ))}
+                </div>
+            </SortableContext>
         );
     };
 
@@ -238,34 +381,48 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                             Nueva Categoría
                         </Button>
                     </div>
-                    <Tabs defaultValue="income">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="income">Ingresos</TabsTrigger>
-                            <TabsTrigger value="expense">Gastos</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="income" className="space-y-4 mt-4">
-                            {dataLoading ? (
-                                <div className="text-center py-8 text-muted-foreground">Cargando...</div>
-                            ) : incomeCategories.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No hay categorías de ingresos
-                                </div>
-                            ) : (
-                                renderCategoryList(incomeCategories)
-                            )}
-                        </TabsContent>
-                        <TabsContent value="expense" className="space-y-4 mt-4">
-                            {dataLoading ? (
-                                <div className="text-center py-8 text-muted-foreground">Cargando...</div>
-                            ) : expenseCategories.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No hay categorías de gastos
-                                </div>
-                            ) : (
-                                renderCategoryList(expenseCategories)
-                            )}
-                        </TabsContent>
-                    </Tabs>
+
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'income' | 'expense')}>
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="income">Ingresos</TabsTrigger>
+                                <TabsTrigger value="expense">Gastos</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="income" className="space-y-4 mt-4">
+                                {dataLoading ? (
+                                    <div className="text-center py-8 text-muted-foreground">Cargando...</div>
+                                ) : (
+                                    renderCategoryList(incomeCategories)
+                                )}
+                            </TabsContent>
+                            <TabsContent value="expense" className="space-y-4 mt-4">
+                                {dataLoading ? (
+                                    <div className="text-center py-8 text-muted-foreground">Cargando...</div>
+                                ) : (
+                                    renderCategoryList(expenseCategories)
+                                )}
+                            </TabsContent>
+                        </Tabs>
+
+                        <DragOverlay dropAnimation={dropAnimation}>
+                            {activeDragItem ? (
+                                <SortableCategoryItem
+                                    category={activeDragItem}
+                                    movementCount={movementCounts[activeDragItem.id] || 0}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                    getSubcategoryMovementCount={getSubcategoryMovementCount}
+                                    handleRenameSubcategory={handleRenameSubcategory}
+                                    handleDeleteSubcategory={handleDeleteSubcategory}
+                                />
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
                 </CardContent>
             </Card>
 
@@ -274,6 +431,7 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
                 onOpenChange={setEditDialogOpen}
                 category={editingCategory}
                 onSuccess={handleEditSuccess}
+                defaultType={activeTab}
             />
 
             <CategoryDeleteDialog
@@ -299,3 +457,4 @@ export function CategoriesPanel({ entityId }: CategoriesPanelProps) {
         </div>
     );
 }
+

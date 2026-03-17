@@ -17,7 +17,7 @@ import { IconComponent } from '@/components/IconPicker';
 import type { MovementType, Subscription } from '@/types';
 import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, CheckCircle, RefreshCcw, Briefcase, Wallet } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { getClients, getSubscriptions as getClientSubscriptions } from '@/lib/firebase/database';
+import { getClients, getSubscriptions as getClientSubscriptions } from '@/lib/supabase/database';
 import { fetchIndicators } from '@/lib/indicators';
 
 interface ProjectionsProps {

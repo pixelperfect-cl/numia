@@ -29,6 +29,23 @@ export interface Entity {
       billingNotificationsEnabled: boolean;
     };
     apiPreferences?: ApiPreference[];
+    serviceSettings?: {
+      reminders: {
+        id: string;
+        daysBefore: number;
+        subject: string;
+        body: string;
+        enabled: boolean;
+      }[];
+    };
+    projectSettings?: {
+      statusChangeTemplates: {
+        id: string; // The specific project list status
+        subject: string;
+        body: string;
+        enabled: boolean;
+      }[];
+    };
   };
   rut?: string;
   email?: string;
@@ -47,6 +64,24 @@ export interface ApiPreference {
   source: string;
 }
 
+// Notification Types
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  type: 'info' | 'warning' | 'success';
+  date?: string;
+  createdAt: string; // ISO date
+}
+
+export interface NotificationPreferences {
+  loans: boolean;
+  projections: boolean;
+  lowBalance: boolean;
+}
+
 // Category Types
 export interface Category {
   id: string;
@@ -55,6 +90,7 @@ export interface Category {
   type: 'income' | 'expense';
   icon: string;
   color: string;
+  order?: number;
   subcategories?: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -89,6 +125,7 @@ export interface Movement {
   billingPeriod?: string; // The specific billing cycle date this payment applies to (YYYY-MM-DD)
   isFinancial?: boolean; // Indicates if this movement is backed by a financial record
   projectId?: string; // Link to Project
+  bankTransactionId?: string; // Bank transaction code for deduplication
   history?: MovementHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
@@ -150,7 +187,7 @@ export interface Projection {
 }
 
 // Date Filter Types
-export type DateFilterType = 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR' | 'CUSTOM';
+export type DateFilterType = 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR' | 'ALL' | 'CUSTOM';
 
 export interface DateFilter {
   type: DateFilterType;
@@ -303,6 +340,7 @@ export interface ServiceDefinition {
   currency: 'CLP' | 'UF';
   amount: number;
   frequency: 'monthly' | 'yearly';
+  categoryId?: string; // Category for automatic payment categorization
   createdAt: Date;
   updatedAt: Date;
 }
@@ -361,6 +399,7 @@ export interface Project {
   amount?: number;
   currency?: 'CLP' | 'UF';
   description?: string;
+  startDate?: string; // ISO date
   dueDate?: string; // ISO date
   progress: number; // 0-100
   checklists?: ProjectChecklist[];
@@ -390,3 +429,5 @@ export interface Project {
     hosting?: string;
   };
 }
+
+// Roadmap Types

@@ -36,17 +36,17 @@ export function useConnectionStatus() {
 
             // We assume Firebase is OK if browser is online, as it manages its own connection robustly.
             // If we are offline, both are considered down for "Remote" status purposes.
-            const firebaseOk = isOnline;
+            // const firebaseOk = isOnline;
 
             setDetails({
-                firebase: firebaseOk,
+                firebase: false, // Legacy disabled
                 supabase: supabaseOk,
                 isOnline: isOnline,
             });
 
             if (!isOnline) {
                 setStatus('disconnected');
-            } else if (firebaseOk && supabaseOk) {
+            } else if (supabaseOk) {
                 setStatus('connected');
             } else {
                 setStatus('partial');

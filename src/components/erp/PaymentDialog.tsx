@@ -96,7 +96,6 @@ export function PaymentDialog({
                                 onChange={(e) => setAmount(e.target.value)}
                                 className={cn("pl-8", mode === 'full' && "bg-muted text-muted-foreground")}
                                 placeholder="0"
-                                readOnly={mode === 'full'}
                             />
                         </div>
                         {subscription?.currency === 'UF' && ufValue && (

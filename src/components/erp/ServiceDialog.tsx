@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createSubscription, updateSubscription, getServiceDefinitions, getClients } from '@/lib/firebase/database';
+import { createSubscription, updateSubscription, getServiceDefinitions, getClients } from '@/lib/supabase/database';
 import type { Client, Subscription, ServiceDefinition } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -114,6 +114,7 @@ export function ServiceDialog({
                 currency: preselectedDefinition.currency,
                 frequency: preselectedDefinition.frequency,
                 startDate: defaultDate,
+                nextBillingDate: defaultDate,
                 status: 'active'
             });
         } else {
@@ -126,6 +127,7 @@ export function ServiceDialog({
                 currency: 'CLP',
                 frequency: defaultFrequency || 'monthly',
                 startDate: defaultDate,
+                nextBillingDate: defaultDate,
                 status: 'active',
                 notes: ''
             });
@@ -159,8 +161,7 @@ export function ServiceDialog({
         try {
             const dataToSave = {
                 ...formData,
-                // Create logic: nextBillingDate = startDate initially
-                nextBillingDate: subscription ? formData.nextBillingDate : formData.startDate
+                nextBillingDate: formData.nextBillingDate || formData.startDate // Fallback to start date if empty
             };
 
             if (subscription) {
@@ -350,15 +351,27 @@ export function ServiceDialog({
                         </div>
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="startDate">Fecha Inicio</Label>
-                        <Input
-                            id="startDate"
-                            type="date"
-                            value={formData.startDate}
-                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                            required
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="startDate">Fecha Inicio</Label>
+                            <Input
+                                id="startDate"
+                                type="date"
+                                value={formData.startDate ? formData.startDate.split('T')[0] : ''}
+                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="nextBillingDate">Próximo Pago</Label>
+                            <Input
+                                id="nextBillingDate"
+                                type="date"
+                                value={formData.nextBillingDate ? formData.nextBillingDate.split('T')[0] : ''}
+                                onChange={(e) => setFormData({ ...formData, nextBillingDate: e.target.value })}
+                                required
+                            />
+                        </div>
                     </div>
 
                     <div className="grid gap-2">
@@ -394,3 +407,4 @@ export function ServiceDialog({
         </Dialog>
     );
 }
+

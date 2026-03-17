@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getEntitySubscriptions } from '@/lib/firebase/database';
+import { getEntitySubscriptions } from '@/lib/supabase/database';
 import { fetchIndicators } from '@/lib/indicators';
 
 export function useSubscriptionMetrics(selectedEntityId: string) {

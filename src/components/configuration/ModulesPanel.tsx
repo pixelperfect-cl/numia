@@ -1,8 +1,8 @@
-import { Switch } from '@/components/ui/switch';
+﻿import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { updateEntity } from '@/lib/firebase/database';
+import { updateEntity } from '@/lib/supabase/database';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Entity } from '@/types';
@@ -42,7 +42,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Módulos Avanzados</CardTitle>
+                    <CardTitle>MÃ³dulos Avanzados</CardTitle>
                     <CardDescription>Activa funcionalidades extras para esta entidad</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -50,7 +50,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                         <div className="space-y-0.5">
                             <Label className="text-base">ERP Agencia</Label>
                             <p className="text-sm text-muted-foreground">
-                                Habilita funciones de CRM, Gestión de Proyectos y Cobros Recurrentes.
+                                Habilita funciones de CRM, GestiÃ³n de Proyectos y Cobros Recurrentes.
                             </p>
                         </div>
                         <Switch
@@ -64,7 +64,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                         <div className="space-y-0.5">
                             <Label className="text-base">SMTP / Notificaciones por Email</Label>
                             <p className="text-sm text-muted-foreground">
-                                Permite enviar notificaciones y códigos de confirmación por correo electrónico.
+                                Permite enviar notificaciones y cÃ³digos de confirmaciÃ³n por correo electrÃ³nico.
                             </p>
                         </div>
                         <Switch
@@ -79,7 +79,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                         <div className="space-y-0.5">
                             <Label className="text-base">Inventario</Label>
                             <p className="text-sm text-muted-foreground">
-                                Gestión de stock y productos (Próximamente)
+                                GestiÃ³n de stock y productos (PrÃ³ximamente)
                             </p>
                         </div>
                         <Switch disabled />
@@ -87,9 +87,9 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
 
                     <div className="flex items-center justify-between rounded-lg border p-4 opacity-50">
                         <div className="space-y-0.5">
-                            <Label className="text-base">Nómina</Label>
+                            <Label className="text-base">NÃ³mina</Label>
                             <p className="text-sm text-muted-foreground">
-                                Gestión de empleados y pagos (Próximamente)
+                                GestiÃ³n de empleados y pagos (PrÃ³ximamente)
                             </p>
                         </div>
                         <Switch disabled />
@@ -106,3 +106,4 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
         </div>
     );
 }
+

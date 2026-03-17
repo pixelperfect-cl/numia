@@ -71,10 +71,10 @@ export function Profile() {
                   <p className="text-sm font-medium">
                     {user.metadata?.creationTime
                       ? new Date(user.metadata.creationTime).toLocaleDateString('es-CL', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })
                       : 'No disponible'}
                   </p>
                 </div>
@@ -92,7 +92,7 @@ export function Profile() {
             <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <p className="text-sm text-muted-foreground">Proveedor de autenticación</p>
               <p className="text-lg font-semibold">
-                {user.providerData?.[0]?.providerId === 'google.com' ? 'Google' : 'Email'}
+                {user.provider === 'google' ? 'Google' : 'Email'}
               </p>
             </div>
 
@@ -106,11 +106,11 @@ export function Profile() {
               <p className="text-lg font-semibold">
                 {user.metadata?.lastSignInTime
                   ? new Date(user.metadata.lastSignInTime).toLocaleDateString('es-CL', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
                   : 'No disponible'}
               </p>
             </div>

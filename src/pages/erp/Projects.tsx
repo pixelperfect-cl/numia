@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Archive, RotateCcw, Trash2, SquareKanban } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getProjects, getClients, deleteProject, updateProject } from '@/lib/firebase/database';
+import { getProjects, getClients, deleteProject, updateProject } from '@/lib/supabase/database';
 import type { Project, ProjectStatus, ProjectList } from '@/types';
 import { ProjectDialog } from '@/components/erp/ProjectDialog';
 import {
@@ -21,8 +21,10 @@ import { KanbanColumn } from '@/components/erp/KanbanColumn';
 import { SortableProjectCard } from '@/components/erp/SortableProjectCard';
 import { ProjectListDialog } from '@/components/erp/ProjectListDialog';
 import { ProjectCreationWizard } from '@/components/erp/ProjectCreationWizard';
-import { getProjectLists, createProjectList, updateProjectList, deleteProjectList, initializeDefaultProjectLists } from '@/lib/firebase/database';
+import { ProjectSettingsPanel } from '@/components/erp/ProjectSettingsPanel';
+import { getProjectLists, createProjectList, updateProjectList, deleteProjectList, initializeDefaultProjectLists } from '@/lib/supabase/database';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -41,6 +43,7 @@ interface ProjectsProps {
 
 export function Projects({ entityId }: ProjectsProps = {}) {
     const { user } = useAuth();
+    const { entities } = useData();
     const location = useLocation();
     const navigate = useNavigate();
     const searchParams = new URLSearchParams(location.search);
@@ -271,11 +274,13 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         {currentTab === 'summary' && 'Resumen de Proyectos'}
                         {currentTab === 'active' && 'Tablero de Proyectos'}
                         {currentTab === 'archived' && 'Proyectos Archivados'}
+                        {currentTab === 'settings' && 'Configuración de Proyectos'}
                     </h1>
                     <p className="text-muted-foreground">
                         {currentTab === 'summary' && 'Vista general del estado de tus proyectos'}
                         {currentTab === 'active' && 'Gestiona tus proyectos activos y flujo de trabajo'}
                         {currentTab === 'archived' && 'Historial de proyectos finalizados o cancelados'}
+                        {currentTab === 'settings' && 'Configura automatizaciones y correos para tus proyectos'}
                     </p>
                 </div>
                 {currentTab !== 'summary' && (
@@ -490,6 +495,11 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         </Table>
                     </CardContent>
                 </Card>
+            )}
+
+            {/* Settings View */}
+            {currentTab === 'settings' && (
+                <ProjectSettingsPanel entityId={entityId || entities[0]?.id} />
             )}
         </div >
     );

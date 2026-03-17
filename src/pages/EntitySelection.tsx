@@ -7,7 +7,6 @@ import { IconComponent } from '@/components/IconPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { EntityForm } from '@/components/EntityForm';
-import numiaLogo from '@/assets/numialogo.png';
 
 interface EntitySelectionProps {
     onSelect: (entityId: string) => void;
@@ -77,7 +76,7 @@ export function EntitySelection({ onSelect }: EntitySelectionProps) {
 
             <div className="w-full max-w-4xl space-y-8">
                 <div className="text-center space-y-2">
-                    <img src={numiaLogo} alt="Numia" className="h-16 mx-auto mb-6" />
+                    <img src="/logo.png" alt="[E]ntity" className="h-16 mx-auto mb-6" />
                     <h2 className="text-3xl font-bold tracking-tight">Bienvenido, {user?.displayName || 'Usuario'}</h2>
                     <p className="text-muted-foreground text-lg">Selecciona una entidad para comenzar a gestionar</p>
                 </div>

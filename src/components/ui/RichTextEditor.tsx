@@ -26,6 +26,7 @@ interface RichTextEditorProps {
     onImageUpload?: (file: File) => Promise<string>
     placeholder?: string
     editable?: boolean
+    className?: string
 }
 
 export function RichTextEditor({
@@ -33,7 +34,8 @@ export function RichTextEditor({
     onChange,
     onImageUpload,
     placeholder = 'Escribe aquí...',
-    editable = true
+    editable = true,
+    className
 }: RichTextEditorProps) {
     const [isUploading, setIsUploading] = useState(false)
 
@@ -181,7 +183,7 @@ export function RichTextEditor({
     }
 
     return (
-        <div className="border rounded-md overflow-hidden bg-background">
+        <div className={cn("border rounded-md overflow-hidden bg-background", className)}>
             <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/40">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => editor.chain().focus().toggleBold().run()} disabled={!editor.can().chain().focus().toggleBold().run()} data-active={editor.isActive('bold') ? 'is-active' : undefined}>
                     <Bold className="h-4 w-4" />

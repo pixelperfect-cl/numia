@@ -123,7 +123,7 @@ export function AIAssistant() {
               )}
             </div>
             <div>
-              <h3 className="text-white font-semibold">Asistente Numia</h3>
+              <h3 className="text-white font-semibold">Asistente [E]ntity</h3>
               <p className="text-white/80 text-xs">
                 {isProcessing ? 'Procesando...' : 'En línea'}
               </p>
@@ -153,64 +153,63 @@ export function AIAssistant() {
         {/* Messages Area */}
         <div className="flex-1 overflow-hidden">
           <ScrollArea ref={scrollAreaRef} className="h-full p-4">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            <div className="space-y-4">
+              {messages.map((message) => (
                 <div
-                  className={`max-w-[85%] rounded-lg p-3 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : message.error
-                      ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100 border border-red-300 dark:border-red-800'
-                      : 'bg-muted'
-                  }`}
+                  key={message.id}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {message.role === 'assistant' && !message.error && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <Bot className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                      <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                        Asistente
-                      </span>
-                    </div>
-                  )}
-
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.content}
-                  </p>
-
-                  {message.functionCall && (
-                    <div className="mt-2 pt-2 border-t border-current/20">
-                      <div className="flex items-center gap-1 text-xs opacity-75">
-                        <Sparkles className="h-3 w-3" />
-                        <span>Acción: {message.functionCall.name}</span>
+                  <div
+                    className={`max-w-[85%] rounded-lg p-3 ${message.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : message.error
+                          ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100 border border-red-300 dark:border-red-800'
+                          : 'bg-muted'
+                      }`}
+                  >
+                    {message.role === 'assistant' && !message.error && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bot className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                          Asistente
+                        </span>
                       </div>
+                    )}
+
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
+
+                    {message.functionCall && (
+                      <div className="mt-2 pt-2 border-t border-current/20">
+                        <div className="flex items-center gap-1 text-xs opacity-75">
+                          <Sparkles className="h-3 w-3" />
+                          <span>Acción: {message.functionCall.name}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-1 text-xs opacity-60">
+                      {formatDistanceToNow(message.timestamp, { addSuffix: true, locale: es })}
                     </div>
-                  )}
-
-                  <div className="mt-1 text-xs opacity-60">
-                    {formatDistanceToNow(message.timestamp, { addSuffix: true, locale: es })}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-lg p-3 max-w-[85%]">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm">Pensando...</span>
+              {isProcessing && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg p-3 max-w-[85%]">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm">Pensando...</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            {/* Elemento invisible para hacer scroll automático */}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+              )}
+              {/* Elemento invisible para hacer scroll automático */}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Error Display */}

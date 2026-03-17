@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // Removed missing imports
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
-import { createProject, updateProject, getClients, getEntities, getEntity } from '@/lib/firebase/database';
+import { createProject, updateProject, getClients, getEntities, getEntity } from '@/lib/supabase/database';
 import type { Project, Client, ProjectStatus, ProjectChecklist, ChecklistItem, ProjectList, Entity } from '@/types';
 import { Loader2, Plus, Trash, X, CheckSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available, else I'll use a custom function or random string
@@ -133,14 +133,14 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                         console.warn("Could not find related Entity for Client:", selectedClient.entityId);
                         // Fallback: Use the first available entity if specific one fails
                         if (entities.length > 0) {
-                            console.log("⚠️ Defaulting to first available entity:", entities[0].name);
+                            console.log("âš ï¸ Defaulting to first available entity:", entities[0].name);
                             clientEntity = entities[0];
                             // Patch the client object for this sync operation
                             // (We cast to any to avoid strict readonly issues if present, though Client interface usually mutable here)
                             (selectedClient as any).entityId = clientEntity.id;
                             await syncEntity(user.uid, clientEntity.id, clientEntity);
                         } else {
-                            console.error("❌ No entities available to assign to client!");
+                            console.error("âŒ No entities available to assign to client!");
                         }
                     }
 
@@ -244,9 +244,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                     ) : (
                                         <>
                                             <SelectItem value="incoming">Incoming</SelectItem>
-                                            <SelectItem value="design">Diseño</SelectItem>
+                                            <SelectItem value="design">DiseÃ±o</SelectItem>
                                             <SelectItem value="development">Desarrollo</SelectItem>
-                                            <SelectItem value="review">Revisión</SelectItem>
+                                            <SelectItem value="review">RevisiÃ³n</SelectItem>
                                             <SelectItem value="completed">Finalizado</SelectItem>
                                         </>
                                     )}
@@ -276,7 +276,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="description">Descripción</Label>
+                        <Label htmlFor="description">DescripciÃ³n</Label>
                         <textarea
                             id="description"
                             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -288,7 +288,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <Label>Listas de verificación</Label>
+                            <Label>Listas de verificaciÃ³n</Label>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -444,7 +444,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                                     setFormData({ ...formData, checklists: newChecklists, progress: newProgress });
                                                 }}
                                             >
-                                                <Plus className="mr-1 h-3 w-3" /> Añadir elemento
+                                                <Plus className="mr-1 h-3 w-3" /> AÃ±adir elemento
                                             </Button>
                                         </div>
                                     </div>
@@ -466,3 +466,4 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
         </Dialog>
     );
 }
+

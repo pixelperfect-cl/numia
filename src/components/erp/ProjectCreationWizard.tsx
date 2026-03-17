@@ -1,10 +1,10 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ClientSelectionStep } from './ClientSelectionStep';
 import { ProjectDialog } from './ProjectDialog'; // We will reuse the form part of ProjectDialog or refactor it
 import type { Client, Project } from '@/types';
 import { useNavigate } from 'react-router-dom';
-import { createProject, getEntity, getEntities } from '@/lib/firebase/database';
+import { createProject, getEntity, getEntities } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { syncClient, syncEntity } from '@/lib/supabase/adapter';
 import { toast } from 'sonner';
@@ -136,7 +136,7 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
                                 id="name"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Ej. Implementación ERP"
+                                placeholder="Ej. ImplementaciÃ³n ERP"
                                 required
                                 autoFocus
                             />
@@ -184,7 +184,7 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="description">Descripción</Label>
+                            <Label htmlFor="description">DescripciÃ³n</Label>
                             <textarea
                                 id="description"
                                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -209,3 +209,4 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
         </Dialog>
     );
 }
+

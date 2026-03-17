@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { createClient, updateClient } from '@/lib/firebase/database';
+import { createClient, updateClient } from '@/lib/supabase/database';
 import type { Client } from '@/types';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 
@@ -292,3 +292,4 @@ export function ClientDialog({ open, onOpenChange, client, onSuccess, entityId }
         </Dialog>
     );
 }
+

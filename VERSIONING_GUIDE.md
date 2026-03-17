@@ -1,6 +1,6 @@
-# Guía de Versionado y Changelog - Numia
+# Guía de Versionado y Changelog - [E]ntity
 
-Esta guía establece el estándar para el manejo de versiones y el registro de cambios en el proyecto Numia.
+Esta guía establece el estándar para el manejo de versiones y el registro de cambios en el proyecto [E]ntity.
 
 ## Sistema de Versionado
 

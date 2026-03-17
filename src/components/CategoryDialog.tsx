@@ -12,13 +12,15 @@ interface CategoryDialogProps {
     onOpenChange: (open: boolean) => void;
     category: Category | null;
     onSuccess: () => void;
+    defaultType?: 'income' | 'expense';
 }
 
-export function CategoryDialog({ open, onOpenChange, category, onSuccess }: CategoryDialogProps) {
-    const { updateCategory } = useData();
+export function CategoryDialog({ open, onOpenChange, category, onSuccess, defaultType = 'income' }: CategoryDialogProps) {
+    const { updateCategory, createCategory } = useData();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
+        type: defaultType,
         color: '#3b82f6',
         subcategories: [] as string[],
     });
@@ -28,29 +30,42 @@ export function CategoryDialog({ open, onOpenChange, category, onSuccess }: Cate
         if (category) {
             setFormData({
                 name: category.name,
+                type: category.type,
                 color: category.color,
                 subcategories: category.subcategories || [],
             });
         } else {
             setFormData({
                 name: '',
+                type: defaultType,
                 color: '#3b82f6',
                 subcategories: [],
             });
         }
-    }, [category, open]);
+    }, [category, open, defaultType]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!category || !formData.name.trim()) return;
+        if (!formData.name.trim()) return;
 
         setLoading(true);
         try {
-            await updateCategory(category.id, {
-                name: formData.name,
-                color: formData.color,
-                subcategories: formData.subcategories,
-            });
+            if (category) {
+                await updateCategory(category.id, {
+                    name: formData.name,
+                    type: formData.type,
+                    color: formData.color,
+                    subcategories: formData.subcategories,
+                });
+            } else {
+                await createCategory({
+                    name: formData.name,
+                    type: formData.type,
+                    color: formData.color,
+                    icon: 'Circle', // Default icon
+                    subcategories: formData.subcategories,
+                });
+            }
 
             onSuccess();
             onOpenChange(false);
@@ -106,10 +121,38 @@ export function CategoryDialog({ open, onOpenChange, category, onSuccess }: Cate
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Editar Categoría</DialogTitle>
+                    <DialogTitle>{category ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label>Tipo</Label>
+                        <div className="flex items-center space-x-4">
+                            <Label className="flex items-center space-x-2 cursor-pointer border p-2 rounded-md hover:bg-muted has-[:checked]:bg-muted has-[:checked]:border-primary">
+                                <input
+                                    type="radio"
+                                    name="type"
+                                    value="income"
+                                    checked={formData.type === 'income'}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'income' | 'expense' })}
+                                    className="accent-primary"
+                                />
+                                <span>Ingresos</span>
+                            </Label>
+                            <Label className="flex items-center space-x-2 cursor-pointer border p-2 rounded-md hover:bg-muted has-[:checked]:bg-muted has-[:checked]:border-primary">
+                                <input
+                                    type="radio"
+                                    name="type"
+                                    value="expense"
+                                    checked={formData.type === 'expense'}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'income' | 'expense' })}
+                                    className="accent-primary"
+                                />
+                                <span>Gastos</span>
+                            </Label>
+                        </div>
+                    </div>
+
                     <div className="grid gap-2">
                         <Label htmlFor="categoryName">Nombre de la Categoría *</Label>
                         <Input

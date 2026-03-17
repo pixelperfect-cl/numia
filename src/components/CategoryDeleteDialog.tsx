@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { reassignCategoryMovements } from '@/lib/firebase/database';
+import { reassignCategoryMovements } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import type { Category } from '@/types';

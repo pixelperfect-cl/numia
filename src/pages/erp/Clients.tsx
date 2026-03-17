@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { getClients, deleteClient } from '@/lib/firebase/database';
+import { getClients, deleteClient } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientDialog } from '@/components/erp/ClientDialog';
 import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';

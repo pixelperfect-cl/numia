@@ -1,5 +1,6 @@
-import { getClients, getSubscriptions, createMovement, updateSubscription, getEntities, getCategories } from '../firebase/database';
-import { addMonths, addYears, isPast, parseISO, format } from 'date-fns';
+import { getClients, getSubscriptions, createMovement, updateSubscription, getEntities, getCategories } from '../supabase/database';
+import { isPast, parseISO, format } from 'date-fns';
+import { addPeriodToDateString } from '@/lib/utils';
 
 export async function checkAndGenerateSubscriptionMovements(userId: string) {
     let createdCount = 0;
@@ -59,15 +60,10 @@ export async function checkAndGenerateSubscriptionMovements(userId: string) {
                     createdCount++;
 
                     // Update Subscription Next Billing Date
-                    let nextDate = dateToBill;
-                    if (sub.frequency === 'monthly') {
-                        nextDate = addMonths(dateToBill, 1);
-                    } else {
-                        nextDate = addYears(dateToBill, 1);
-                    }
+                    const nextDateStr = addPeriodToDateString(sub.nextBillingDate, sub.frequency, 1);
 
                     await updateSubscription(sub.id, {
-                        nextBillingDate: format(nextDate, 'yyyy-MM-dd')
+                        nextBillingDate: nextDateStr
                     });
                 }
             }

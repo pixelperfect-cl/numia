@@ -1,37 +1,31 @@
 /**
- * Numia v1.0 - Authentication Context
+ * Numia v1.0 - Authentication Context (Supabase)
  */
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { type User as FirebaseUser } from 'firebase/auth';
+import { type User as SupabaseUser } from '@supabase/supabase-js';
 import {
   onAuthChange,
-  signInWithGoogle as firebaseSignInGoogle,
-  signInWithEmail as firebaseSignInEmail,
-  signUpWithEmail as firebaseSignUpEmail,
-  resetPassword as firebaseResetPassword,
-  signOut as firebaseSignOut
-} from '@/lib/firebase/auth';
+  signInWithGoogle as supabaseSignInGoogle,
+  signInWithEmail as supabaseSignInEmail,
+  signUpWithEmail as supabaseSignUpEmail,
+  resetPassword as supabaseResetPassword,
+  signOut as supabaseSignOut
+} from '@/lib/supabase/auth';
 
-// Define User type with extended Firebase properties
+// Define User type to abstract provider details
+// We map Supabase User to this AppUser interface to minimize breakage in components
 interface AppUser {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   emailVerified?: boolean;
+  provider?: string;
   metadata?: {
     creationTime?: string;
     lastSignInTime?: string;
   };
-  providerData?: Array<{
-    providerId: string;
-    uid: string;
-    displayName: string | null;
-    email: string | null;
-    phoneNumber: string | null;
-    photoURL: string | null;
-  }>;
 }
 
 interface AuthContextType {
@@ -51,26 +45,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthChange((firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
+    // Supabase onAuthChange returns an unsubscribe function
+    const unsubscribe = onAuthChange((supabaseUser: SupabaseUser | null) => {
+      if (supabaseUser) {
         setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          emailVerified: firebaseUser.emailVerified,
+          uid: supabaseUser.id,
+          email: supabaseUser.email || null,
+          // Supabase stores extra fields in user_metadata
+          displayName: supabaseUser.user_metadata?.display_name || supabaseUser.user_metadata?.full_name || null,
+          photoURL: supabaseUser.user_metadata?.photo_url || supabaseUser.user_metadata?.avatar_url || null,
+          emailVerified: !!supabaseUser.email_confirmed_at,
+          provider: supabaseUser.app_metadata?.provider || 'email',
           metadata: {
-            creationTime: firebaseUser.metadata.creationTime,
-            lastSignInTime: firebaseUser.metadata.lastSignInTime,
+            creationTime: supabaseUser.created_at,
+            lastSignInTime: supabaseUser.last_sign_in_at,
           },
-          providerData: firebaseUser.providerData.map(provider => ({
-            providerId: provider.providerId,
-            uid: provider.uid,
-            displayName: provider.displayName,
-            email: provider.email,
-            phoneNumber: provider.phoneNumber,
-            photoURL: provider.photoURL,
-          })),
         });
       } else {
         setUser(null);
@@ -78,52 +67,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
-    try {
-      await firebaseSignInGoogle();
-    } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
-    }
+    await supabaseSignInGoogle();
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    try {
-      await firebaseSignInEmail(email, password);
-    } catch (error) {
-      console.error('Sign in with email error:', error);
-      throw error;
-    }
+    await supabaseSignInEmail(email, password);
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
-    try {
-      await firebaseSignUpEmail(email, password, displayName);
-    } catch (error) {
-      console.error('Sign up with email error:', error);
-      throw error;
-    }
+    await supabaseSignUpEmail(email, password, displayName);
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      await firebaseResetPassword(email);
-    } catch (error) {
-      console.error('Reset password error:', error);
-      throw error;
-    }
+    await supabaseResetPassword(email);
   };
 
   const signOut = async () => {
-    try {
-      await firebaseSignOut();
-    } catch (error) {
-      console.error('Sign out error:', error);
-      throw error;
-    }
+    await supabaseSignOut();
   };
 
   return (

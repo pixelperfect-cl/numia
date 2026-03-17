@@ -101,12 +101,12 @@ export function PaymentHistoryDialog({
 
                     {/* List */}
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                        {movements.length === 0 ? (
+                        {sortedMovements.length === 0 ? (
                             <div className="text-center py-8 text-zinc-400 text-sm">
                                 No hay abonos registrados en este periodo.
                             </div>
                         ) : (
-                            movements.map((mov) => (
+                            sortedMovements.map((mov) => (
                                 <div key={mov.id} className="flex items-start gap-2 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="h-8 w-8 flex-shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
@@ -116,9 +116,14 @@ export function PaymentHistoryDialog({
                                             <div className="text-sm font-medium">
                                                 {(() => {
                                                     try {
-                                                        return mov.date ? format(new Date(mov.date + 'T00:00:00'), "d 'de' MMMM", { locale: es }) : 'Fecha desconocida';
+                                                        if (!mov.date) return 'Fecha desconocida';
+                                                        const d = mov.date;
+                                                        const dateObj = typeof d === 'string' && !d.includes('T')
+                                                            ? new Date(d + 'T00:00:00')
+                                                            : new Date(d);
+                                                        return format(dateObj, "d 'de' MMMM", { locale: es });
                                                     } catch (e) {
-                                                        return mov.date || 'Fecha inválida';
+                                                        return 'Fecha inválida';
                                                     }
                                                 })()}
                                             </div>

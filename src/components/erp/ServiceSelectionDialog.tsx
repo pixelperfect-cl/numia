@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getServiceDefinitions } from '@/lib/firebase/database';
+import { getServiceDefinitions } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { Package, Plus, Loader2, ArrowRight } from 'lucide-react';
 import type { ServiceDefinition } from '@/types';
@@ -115,3 +115,4 @@ export function ServiceSelectionDialog({ open, onOpenChange, onSelect, filterFre
         </Dialog>
     );
 }
+

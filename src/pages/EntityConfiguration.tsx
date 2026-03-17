@@ -6,7 +6,9 @@ import { GeneralPanel } from '@/components/configuration/GeneralPanel';
 import { BoxesPanel } from '@/components/configuration/BoxesPanel';
 import { CategoriesPanel } from '@/components/configuration/CategoriesPanel';
 import { AdvancedSettings } from '@/components/configuration/AdvancedSettings';
-import { ChangelogPanel } from '@/components/configuration/ChangelogPanel';
+
+
+
 
 interface EntityConfigurationProps {
     entityId: string;
@@ -48,7 +50,7 @@ export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
                     <TabsTrigger value="boxes">Cajas</TabsTrigger>
                     <TabsTrigger value="categories">Categorías</TabsTrigger>
                     <TabsTrigger value="advanced">Avanzado</TabsTrigger>
-                    <TabsTrigger value="changelog">Versión y Cambios</TabsTrigger>
+
                 </TabsList>
                 <TabsContent value="general">
                     <GeneralPanel entity={entity} />
@@ -66,9 +68,9 @@ export function EntityConfiguration({ entityId }: EntityConfigurationProps) {
                     <AdvancedSettings entity={entity} onUpdate={handleUpdate} />
                 </TabsContent>
 
-                <TabsContent value="changelog">
-                    <ChangelogPanel />
-                </TabsContent>
+
+
+
             </Tabs>
         </div>
     );
