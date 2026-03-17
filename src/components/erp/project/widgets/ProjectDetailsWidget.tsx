@@ -1,9 +1,9 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Briefcase, Calendar as CalendarIcon, DollarSign, User, Pencil, RefreshCw, ChevronRight } from "lucide-react";
+import { Briefcase, Calendar as CalendarIcon, DollarSign, User, Pencil, RefreshCw, ChevronRight, Upload, Loader2, ImageIcon, Trash2 } from "lucide-react";
 import { Client, Project } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ import { ClientSelectionDialog } from "@/components/erp/ClientSelectionDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { updateProject } from "@/lib/supabase/database";
+import { uploadProjectLogo } from "@/lib/supabase/storage";
+import { toast } from "sonner";
 
 interface ProjectDetailsWidgetProps {
     project: Project;
@@ -28,6 +30,8 @@ export function ProjectDetailsWidget({ project, client, onUpdate, onClientChange
     const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
     const [cost, setCost] = useState(project.amount?.toString() || "");
     const [isEditingCost, setIsEditingCost] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const [logoUploading, setLogoUploading] = useState(false);
 
     // Sync local state with project prop
     useEffect(() => {
@@ -77,6 +81,80 @@ export function ProjectDetailsWidget({ project, client, onUpdate, onClientChange
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
+
+                {/* Logo Section */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Logo</Label>
+                        <div className="flex items-center gap-1">
+                            {project.logoUrl && (
+                                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive/60 hover:text-destructive" onClick={async () => {
+                                    try {
+                                        await updateProject(project.id, { logoUrl: '' });
+                                        onUpdate({ ...project, logoUrl: undefined });
+                                        toast.success('Logo eliminado');
+                                    } catch (err) {
+                                        toast.error('Error al eliminar el logo');
+                                    }
+                                }}>
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-primary" onClick={() => logoInputRef.current?.click()}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        </div>
+                    </div>
+                    <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setLogoUploading(true);
+                        try {
+                            const url = await uploadProjectLogo(file, project.id);
+                            const cacheBustedUrl = url + '?t=' + Date.now();
+                            await updateProject(project.id, { logoUrl: cacheBustedUrl });
+                            onUpdate({ ...project, logoUrl: cacheBustedUrl });
+                            toast.success('Logo actualizado');
+                        } catch (err) {
+                            console.error('Logo upload error:', err);
+                            toast.error('Error al subir el logo');
+                        } finally {
+                            setLogoUploading(false);
+                            e.target.value = '';
+                        }
+                    }} />
+                    <div
+                        className="relative w-full rounded-lg border border-dashed border-border/60 bg-background/50 flex items-center justify-center cursor-pointer group hover:border-primary/40 hover:bg-primary/5 transition-all overflow-hidden"
+                        style={{ minHeight: '80px' }}
+                        onClick={() => logoInputRef.current?.click()}
+                    >
+                        {logoUploading ? (
+                            <div className="flex flex-col items-center gap-2 py-6">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Subiendo...</span>
+                            </div>
+                        ) : project.logoUrl ? (
+                            <>
+                                <img
+                                    src={project.logoUrl}
+                                    alt={project.name}
+                                    className="max-h-24 max-w-full w-auto object-contain p-3"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <Upload className="h-4 w-4 text-white" />
+                                    <span className="text-xs text-white font-medium">Cambiar logo</span>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground group-hover:text-primary transition-colors">
+                                <ImageIcon className="h-8 w-8 opacity-40" />
+                                <span className="text-xs">Click para subir logo</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="h-px bg-border/50" />
 
                 {/* Client Section */}
                 <div className="space-y-3">

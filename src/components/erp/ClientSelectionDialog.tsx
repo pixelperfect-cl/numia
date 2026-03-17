@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,7 +99,7 @@ export function ClientSelectionDialog({ open, onOpenChange, onSelect, entityId }
                         />
                     </div>
 
-                    <div className="-mx-6 px-6 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                    <div className="-mx-6 px-6 max-h-[400px] overflow-y-auto no-scrollbar">
                         <div className="space-y-1 py-2">
                             {/* Create New Client Option */}
                             <div

@@ -395,6 +395,7 @@ export interface Project {
   entityId: string;
   clientId: string;
   name: string;
+  logoUrl?: string; // URL of uploaded project logo image
   status: ProjectStatus;
   amount?: number;
   currency?: 'CLP' | 'UF';

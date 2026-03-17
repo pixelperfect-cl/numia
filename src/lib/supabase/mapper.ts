@@ -226,6 +226,7 @@ export const mapProject = (userId: string | undefined, data: Partial<Project>) =
     obj.clientId = safeStringToUuid(obj.clientId);
 
     delete obj.amount;
+    delete obj.archived; // No 'archived' column in DB - archival is determined by archive_date presence
 
     // Ensure nulls for empty date strings
     if (obj.dueDate === '') obj.dueDate = null;
@@ -236,6 +237,7 @@ export const mapProject = (userId: string | undefined, data: Partial<Project>) =
         userId: 'user_id',
         entityId: 'entity_id',
         clientId: 'client_id',
+        logoUrl: 'logo_url',
         dueDate: 'due_date',
         archiveDate: 'archive_date',
         archiveReason: 'archive_reason',
@@ -396,6 +398,7 @@ export const fromProject = (data: any): Project => {
         user_id: 'userId',
         entity_id: 'entityId',
         client_id: 'clientId',
+        logo_url: 'logoUrl',
         due_date: 'dueDate',
         archive_date: 'archiveDate',
         archive_reason: 'archiveReason',
@@ -404,6 +407,8 @@ export const fromProject = (data: any): Project => {
     });
     mapped.createdAt = new Date(mapped.createdAt);
     mapped.updatedAt = new Date(mapped.updatedAt);
+    // Compute archived from archiveDate since there's no 'archived' column in DB
+    mapped.archived = !!data.archive_date;
     // Note: ProjectStatus is just string, so no conversion needed
     return mapped as Project;
 };

@@ -11,12 +11,13 @@ import { useERPDashboardMetrics } from '@/hooks/useERPDashboardMetrics';
 import {
     TrendingUp, TrendingDown, DollarSign, Loader2, Briefcase, Users, UserCheck,
     UserX, SquareKanban, Archive, Activity, Wallet, HandCoins, PiggyBank, Receipt,
-    LayoutDashboard, FileBarChart, PieChart, ChevronRight, CheckSquare, ChevronDown, Search, Clock
+    LayoutDashboard, FileBarChart, PieChart, ChevronRight, CheckSquare, ChevronDown, Search, Clock,
+    Upload, ImageIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { subscribeToProject } from '@/lib/supabase/database';
 import type { Project } from '@/types';
 import { Progress } from '@/components/ui/progress';
@@ -28,6 +29,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadProjectLogo } from '@/lib/supabase/storage';
+import { toast } from 'sonner';
 
 interface ContextualHeaderProps {
     selectedEntityId: string;
@@ -324,6 +327,8 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
     const [statuses, setStatuses] = useState<any[]>([]); // ProjectList[]
     const { user } = useAuth();
     const navigate = useNavigate();
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const [logoUploading, setLogoUploading] = useState(false);
 
     useEffect(() => {
         if (projectId && user) {
@@ -339,6 +344,23 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
             return () => unsubscribe();
         }
     }, [projectId, user]);
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !project) return;
+        setLogoUploading(true);
+        try {
+            const url = await uploadProjectLogo(file, project.id);
+            const { updateProject } = await import('@/lib/supabase/database');
+            await updateProject(project.id, { logoUrl: url });
+            toast.success('Logo actualizado');
+        } catch (err) {
+            console.error('Logo upload error:', err);
+            toast.error('Error al subir el logo');
+        } finally {
+            setLogoUploading(false);
+        }
+    };
 
     const handleStatusChange = async (newStatusId: string) => {
         if (!project) return;
@@ -381,7 +403,42 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
 
     return (
         <div className="hidden md:flex items-center gap-3 px-4 py-1.5 bg-muted/40 backdrop-blur-sm border border-border/40 rounded-full transition-all hover:bg-muted/60 animate-in fade-in zoom-in-95 duration-200">
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             <div className="flex items-center gap-2 pr-4 border-r border-border/40">
+                {/* Clickable Project Logo */}
+                {!loading && project && (
+                    <div
+                        className="relative cursor-pointer group shrink-0"
+                        onClick={() => logoInputRef.current?.click()}
+                        title="Cambiar logo del proyecto"
+                    >
+                        {logoUploading ? (
+                            <div className="h-6 w-6 rounded-md bg-muted border border-border/50 flex items-center justify-center">
+                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : project.logoUrl ? (
+                            <>
+                                <img
+                                    src={project.logoUrl}
+                                    alt={project.name}
+                                    className="max-h-5 max-w-8 w-auto object-contain"
+                                />
+                                <div className="absolute inset-0 rounded-md bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Upload className="h-3 w-3 text-white" />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="h-6 w-6 rounded-md bg-gradient-to-br from-primary/20 to-primary/5 border border-border/50 flex items-center justify-center">
+                                    <span className="text-[9px] font-bold text-primary/70">{project.name.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <div className="absolute inset-0 rounded-md bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Upload className="h-3 w-3 text-white" />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
                 <Link to="/erp/projects" className="flex items-center gap-1 hover:text-foreground transition-colors group">
                     <SquareKanban className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground uppercase tracking-wide">Proyectos</span>

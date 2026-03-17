@@ -15,6 +15,27 @@ export const appStats = {
 
 export const changelog: ChangeLogEntry[] = [
     {
+        version: '1.0.1',
+        date: '2026-03-17',
+        changes: [
+            // ─── Proyectos: Logo ───
+            { type: 'added', description: 'Logo de proyecto: subida, edición y eliminación desde el detalle del proyecto (pestaña General)' },
+            { type: 'added', description: 'Logo visible como banner en las tarjetas del tablero Kanban de proyectos' },
+            { type: 'added', description: 'Logo con aspecto flexible (object-contain) para soportar logos horizontales y verticales' },
+            { type: 'added', description: 'Logo editable desde el wizard de creación y diálogo de edición de proyectos' },
+            { type: 'added', description: 'Cache-busting automático al reemplazar logo para evitar caché del navegador' },
+
+            // ─── Proyectos: Archivado y Eliminación ───
+            { type: 'fixed', description: 'Corrección de error 400 al archivar proyectos: eliminado campo "archived" inexistente en la base de datos' },
+            { type: 'fixed', description: 'Botones "Archivar Proyecto" y "Eliminar Proyecto" en la pestaña Configuración ahora funcionan correctamente' },
+            { type: 'fixed', description: 'Restaurar proyecto ahora limpia correctamente archive_date en la base de datos (null en vez de undefined)' },
+
+            // ─── UI/UX ───
+            { type: 'changed', description: 'Scrollbar horizontal personalizada en el tablero Kanban de proyectos con diseño acorde a la app' },
+            { type: 'changed', description: 'Logo en tarjetas de proyecto y header contextual con dimensiones flexibles para logos no cuadrados' },
+        ]
+    },
+    {
         version: '1.0.0-beta',
         date: '2026-03-16',
         changes: [

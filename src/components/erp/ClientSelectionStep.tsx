@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Search, User, Plus, Loader2, ArrowRight } from 'lucide-react';
 import { getClients } from '@/lib/supabase/database';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Client } from '@/types';
+import { ClientDialog } from './ClientDialog';
 
 interface ClientSelectionStepProps {
     onSelect: (client: Client) => void;
@@ -17,6 +18,7 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -42,7 +44,16 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
         client.phone?.includes(searchTerm)
     );
 
+    const handleClientCreated = (newClient?: Client) => {
+        if (newClient) {
+            setClients(prev => [newClient, ...prev]);
+            onSelect(newClient);
+        }
+        setClientDialogOpen(false);
+    };
+
     return (
+        <>
         <div className="space-y-4">
             <div className="flex items-center gap-2 relative">
                 <Search className="h-4 w-4 absolute left-3 text-muted-foreground" />
@@ -55,11 +66,11 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-1">
-                {/* New Client Option - Placeholder for now could be wired up later */}
+            <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-1 no-scrollbar">
+                {/* New Client Option */}
                 <Card
                     className="cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all border-dashed"
-                    onClick={() => {/* TODO: Implement quick client creation or redirect */ console.log("New client clicked") }}
+                    onClick={() => setClientDialogOpen(true)}
                 >
                     <CardContent className="p-4 flex items-center gap-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -110,6 +121,13 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
                 <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
             </div>
         </div>
+
+            <ClientDialog
+                open={clientDialogOpen}
+                onOpenChange={setClientDialogOpen}
+                onSuccess={handleClientCreated}
+            />
+        </>
     );
 }
 

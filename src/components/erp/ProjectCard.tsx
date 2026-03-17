@@ -27,13 +27,28 @@ export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCa
             onClick={() => onEdit(project)}
         >
             <CardContent className="p-2 space-y-1.5">
+                {/* Logo */}
+                {project.logoUrl && (
+                    <img
+                        src={project.logoUrl}
+                        alt={project.name}
+                        className="-mt-2 max-h-14 max-w-full w-auto object-contain mx-auto block"
+                    />
+                )}
                 {/* Header */}
                 <div className="flex items-start justify-between">
-                    <div className="min-w-0">
-                        <h4 className="font-semibold text-sm truncate bg-transparent">{project.name}</h4>
-                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
-                            <User className="h-3 w-3" />
-                            <span className="truncate">{clientName}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                        {!project.logoUrl && (
+                            <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary/20 to-primary/5 border border-border/50 flex items-center justify-center shrink-0">
+                                <span className="text-[10px] font-bold text-primary/70">{project.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                        )}
+                        <div className="min-w-0">
+                            <h4 className="font-semibold text-sm truncate bg-transparent">{project.name}</h4>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                                <User className="h-3 w-3" />
+                                <span className="truncate">{clientName}</span>
+                            </div>
                         </div>
                     </div>
                     <div className="flex gap-1 -mr-2 -mt-1 opacity-0 group-hover:opacity-100 transition-opacity">

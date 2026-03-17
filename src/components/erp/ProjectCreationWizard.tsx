@@ -1,7 +1,7 @@
-﻿import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ClientSelectionStep } from './ClientSelectionStep';
-import { ProjectDialog } from './ProjectDialog'; // We will reuse the form part of ProjectDialog or refactor it
+import { ProjectDialog } from './ProjectDialog';
 import type { Client, Project } from '@/types';
 import { useNavigate } from 'react-router-dom';
 import { createProject, getEntity, getEntities } from '@/lib/supabase/database';
@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, ImageIcon, X } from 'lucide-react';
+import { uploadProjectLogo } from '@/lib/supabase/storage';
 
 interface ProjectCreationWizardProps {
     open: boolean;
@@ -26,6 +27,9 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
     const [step, setStep] = useState<1 | 2>(1);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(false);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
 
     // Form Data for Step 2
     const [formData, setFormData] = useState({
@@ -34,7 +38,8 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
         currency: 'CLP',
         status: 'incoming',
         dueDate: '',
-        description: ''
+        description: '',
+        logoUrl: ''
     });
 
     const handleClientSelect = (client: Client) => {
@@ -86,16 +91,17 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
                 navigate(`/erp/projects/${newProject}`);
             }
 
-            // Reset state
             setStep(1);
             setSelectedClient(null);
+            setLogoPreview(null);
             setFormData({
                 name: '',
                 amount: 0,
                 currency: 'CLP',
                 status: 'incoming',
                 dueDate: '',
-                description: ''
+                description: '',
+                logoUrl: ''
             });
 
         } catch (error) {
@@ -130,17 +136,74 @@ export function ProjectCreationWizard({ open, onOpenChange, onSuccess }: Project
 
                 {step === 2 && (
                     <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Nombre Proyecto</Label>
-                            <Input
-                                id="name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Ej. ImplementaciÃ³n ERP"
-                                required
-                                autoFocus
+                        {/* Logo Upload */}
+                        <div className="flex items-center gap-4">
+                            <input
+                                ref={logoInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+                                    reader.readAsDataURL(file);
+                                    setLogoUploading(true);
+                                    try {
+                                        const url = await uploadProjectLogo(file, crypto.randomUUID());
+                                        setFormData(prev => ({ ...prev, logoUrl: url }));
+                                        toast.success('Logo subido');
+                                    } catch (err) {
+                                        console.error('Logo upload error:', err);
+                                        toast.error('Error al subir el logo');
+                                        setLogoPreview(null);
+                                    } finally {
+                                        setLogoUploading(false);
+                                    }
+                                }}
                             />
+                            <div
+                                className="relative h-14 w-14 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors flex items-center justify-center overflow-hidden group shrink-0"
+                                onClick={() => logoInputRef.current?.click()}
+                            >
+                                {logoUploading ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                ) : logoPreview ? (
+                                    <>
+                                        <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Upload className="h-4 w-4 text-white" />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-0.5 text-muted-foreground">
+                                        <ImageIcon className="h-4 w-4" />
+                                        <span className="text-[8px]">Logo</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 grid gap-2">
+                                <Label htmlFor="name">Nombre Proyecto</Label>
+                                <Input
+                                    id="name"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="Ej. Implementación ERP"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
                         </div>
+                        {logoPreview && (
+                            <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground -mt-2" onClick={() => {
+                                setLogoPreview(null);
+                                setFormData(prev => ({ ...prev, logoUrl: '' }));
+                                if (logoInputRef.current) logoInputRef.current.value = '';
+                            }}>
+                                <X className="h-3 w-3 mr-1" /> Quitar logo
+                            </Button>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">

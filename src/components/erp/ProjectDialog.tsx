@@ -1,19 +1,19 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// Removed missing imports
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { createProject, updateProject, getClients, getEntities, getEntity } from '@/lib/supabase/database';
 import type { Project, Client, ProjectStatus, ProjectChecklist, ChecklistItem, ProjectList, Entity } from '@/types';
-import { Loader2, Plus, Trash, X, CheckSquare } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available, else I'll use a custom function or random string
+import { Loader2, Plus, Trash, X, CheckSquare, Upload, ImageIcon } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { Progress } from '@/components/ui/progress';
 import { syncClient, syncEntity } from '@/lib/supabase/adapter';
 import { toast } from 'sonner';
+import { uploadProjectLogo } from '@/lib/supabase/storage';
 
 interface ProjectDialogProps {
     open: boolean;
@@ -30,6 +30,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
     const [loading, setLoading] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     const [entities, setEntities] = useState<Entity[]>([]);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<Partial<Project>>({
         name: '',
         clientId: '',
@@ -40,7 +43,8 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
         progress: 0,
         checklists: [],
         amount: 0,
-        currency: 'CLP'
+        currency: 'CLP',
+        logoUrl: ''
     });
 
     useEffect(() => {
@@ -62,8 +66,10 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                 progress: project.progress || 0,
                 checklists: project.checklists || [],
                 amount: project.amount || 0,
-                currency: project.currency || 'CLP'
+                currency: project.currency || 'CLP',
+                logoUrl: project.logoUrl || ''
             });
+            setLogoPreview(project.logoUrl || null);
         } else {
             setFormData({
                 name: '',
@@ -75,10 +81,43 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                 progress: 0,
                 checklists: [],
                 amount: 0,
-                currency: 'CLP'
+                currency: 'CLP',
+                logoUrl: ''
             });
+            setLogoPreview(null);
         }
     }, [project, open, entityId, initialStatus]);
+
+    const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Show preview immediately
+        const reader = new FileReader();
+        reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+        reader.readAsDataURL(file);
+
+        // Upload to storage
+        const uploadId = project?.id || crypto.randomUUID();
+        setLogoUploading(true);
+        try {
+            const url = await uploadProjectLogo(file, uploadId);
+            setFormData(prev => ({ ...prev, logoUrl: url }));
+            toast.success('Logo subido');
+        } catch (err) {
+            console.error('Logo upload error:', err);
+            toast.error('Error al subir el logo');
+            setLogoPreview(project?.logoUrl || null);
+        } finally {
+            setLogoUploading(false);
+        }
+    };
+
+    const handleLogoRemove = () => {
+        setLogoPreview(null);
+        setFormData(prev => ({ ...prev, logoUrl: '' }));
+        if (logoInputRef.current) logoInputRef.current.value = '';
+    };
 
     const loadClients = async () => {
         if (!user) return;
@@ -169,15 +208,50 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="name">Nombre Proyecto</Label>
-                        <Input
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            required
+                    {/* Logo Upload */}
+                    <div className="flex items-center gap-4">
+                        <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleLogoSelect}
                         />
+                        <div
+                            className="relative h-16 w-16 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors flex items-center justify-center overflow-hidden group shrink-0"
+                            onClick={() => logoInputRef.current?.click()}
+                        >
+                            {logoUploading ? (
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            ) : logoPreview ? (
+                                <>
+                                    <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <Upload className="h-4 w-4 text-white" />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                                    <ImageIcon className="h-5 w-5" />
+                                    <span className="text-[9px]">Logo</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 grid gap-2">
+                            <Label htmlFor="name">Nombre Proyecto</Label>
+                            <Input
+                                id="name"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                required
+                            />
+                        </div>
                     </div>
+                    {logoPreview && (
+                        <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground -mt-2" onClick={handleLogoRemove}>
+                            <X className="h-3 w-3 mr-1" /> Quitar logo
+                        </Button>
+                    )}
 
                     <div className="grid gap-2">
                         <Label htmlFor="client">Cliente</Label>

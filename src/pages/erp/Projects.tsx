@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as React from 'react';
+import { CustomScrollbar } from '@/components/ui/CustomScrollbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Archive, RotateCcw, Trash2, SquareKanban } from 'lucide-react';
@@ -165,8 +166,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
 
         try {
             await updateProject(project.id, {
-                archived: isArchiving,
-                archiveDate: isArchiving ? new Date().toISOString() : undefined
+                archiveDate: isArchiving ? new Date().toISOString() : null as any
             });
             loadData();
         } catch (error) {
@@ -354,9 +354,10 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                     >
+                        <CustomScrollbar scrollContainerRef={scrollContainerRef as React.RefObject<HTMLDivElement>} deps={[columns]} />
                         <div
                             ref={scrollContainerRef}
-                            className="flex gap-4 items-start overflow-x-auto pb-4 cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)]"
+                            className="flex gap-4 items-start overflow-x-auto pb-4 cursor-grab active:cursor-grabbing min-h-[calc(100vh-12rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                             onMouseDown={handleMouseDown}
                             onMouseLeave={handleMouseLeave}
                             onMouseUp={handleMouseUp}

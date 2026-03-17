@@ -30,3 +30,9 @@ export const uploadEntityLogo = async (file: File, tempId: string): Promise<stri
     const path = `entities/${tempId}/logo.${extension}`;
     return uploadFile('files', path, file);
 };
+
+export const uploadProjectLogo = async (file: File, projectId: string): Promise<string> => {
+    const extension = file.name.split('.').pop() || 'png';
+    const path = `projects/${projectId}/logo.${extension}`;
+    return uploadFile('files', path, file);
+};
