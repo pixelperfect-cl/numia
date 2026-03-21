@@ -1,255 +1,502 @@
 /**
  * Numia v1.0 - Notification Settings Component
+ * 
+ * Single component managing all email triggers with 2 tabs.
+ * Tabs: Servicios | Proyectos
+ * + 3-step guided wizard for creating triggers
  */
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useNotifications } from '@/contexts/NotificationContext';
-import { Bell, Trash2, CheckCheck, Info, AlertTriangle, CheckCircle, Settings } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger as SelectTrig,
+    SelectValue,
+} from '@/components/ui/select';
+import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { getProjectLists, getClients } from '@/lib/supabase/database';
+import {
+    Save,
+    Plus,
+    Trash2,
+    Bell,
+    Clock,
+    ArrowRightLeft,
+    Receipt,
+    ChevronDown,
+    ChevronUp,
+    Info,
+    Loader2,
+    ListIcon,
+    SquareKanban,
+} from 'lucide-react';
+import { NotificationCreationWizard } from './NotificationCreationWizard';
+import type { TriggerType as WizardTriggerType, WizardData } from './NotificationCreationWizard';
+import type { Entity, ProjectList, Client } from '@/types';
 
-interface NotificationPreferences {
-  loans: boolean;
-  projections: boolean;
-  lowBalance: boolean;
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type TriggerType = 'service_due' | 'project_status' | 'billing_generated';
+
+interface BaseTrigger {
+    id: string;
+    type: TriggerType;
+    subject: string;
+    body: string;
+    enabled: boolean;
 }
 
-export function NotificationSettings() {
-  const { notifications, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
-  const { user } = useAuth();
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
-    loans: true,
-    projections: true,
-    lowBalance: true,
-  });
-  const [saving, setSaving] = useState(false);
+interface ServiceDueTrigger extends BaseTrigger {
+    type: 'service_due';
+    daysBefore: number;
+}
 
-  // Load preferences from Firestore
-  // Load preferences from Supabase Auth Metadata
-  useEffect(() => {
-    const loadPreferences = async () => {
-      if (!user) return;
+interface ProjectStatusTrigger extends BaseTrigger {
+    type: 'project_status';
+    statusId: string;
+}
 
-      try {
-        const { data } = await supabase.auth.getUser();
-        const prefs = data.user?.user_metadata?.preferences?.notifications;
+interface BillingGeneratedTrigger extends BaseTrigger {
+    type: 'billing_generated';
+}
 
-        if (prefs) {
-          setPreferences(prefs);
+type EmailTrigger = ServiceDueTrigger | ProjectStatusTrigger | BillingGeneratedTrigger;
+
+// ─── Trigger Metadata ───────────────────────────────────────────────────────
+
+const TRIGGER_META: Record<TriggerType, {
+    label: string;
+    icon: typeof Bell;
+    color: string;
+    badgeClass: string;
+    description: string;
+    variables: string[];
+}> = {
+    service_due: {
+        label: 'Vencimiento de Servicio',
+        icon: Clock,
+        color: 'text-amber-500',
+        badgeClass: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',
+        description: 'Se envía X días antes de la fecha de vencimiento',
+        variables: ['{{client_name}}', '{{service_name}}', '{{amount}}', '{{due_date}}', '{{days}}'],
+    },
+    project_status: {
+        label: 'Cambio de Estado',
+        icon: ArrowRightLeft,
+        color: 'text-blue-500',
+        badgeClass: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400',
+        description: 'Se envía cuando un proyecto cambia de estado',
+        variables: ['{{client_name}}', '{{project_name}}', '{{status_name}}'],
+    },
+    billing_generated: {
+        label: 'Cobro Generado',
+        icon: Receipt,
+        color: 'text-emerald-500',
+        badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400',
+        description: 'Se envía al generar un cobro',
+        variables: ['{{client_name}}', '{{service_name}}', '{{amount}}', '{{due_date}}'],
+    },
+};
+
+// Tab definitions
+const TAB_CONFIG = {
+    services: {
+        label: 'Servicios',
+        icon: ListIcon,
+        types: ['service_due', 'billing_generated'] as TriggerType[],
+        emptyTitle: 'Sin notificaciones de servicios',
+        emptyDescription: 'Usa el botón "Crear Notificación" para configurar emails de vencimientos o cobros de servicios',
+    },
+    projects: {
+        label: 'Proyectos',
+        icon: SquareKanban,
+        types: ['project_status', 'billing_generated'] as TriggerType[],
+        emptyTitle: 'Sin notificaciones de proyectos',
+        emptyDescription: 'Usa el botón "Crear Notificación" para configurar emails de cambios de estado o cobros de proyectos',
+    },
+} as const;
+
+type TabKey = keyof typeof TAB_CONFIG;
+
+// ─── Trigger Card ───────────────────────────────────────────────────────────
+
+function TriggerCard({
+    trigger,
+    projectLists,
+    onUpdate,
+    onDelete,
+}: {
+    trigger: EmailTrigger;
+    projectLists: ProjectList[];
+    onUpdate: (id: string, field: string, value: any) => void;
+    onDelete: (id: string) => void;
+}) {
+    const [expanded, setExpanded] = useState(true);
+    const meta = TRIGGER_META[trigger.type];
+    const Icon = meta.icon;
+
+    return (
+        <div className={`border rounded-xl overflow-hidden transition-all ${trigger.enabled ? 'bg-card' : 'bg-muted/30 opacity-75'}`}>
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-muted/20 border-b">
+                <Icon className={`h-4 w-4 ${meta.color} shrink-0`} />
+                <Badge variant="outline" className={`${meta.badgeClass} text-[11px] font-medium`}>
+                    {meta.label}
+                </Badge>
+                <div className="flex-1" />
+                <Switch checked={trigger.enabled} onCheckedChange={(c) => onUpdate(trigger.id, 'enabled', c)} className="scale-90" />
+                <Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)} className="h-7 w-7">
+                    {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => onDelete(trigger.id)} className="h-7 w-7 text-destructive hover:text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+
+            {/* Body */}
+            {expanded && (
+                <div className="px-4 py-4 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {trigger.type === 'service_due' && (
+                            <div className="space-y-2">
+                                <Label>Días antes del vencimiento</Label>
+                                <div className="flex items-center gap-2">
+                                    <Input type="number" min="1" value={(trigger as ServiceDueTrigger).daysBefore}
+                                        onChange={(e) => onUpdate(trigger.id, 'daysBefore', parseInt(e.target.value) || 0)} className="w-24" />
+                                    <span className="text-sm text-muted-foreground">días</span>
+                                </div>
+                            </div>
+                        )}
+                        {trigger.type === 'project_status' && (
+                            <div className="space-y-2">
+                                <Label>Estado gatillador</Label>
+                                <Select value={(trigger as ProjectStatusTrigger).statusId} onValueChange={(val) => onUpdate(trigger.id, 'statusId', val)}>
+                                    <SelectTrig><SelectValue placeholder="Seleccionar estado" /></SelectTrig>
+                                    <SelectContent>
+                                        {projectLists.map(list => (
+                                            <SelectItem key={list.id} value={list.id}>Al mover a: {list.title}</SelectItem>
+                                        ))}
+                                        {projectLists.length === 0 && <SelectItem value="none" disabled>No hay listas</SelectItem>}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <div className={`space-y-2 ${trigger.type === 'billing_generated' ? 'sm:col-span-2 lg:col-span-3' : 'lg:col-span-2'}`}>
+                            <Label>Asunto del correo</Label>
+                            <Input placeholder="Ej: Aviso de pago próximo" value={trigger.subject}
+                                onChange={(e) => onUpdate(trigger.id, 'subject', e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Cuerpo del correo</Label>
+                        <Textarea placeholder="Escribe el mensaje aquí..." className="min-h-[100px] font-mono text-sm"
+                            value={trigger.body} onChange={(e) => onUpdate(trigger.id, 'body', e.target.value)} />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-muted-foreground mr-1">Variables:</span>
+                        {meta.variables.map(v => (
+                            <Badge key={v} variant="outline"
+                                className="text-[10px] font-mono px-1.5 py-0 cursor-pointer hover:bg-accent transition-colors"
+                                onClick={() => navigator.clipboard.writeText(v)} title="Click para copiar">
+                                {v}
+                            </Badge>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Tab Content ────────────────────────────────────────────────────────────
+
+function TriggerTabContent({
+    triggers,
+    tabConfig,
+    projectLists,
+    onUpdate,
+    onDelete,
+}: {
+    triggers: EmailTrigger[];
+    tabConfig: (typeof TAB_CONFIG)[TabKey];
+    projectLists: ProjectList[];
+    onUpdate: (id: string, field: string, value: any) => void;
+    onDelete: (id: string) => void;
+}) {
+    const filteredTriggers = triggers.filter(t => tabConfig.types.includes(t.type));
+
+    return (
+        <div className="space-y-4">
+            {filteredTriggers.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                    <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">{tabConfig.emptyTitle}</p>
+                    <p className="text-sm mt-1">{tabConfig.emptyDescription}</p>
+                </div>
+            ) : (
+                <>
+                    {/* Info banner */}
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 text-sm">
+                        <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                        <div className="text-muted-foreground">
+                            Cada trigger puede usar <strong>variables</strong> en el asunto y cuerpo del correo.
+                            Haz click en una variable para copiarla al portapapeles.
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {filteredTriggers.map(trigger => (
+                            <TriggerCard key={trigger.id} trigger={trigger} projectLists={projectLists}
+                                onUpdate={onUpdate} onDelete={onDelete} />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
+interface NotificationSettingsProps {
+    entity?: Entity;
+}
+
+export function NotificationSettings({ entity }: NotificationSettingsProps = {}) {
+    const { user } = useAuth();
+    const { updateEntity } = useData();
+    const [projectLists, setProjectLists] = useState<ProjectList[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [triggers, setTriggers] = useState<EmailTrigger[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [wizardOpen, setWizardOpen] = useState(false);
+
+    // Load project lists + clients
+    useEffect(() => {
+        if (user) {
+            getProjectLists(user.uid).then(setProjectLists).catch(console.error);
+            getClients(user.uid).then(all => {
+                // Filter to entity's clients if entity is selected
+                if (entity) {
+                    setClients(all.filter(c => c.entityId === entity.id));
+                } else {
+                    setClients(all);
+                }
+            }).catch(console.error);
         }
-      } catch (error) {
-        console.error('Error loading notification preferences:', error);
-      }
+    }, [user, entity?.id]);
+
+    // Load triggers from entity settings (single source of truth)
+    useEffect(() => {
+        if (!entity) return;
+        const allTriggers: EmailTrigger[] = [];
+
+        const reminders = entity?.settings?.serviceSettings?.reminders;
+        if (reminders && Array.isArray(reminders)) {
+            reminders.forEach((r: any) => {
+                allTriggers.push({
+                    id: r.id || crypto.randomUUID(),
+                    type: 'service_due',
+                    daysBefore: r.daysBefore ?? 5,
+                    subject: r.subject || '',
+                    body: r.body || '',
+                    enabled: r.enabled ?? true,
+                });
+            });
+        }
+
+        const statusTemplates = entity?.settings?.projectSettings?.statusChangeTemplates;
+        if (statusTemplates && Array.isArray(statusTemplates)) {
+            statusTemplates.forEach((t: any) => {
+                allTriggers.push({
+                    id: t.id || crypto.randomUUID(),
+                    type: 'project_status',
+                    statusId: t.id || '',
+                    subject: t.subject || '',
+                    body: t.body || '',
+                    enabled: t.enabled ?? true,
+                });
+            });
+        }
+
+        const billing = entity?.settings?.notificationSettings?.billingTemplates;
+        if (billing && Array.isArray(billing)) {
+            billing.forEach((b: any) => {
+                allTriggers.push({
+                    id: b.id || crypto.randomUUID(),
+                    type: 'billing_generated',
+                    subject: b.subject || '',
+                    body: b.body || '',
+                    enabled: b.enabled ?? true,
+                });
+            });
+        }
+
+        setTriggers(allTriggers);
+    }, [entity?.id, entity?.settings]);
+
+    // CRUD handlers
+    const handleUpdateTrigger = (id: string, field: string, value: any) => {
+        setTriggers(triggers.map(t => t.id === id ? { ...t, [field]: value } : t));
     };
 
-    loadPreferences();
-  }, [user]);
+    const handleDeleteTrigger = (id: string) => {
+        setTriggers(triggers.filter(t => t.id !== id));
+    };
 
-  const handleSavePreferences = async () => {
-    if (!user) return;
+    const handleSave = async () => {
+        if (!entity) return;
+        setLoading(true);
+        try {
+            const serviceReminders = triggers.filter(t => t.type === 'service_due').map(t => ({
+                id: t.id, daysBefore: (t as ServiceDueTrigger).daysBefore, subject: t.subject, body: t.body, enabled: t.enabled,
+            }));
+            const projectStatusTemplates = triggers.filter(t => t.type === 'project_status').map(t => ({
+                id: (t as ProjectStatusTrigger).statusId, subject: t.subject, body: t.body, enabled: t.enabled,
+            }));
+            const billingTemplates = triggers.filter(t => t.type === 'billing_generated').map(t => ({
+                id: t.id, subject: t.subject, body: t.body, enabled: t.enabled,
+            }));
 
-    try {
-      setSaving(true);
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          preferences: {
-            notifications: preferences
-          }
+            await updateEntity(entity.id, {
+                settings: {
+                    ...entity.settings,
+                    serviceSettings: { ...entity.settings?.serviceSettings, reminders: serviceReminders },
+                    projectSettings: { ...entity.settings?.projectSettings, statusChangeTemplates: projectStatusTemplates },
+                    notificationSettings: { ...entity.settings?.notificationSettings, billingTemplates },
+                },
+            });
+            alert('Configuración de notificaciones guardada correctamente');
+        } catch (error) {
+            console.error('Error saving:', error);
+            alert('Error al guardar la configuración');
+        } finally {
+            setLoading(false);
         }
-      });
+    };
 
-      if (error) throw error;
-      alert('Preferencias guardadas exitosamente');
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      alert('Error al guardar preferencias');
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleWizardCreated = async (data: WizardData) => {
+        if (!data.triggerType) return;
 
-  const togglePreference = (key: keyof NotificationPreferences) => {
-    setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+        const base = { id: crypto.randomUUID(), subject: data.subject, body: data.body, enabled: data.enabled };
+        let newTrigger: EmailTrigger;
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-orange-600" />;
-      case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      default:
-        return <Info className="h-4 w-4 text-blue-600" />;
-    }
-  };
+        switch (data.triggerType) {
+            case 'service_due':
+                newTrigger = { ...base, type: 'service_due', daysBefore: data.daysBefore };
+                break;
+            case 'project_status':
+                newTrigger = { ...base, type: 'project_status', statusId: data.statusId };
+                break;
+            case 'billing_generated':
+                newTrigger = { ...base, type: 'billing_generated' };
+                break;
+        }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta notificación?')) {
-      await deleteNotification(id);
-    }
-  };
+        setTriggers(prev => [...prev, newTrigger]);
+    };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Notificaciones</h2>
-          <p className="text-muted-foreground">Administra tus notificaciones</p>
-        </div>
-        {notifications.length > 0 && (
-          <Button onClick={markAllAsRead} variant="outline" size="sm" className="gap-2">
-            <CheckCheck className="h-4 w-4" />
-            Marcar todas como leídas
-          </Button>
-        )}
-      </div>
+    // Counts per tab
+    const counts = useMemo(() => {
+        const result: Record<TabKey, number> = { services: 0, projects: 0 };
+        triggers.forEach(t => {
+            if (TAB_CONFIG.services.types.includes(t.type)) result.services++;
+            if (TAB_CONFIG.projects.types.includes(t.type)) result.projects++;
+        });
+        return result;
+    }, [triggers]);
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Todas las Notificaciones
-          </CardTitle>
-          <CardDescription>
-            {notifications.length === 0
-              ? 'No tienes notificaciones'
-              : `Tienes ${notifications.length} notificación${notifications.length > 1 ? 'es' : ''}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {notifications.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No hay notificaciones en este momento</p>
+    if (!entity) {
+        return (
+            <div className="text-center py-12 text-muted-foreground">
+                <p>Selecciona una entidad para configurar notificaciones.</p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${notification.read ? 'bg-background' : 'bg-blue-500/5 border-blue-500/20'
-                    }`}
-                >
-                  <div className="mt-0.5">{getNotificationIcon(notification.type)}</div>
+        );
+    }
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold mb-1">{notification.title}</h4>
-                        <p className="text-sm text-muted-foreground">{notification.message}</p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {formatDistanceToNow(new Date(notification.date), {
-                            addSuffix: true,
-                            locale: es,
-                          })}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {!notification.read && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => markAsRead(notification.id)}
-                            className="h-8 px-2"
-                          >
-                            <CheckCheck className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(notification.id)}
-                          className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">Notificaciones de Email</h2>
+                    <p className="text-muted-foreground">Configura los correos automáticos que se envían a tus clientes</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Preferences Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Preferencias de Notificación
-          </CardTitle>
-          <CardDescription>Configura qué notificaciones deseas recibir</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            {/* Loans Notifications */}
-            <div className="flex items-start space-x-3 p-4 rounded-lg border">
-              <Checkbox
-                id="loans"
-                checked={preferences.loans}
-                onCheckedChange={() => togglePreference('loans')}
-              />
-              <div className="flex-1">
-                <Label htmlFor="loans" className="text-sm font-medium cursor-pointer">
-                  Notificaciones de Préstamos
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recibe alertas sobre préstamos próximos a vencer o pagos pendientes
-                </p>
-              </div>
+                <Button onClick={() => setWizardOpen(true)} size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Crear Notificación
+                </Button>
             </div>
 
-            {/* Projections Notifications */}
-            <div className="flex items-start space-x-3 p-4 rounded-lg border">
-              <Checkbox
-                id="projections"
-                checked={preferences.projections}
-                onCheckedChange={() => togglePreference('projections')}
-              />
-              <div className="flex-1">
-                <Label htmlFor="projections" className="text-sm font-medium cursor-pointer">
-                  Comparación de Proyecciones
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recibe notificaciones cuando tus gastos reales se desvíen de las proyecciones
-                </p>
-              </div>
-            </div>
+            {/* Tabbed Content */}
+            <Card>
+                <Tabs defaultValue="services" className="w-full">
+                    <div className="px-6 pt-6">
+                        <TabsList className="grid w-full grid-cols-2 h-auto">
+                            {(Object.keys(TAB_CONFIG) as TabKey[]).map(key => {
+                                const config = TAB_CONFIG[key];
+                                const Icon = config.icon;
+                                return (
+                                    <TabsTrigger key={key} value={key} className="gap-2">
+                                        <Icon className="h-4 w-4" />
+                                        {config.label}
+                                        {counts[key] > 0 && (
+                                            <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-[10px] font-bold">
+                                                {counts[key]}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                );
+                            })}
+                        </TabsList>
+                    </div>
 
-            {/* Low Balance Alerts */}
-            <div className="flex items-start space-x-3 p-4 rounded-lg border">
-              <Checkbox
-                id="lowBalance"
-                checked={preferences.lowBalance}
-                onCheckedChange={() => togglePreference('lowBalance')}
-              />
-              <div className="flex-1">
-                <Label htmlFor="lowBalance" className="text-sm font-medium cursor-pointer">
-                  Alertas de Balance Bajo
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recibe notificaciones cuando el balance de una entidad sea menor a un umbral definido
-                </p>
-              </div>
-            </div>
-          </div>
+                    {(Object.keys(TAB_CONFIG) as TabKey[]).map(key => (
+                        <TabsContent key={key} value={key}>
+                            <CardContent className="pt-6">
+                                <TriggerTabContent
+                                    triggers={triggers}
+                                    tabConfig={TAB_CONFIG[key]}
+                                    projectLists={projectLists}
+                                    onUpdate={handleUpdateTrigger}
+                                    onDelete={handleDeleteTrigger}
+                                />
+                            </CardContent>
+                        </TabsContent>
+                    ))}
+                </Tabs>
 
-          <div className="flex justify-end pt-4 border-t">
-            <Button onClick={handleSavePreferences} disabled={saving}>
-              {saving ? 'Guardando...' : 'Guardar Preferencias'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+                {triggers.length > 0 && (
+                    <CardFooter className="justify-end bg-muted/20 pt-6">
+                        <Button onClick={handleSave} disabled={loading} size="lg">
+                            {loading ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</>
+                            ) : (
+                                <><Save className="h-4 w-4 mr-2" /> Guardar Cambios</>
+                            )}
+                        </Button>
+                    </CardFooter>
+                )}
+            </Card>
+
+            {/* Creation Wizard */}
+            <NotificationCreationWizard
+                open={wizardOpen}
+                onOpenChange={setWizardOpen}
+                onCreated={handleWizardCreated}
+                projectLists={projectLists}
+                clients={clients}
+            />
+        </div>
+    );
 }

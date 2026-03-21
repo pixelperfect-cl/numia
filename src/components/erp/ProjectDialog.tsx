@@ -318,9 +318,9 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                     ) : (
                                         <>
                                             <SelectItem value="incoming">Incoming</SelectItem>
-                                            <SelectItem value="design">DiseÃ±o</SelectItem>
+                                            <SelectItem value="design">Diseño</SelectItem>
                                             <SelectItem value="development">Desarrollo</SelectItem>
-                                            <SelectItem value="review">RevisiÃ³n</SelectItem>
+                                            <SelectItem value="review">Revisión</SelectItem>
                                             <SelectItem value="completed">Finalizado</SelectItem>
                                         </>
                                     )}
@@ -350,7 +350,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="description">DescripciÃ³n</Label>
+                        <Label htmlFor="description">Descripción</Label>
                         <textarea
                             id="description"
                             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -362,7 +362,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <Label>Listas de verificaciÃ³n</Label>
+                            <Label>Listas de verificación</Label>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -518,7 +518,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSuccess, entityId
                                                     setFormData({ ...formData, checklists: newChecklists, progress: newProgress });
                                                 }}
                                             >
-                                                <Plus className="mr-1 h-3 w-3" /> AÃ±adir elemento
+                                                <Plus className="mr-1 h-3 w-3" /> Añadir elemento
                                             </Button>
                                         </div>
                                     </div>

@@ -22,7 +22,7 @@ import { KanbanColumn } from '@/components/erp/KanbanColumn';
 import { SortableProjectCard } from '@/components/erp/SortableProjectCard';
 import { ProjectListDialog } from '@/components/erp/ProjectListDialog';
 import { ProjectCreationWizard } from '@/components/erp/ProjectCreationWizard';
-import { ProjectSettingsPanel } from '@/components/erp/ProjectSettingsPanel';
+
 import { getProjectLists, createProjectList, updateProjectList, deleteProjectList, initializeDefaultProjectLists } from '@/lib/supabase/database';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
@@ -274,13 +274,11 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         {currentTab === 'summary' && 'Resumen de Proyectos'}
                         {currentTab === 'active' && 'Tablero de Proyectos'}
                         {currentTab === 'archived' && 'Proyectos Archivados'}
-                        {currentTab === 'settings' && 'Configuración de Proyectos'}
                     </h1>
                     <p className="text-muted-foreground">
                         {currentTab === 'summary' && 'Vista general del estado de tus proyectos'}
                         {currentTab === 'active' && 'Gestiona tus proyectos activos y flujo de trabajo'}
                         {currentTab === 'archived' && 'Historial de proyectos finalizados o cancelados'}
-                        {currentTab === 'settings' && 'Configura automatizaciones y correos para tus proyectos'}
                     </p>
                 </div>
                 {currentTab !== 'summary' && (
@@ -498,10 +496,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                 </Card>
             )}
 
-            {/* Settings View */}
-            {currentTab === 'settings' && (
-                <ProjectSettingsPanel entityId={entityId || entities[0]?.id} />
-            )}
+
         </div >
     );
 }

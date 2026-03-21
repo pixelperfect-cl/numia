@@ -286,6 +286,26 @@ export interface PaymentRecord {
   movementId?: string; // ID of the related financial movement
 }
 
+export interface ServiceChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface ServiceChecklist {
+  id: string;
+  title: string;
+  items: ServiceChecklistItem[];
+}
+
+export interface ServiceActivityEntry {
+  id: string;
+  type: 'payment' | 'status_change' | 'edit' | 'note';
+  description: string;
+  date: string; // ISO date
+  metadata?: Record<string, any>;
+}
+
 export interface Subscription {
   id: string;
   clientId: string;
@@ -298,6 +318,8 @@ export interface Subscription {
   status: 'active' | 'inactive' | 'archived';
   notes?: string;
   payments?: PaymentRecord[]; // History of payments for this service
+  checklists?: ServiceChecklist[]; // Task checklists for this service
+  activityLog?: ServiceActivityEntry[]; // Activity log entries
   // Archive tracking
   archiveReason?: string;     // Reason for archiving (e.g., "Servicio Concluido")
   archiveNotes?: string;      // Additional comments when archiving

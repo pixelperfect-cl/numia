@@ -58,7 +58,7 @@ export function ClientSelectionStep({ onSelect, onCancel }: ClientSelectionStepP
             <div className="flex items-center gap-2 relative">
                 <Search className="h-4 w-4 absolute left-3 text-muted-foreground" />
                 <Input
-                    placeholder="Buscar por nombre, email o telÃ©fono..."
+                    placeholder="Buscar por nombre, email o teléfono..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-9"

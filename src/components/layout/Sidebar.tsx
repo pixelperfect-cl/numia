@@ -22,14 +22,15 @@ import {
   Network,
   Archive,
   List as ListIcon,
-  Info,
+
   FileText,
   BarChart3,
+  Bell,
   type LucideIcon
 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
-import { changelog } from '@/data/changelog';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
@@ -141,12 +142,6 @@ export const menuItems: MenuItem[] = [
         label: 'Archivados',
         icon: Archive,
         path: '/erp/services?tab=archived'
-      },
-      {
-        id: 'services-settings',
-        label: 'Configuración',
-        icon: Settings,
-        path: '/erp/services?tab=settings'
       }
     ]
   },
@@ -174,12 +169,6 @@ export const menuItems: MenuItem[] = [
         label: 'Archivados',
         icon: Archive,
         path: '/erp/projects?tab=archived'
-      },
-      {
-        id: 'projects-settings',
-        label: 'Configuración',
-        icon: Settings,
-        path: '/erp/projects?tab=settings'
       }
     ]
   },
@@ -208,6 +197,12 @@ export const menuItems: MenuItem[] = [
         path: '/configuration?tab=categories'
       },
       {
+        id: 'config-notifications',
+        label: 'Notificaciones',
+        icon: Bell,
+        path: '/configuration?tab=notifications'
+      },
+      {
         id: 'config-advanced',
         label: 'Avanzado',
         icon: Settings,
@@ -224,7 +219,6 @@ export function Sidebar({ selectedEntityId }: SidebarProps) {
   const [servicesOpen, setServicesOpen] = useState(true);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [reportsOpen, setReportsOpen] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
   const [erpOpen, setErpOpen] = useState(true);
 
   const entity = entities.find(e => e.id === selectedEntityId);
@@ -252,8 +246,8 @@ export function Sidebar({ selectedEntityId }: SidebarProps) {
   };
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card h-full">
-      <div className="flex-1 overflow-y-auto py-4 no-scrollbar">
+    <aside className="hidden md:flex md:w-64 md:flex-col border-r bg-card h-full relative">
+      <div className="flex-1 min-h-0 overflow-y-auto py-4 pb-24 no-scrollbar">
         <div className="px-4 mb-4">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Gestionando
@@ -447,62 +441,21 @@ export function Sidebar({ selectedEntityId }: SidebarProps) {
       </div>
 
       {configItem && (
-        <div className="p-2 pb-12 border-t border-border/40 bg-card/50 backdrop-blur-sm">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 w-full">
-              <button
-                onClick={() => {
-                  setConfigOpen(!configOpen);
-                }}
-                className={cn(
-                  'flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer justify-between group',
-                  isActive(configItem.path) || isChildActive(configItem)
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <configItem.icon className="h-4 w-4 group-hover:text-foreground transition-colors" />
-                  <span>{configItem.label}</span>
-                </div>
-                {configOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              </button>
-              <ConnectionStatus />
-            </div>
-
-
-
-            {configOpen && (
-              <div className="ml-5 pl-3 border-l border-border/50 space-y-1 my-1">
-                {configItem.subItems!.map(child => {
-                  const ChildIcon = child.icon;
-                  return (
-                    <button
-                      key={child.id}
-                      onClick={() => handleNavigate(child.path)}
-                      className={cn(
-                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer',
-                        isActive(child.path)
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      )}
-                    >
-                      <ChildIcon className="h-3 w-3" />
-                      <span>{child.label}</span>
-                    </button>
-                  );
-                })}
-
-                {/* Version Item */}
-                <button
-                  onClick={() => handleNavigate('/changelog')}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                >
-                  <Info className="h-3 w-3" />
-                  <span>Versión v{changelog[0]?.version || '0.0.0'}</span>
-                </button>
-              </div>
-            )}
+        <div className="absolute bottom-0 left-0 right-0 p-2 pb-3 border-t border-border/40 bg-card backdrop-blur-sm z-10">
+          <div className="flex items-center gap-1 w-full">
+            <button
+              onClick={() => handleNavigate('/configuration')}
+              className={cn(
+                'flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer group',
+                location.pathname === '/configuration'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <configItem.icon className="h-4 w-4 group-hover:text-foreground transition-colors" />
+              <span>{configItem.label}</span>
+            </button>
+            <ConnectionStatus />
           </div>
         </div>
       )}

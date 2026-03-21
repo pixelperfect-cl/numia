@@ -15,7 +15,7 @@ import { useData } from '@/contexts/DataContext';
 import { ServiceDialog } from '@/components/erp/ServiceDialog';
 import { ServiceKanbanBoard } from '@/components/erp/ServiceKanbanBoard';
 import { ServiceCatalogPanel } from '@/components/erp/ServiceCatalogPanel';
-import { ServiceSettingsPanel } from '@/components/erp/ServiceSettingsPanel';
+
 
 import { ServiceSelectionDialog } from '@/components/erp/ServiceSelectionDialog';
 import { ClientSelectionDialog } from '@/components/erp/ClientSelectionDialog';
@@ -26,9 +26,10 @@ import { PaymentDialog } from '@/components/erp/PaymentDialog';
 import { ArchiveServiceDialog } from '@/components/erp/ArchiveServiceDialog';
 import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';
 import { ClientDialog } from '@/components/erp/ClientDialog';
+import { ServiceDetailPanel } from '@/components/erp/service/ServiceDetailPanel';
 import { fetchIndicators } from '@/lib/indicators';
 import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText, CalendarRange, Activity } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord, EnhancedSubscription } from '@/types';
 import { format, addMonths, addYears, subMonths, subYears, parseISO, isAfter } from 'date-fns';
 
@@ -147,6 +148,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [clientDialogOpen, setClientDialogOpen] = useState(false);
     const [selectedClientForView, setSelectedClientForView] = useState<Client | null>(null);
     const [selectedClientForEdit, setSelectedClientForEdit] = useState<Client | null>(null);
+
+    // Service Detail Panel State
+    const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+    const [selectedServiceForDetail, setSelectedServiceForDetail] = useState<EnhancedSubscription | null>(null);
 
     const loadData = async () => {
         if (!user) return;
@@ -638,8 +643,8 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
     // const [searchParams, setSearchParams] = useSearchParams(); // Already defined above
     const tabParam = searchParams.get('tab');
-    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog' | 'settings' => {
-        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived' || tab === 'catalog' || tab === 'settings';
+    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog' => {
+        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived' || tab === 'catalog';
     };
     const activeTab = isValidTab(tabParam)
         ? tabParam
@@ -691,9 +696,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 <TabsContent value="catalog" className="h-full overflow-y-auto">
                     <ServiceCatalogPanel />
                 </TabsContent>
-                <TabsContent value="settings" className="h-full overflow-y-auto">
-                    <ServiceSettingsPanel entityId={entityId || entities[0]?.id} />
-                </TabsContent>
+
 
 
                 <TabsContent value="summary" className="space-y-4 flex-1 flex flex-col h-full">
@@ -726,206 +729,326 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                     </div>
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                        {/* Monthly Services */}
+                        {/* Card 1: Distribución de Servicios (Donut) */}
                         <Card className="h-full border-t-4 border-t-emerald-500 shadow-sm">
                             <CardHeader className="pb-3 bg-muted/20">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-lg flex items-center gap-2">
                                         <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                        Servicios Mensuales
+                                        Distribución de Servicios
                                     </CardTitle>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 font-mono" title="Mensual">
-                                                Mes: ${Math.round(totalMonthlyServicesAmount).toLocaleString()}
-                                            </Badge>
-                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Proyección Anual">
-                                                Anual: ${Math.round(totalMonthlyServicesAmount * 12).toLocaleString()}
-                                            </Badge>
-                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Diario">
-                                                Diario: ${Math.round((totalMonthlyServicesAmount * 12) / 365).toLocaleString()}
-                                            </Badge>
-                                        </div>
-                                        <Badge variant="outline" className="bg-background">
-                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length}
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 font-mono">
+                                            {activeCount} activos
+                                        </Badge>
+                                        <Badge variant="outline" className="text-muted-foreground font-mono">
+                                            ${Math.round(monthlyAverage).toLocaleString()}/mes
                                         </Badge>
                                     </div>
                                 </div>
-                                <CardDescription>Recurrencia mensual indefinida</CardDescription>
+                                <CardDescription>Proporción de ingresos por tipo de servicio</CardDescription>
                             </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="border-t max-h-[384px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
-                                                <TableHead className="w-[30%]">Servicio</TableHead>
-                                                <TableHead>Cliente</TableHead>
-                                                <TableHead>Monto</TableHead>
-                                                <TableHead>Próx. Cobro</TableHead>
-                                                <TableHead className="text-right">Acciones</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {loading ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell>
-                                                </TableRow>
-                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                                        No hay servicios mensuales.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'monthly').map((sub) => {
-                                                    let formattedDate = '-';
-                                                    try {
-                                                        const dateStr = sub.nextBillingDate;
-                                                        // Safe parsing: if it already includes time, don't append T00:00:00
-                                                        const dateObj = dateStr.includes('T') || dateStr.includes(' ')
-                                                            ? new Date(dateStr)
-                                                            : new Date(dateStr + 'T00:00:00');
-                                                        formattedDate = format(dateObj, 'dd/MM/yyyy');
-                                                    } catch (e) {
-                                                        console.warn('Invalid date:', sub.nextBillingDate);
-                                                    }
+                            <CardContent className="pt-4">
+                                {loading ? (
+                                    <div className="flex items-center justify-center h-[320px]">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : (() => {
+                                    // Group services by name and calculate totals
+                                    const serviceGroups: Record<string, { name: string; totalCLP: number; count: number; frequency: string }> = {};
+                                    const donutColors = [
+                                        'hsl(160, 84%, 39%)', // emerald-600
+                                        'hsl(217, 91%, 60%)', // blue-500
+                                        'hsl(262, 83%, 58%)', // violet-500
+                                        'hsl(25, 95%, 53%)',  // orange-500
+                                        'hsl(340, 82%, 52%)', // rose-500
+                                        'hsl(199, 89%, 48%)', // sky-500
+                                        'hsl(47, 96%, 53%)',  // amber-400
+                                        'hsl(280, 67%, 51%)', // purple-500
+                                    ];
 
-                                                    return (
-                                                        <TableRow key={sub.id}>
-                                                            <TableCell className="font-medium">
-                                                                <div className="flex flex-col">
-                                                                    <span>{sub.name}</span>
-                                                                    {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="flex items-center gap-2 text-muted-foreground">
-                                                                    <Briefcase className="h-3 w-3" />
-                                                                    <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
-                                                            </TableCell>
-                                                            <TableCell className="whitespace-nowrap">{formattedDate}</TableCell>
-                                                            <TableCell className="text-right">
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
-                                                                        <Edit className="h-4 w-4 text-zinc-500" />
-                                                                    </Button>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
-                                                                        <Archive className="h-4 w-4 text-zinc-500" />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )
-                                                })
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                    activeSubs.forEach(sub => {
+                                        const amountCLP = sub.currency === 'UF' && ufValue ? sub.amount * ufValue : sub.amount;
+                                        const monthlyEquiv = sub.frequency === 'monthly' ? amountCLP : amountCLP / 12;
+                                        if (!serviceGroups[sub.name]) {
+                                            serviceGroups[sub.name] = { name: sub.name, totalCLP: 0, count: 0, frequency: sub.frequency };
+                                        }
+                                        serviceGroups[sub.name].totalCLP += monthlyEquiv;
+                                        serviceGroups[sub.name].count += 1;
+                                    });
+
+                                    const sortedGroups = Object.values(serviceGroups).sort((a, b) => b.totalCLP - a.totalCLP);
+                                    const donutData = sortedGroups.map((g, i) => ({
+                                        name: g.name,
+                                        value: Math.round(g.totalCLP),
+                                        count: g.count,
+                                        frequency: g.frequency,
+                                        fill: donutColors[i % donutColors.length],
+                                    }));
+
+                                    const totalDonut = donutData.reduce((sum, d) => sum + d.value, 0);
+
+                                    if (donutData.length === 0) {
+                                        return (
+                                            <div className="flex items-center justify-center h-[320px] text-muted-foreground text-sm">
+                                                No hay servicios activos.
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="flex flex-col gap-4">
+                                            {/* Donut Chart */}
+                                            <div className="relative h-[200px] flex items-center justify-center">
+                                                {/* SVG Donut Chart */}
+                                                    <svg viewBox="0 0 200 200" className="w-[180px] h-[180px]">
+                                                        {(() => {
+                                                            let cumulativeAngle = -90;
+                                                            return donutData.map((segment, i) => {
+                                                                const percentage = segment.value / totalDonut;
+                                                                const angle = percentage * 360;
+                                                                const startAngle = cumulativeAngle;
+                                                                cumulativeAngle += angle;
+                                                                const endAngle = cumulativeAngle;
+
+                                                                const startRad = (startAngle * Math.PI) / 180;
+                                                                const endRad = (endAngle * Math.PI) / 180;
+                                                                const largeArc = angle > 180 ? 1 : 0;
+
+                                                                const outerR = 90;
+                                                                const innerR = 58;
+                                                                const cx = 100;
+                                                                const cy = 100;
+                                                                // Tiny gap between segments
+                                                                const gapAngle = donutData.length > 1 ? 1.5 : 0;
+                                                                const gapRad = (gapAngle * Math.PI) / 180;
+                                                                const adjStartRad = startRad + (donutData.length > 1 ? gapRad / 2 : 0);
+                                                                const adjEndRad = endRad - (donutData.length > 1 ? gapRad / 2 : 0);
+                                                                const adjAngle = angle - gapAngle;
+                                                                const adjLargeArc = adjAngle > 180 ? 1 : 0;
+
+                                                                const x1Outer = cx + outerR * Math.cos(adjStartRad);
+                                                                const y1Outer = cy + outerR * Math.sin(adjStartRad);
+                                                                const x2Outer = cx + outerR * Math.cos(adjEndRad);
+                                                                const y2Outer = cy + outerR * Math.sin(adjEndRad);
+                                                                const x1Inner = cx + innerR * Math.cos(adjEndRad);
+                                                                const y1Inner = cy + innerR * Math.sin(adjEndRad);
+                                                                const x2Inner = cx + innerR * Math.cos(adjStartRad);
+                                                                const y2Inner = cy + innerR * Math.sin(adjStartRad);
+
+                                                                const d = [
+                                                                    `M ${x1Outer} ${y1Outer}`,
+                                                                    `A ${outerR} ${outerR} 0 ${adjLargeArc} 1 ${x2Outer} ${y2Outer}`,
+                                                                    `L ${x1Inner} ${y1Inner}`,
+                                                                    `A ${innerR} ${innerR} 0 ${adjLargeArc} 0 ${x2Inner} ${y2Inner}`,
+                                                                    'Z'
+                                                                ].join(' ');
+
+                                                                return (
+                                                                    <path
+                                                                        key={i}
+                                                                        d={d}
+                                                                        fill={segment.fill}
+                                                                        className="transition-opacity hover:opacity-80 cursor-pointer"
+                                                                        opacity={0.9}
+                                                                    >
+                                                                        <title>{`${segment.name}: $${segment.value.toLocaleString()}/mes (${(percentage * 100).toFixed(1)}%)`}</title>
+                                                                    </path>
+                                                                );
+                                                            });
+                                                        })()}
+                                                        {/* Center text */}
+                                                        <text x="100" y="94" textAnchor="middle" className="fill-foreground font-bold" fontSize="16">${Math.round(totalDonut).toLocaleString()}</text>
+                                                        <text x="100" y="112" textAnchor="middle" className="fill-muted-foreground" fontSize="10">mensual</text>
+                                                    </svg>
+                                            </div>
+
+                                            {/* Breakdown List */}
+                                            <div className="space-y-2 max-h-[160px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1">
+                                                {donutData.map((item, i) => (
+                                                    <div key={i} className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-muted/30 transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.fill }} />
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{item.name}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{item.count} {item.count === 1 ? 'servicio' : 'servicios'} · {item.frequency === 'monthly' ? 'Mensual' : 'Anual'}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-sm font-mono font-semibold">${item.value.toLocaleString()}</span>
+                                                            <span className="text-[10px] text-muted-foreground font-mono">{((item.value / totalDonut) * 100).toFixed(1)}%</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </CardContent>
                         </Card>
 
-                        {/* Annual/Other Services */}
+                        {/* Card 2: Proyección Mensual de Ingresos (Bar Chart) */}
                         <Card className="h-full border-t-4 border-t-blue-500 shadow-sm">
                             <CardHeader className="pb-3 bg-muted/20">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-lg flex items-center gap-2">
                                         <div className="h-2 w-2 rounded-full bg-blue-500" />
-                                        Servicios Anuales
+                                        Proyección de Ingresos
                                     </CardTitle>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Promedio Mensual">
-                                                Mes: ${Math.round(totalAnnualServicesAmount / 12).toLocaleString()}
-                                            </Badge>
-                                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-mono" title="Anual">
-                                                Anual: ${Math.round(totalAnnualServicesAmount).toLocaleString()}
-                                            </Badge>
-                                            <Badge variant="outline" className="text-muted-foreground font-mono" title="Diario">
-                                                Diario: ${Math.round(totalAnnualServicesAmount / 365).toLocaleString()}
-                                            </Badge>
-                                        </div>
-                                        <Badge variant="outline" className="bg-background">
-                                            {filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').length}
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-mono">
+                                            ${Math.round(totalAnnual).toLocaleString()}/año
+                                        </Badge>
+                                        <Badge variant="outline" className="text-muted-foreground font-mono">
+                                            ${Math.round(totalAnnual / 365).toLocaleString()}/día
                                         </Badge>
                                     </div>
                                 </div>
-                                <CardDescription>Pagos anuales y periodicidad larga</CardDescription>
+                                <CardDescription>Ingresos proyectados por mes ({new Date().getFullYear()})</CardDescription>
                             </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="border-t max-h-[384px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
-                                                <TableHead className="w-[30%]">Servicio</TableHead>
-                                                <TableHead>Cliente</TableHead>
-                                                <TableHead>Monto</TableHead>
-                                                <TableHead>Próx. Cobro</TableHead>
-                                                <TableHead className="text-right">Acciones</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {loading ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell>
-                                                </TableRow>
-                                            ) : filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                                        No hay servicios anuales.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                filteredSubscriptions.filter(s => s.status !== 'archived' && s.frequency === 'yearly').map((sub) => {
-                                                    let formattedDate = '-';
-                                                    try {
-                                                        const dateStr = sub.nextBillingDate;
-                                                        const dateObj = dateStr.includes('T') || dateStr.includes(' ')
-                                                            ? new Date(dateStr)
-                                                            : new Date(dateStr + 'T00:00:00');
-                                                        formattedDate = format(dateObj, 'dd/MM/yyyy');
-                                                    } catch (e) {
-                                                        console.warn('Invalid date:', sub.nextBillingDate);
-                                                    }
+                            <CardContent className="pt-4">
+                                {loading ? (
+                                    <div className="flex items-center justify-center h-[320px]">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : (() => {
+                                    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                                    const currentYear = new Date().getFullYear();
+                                    const currentMonth = new Date().getMonth();
 
-                                                    return (
-                                                        <TableRow key={sub.id}>
-                                                            <TableCell className="font-medium">
-                                                                <div className="flex flex-col">
-                                                                    <span>{sub.name}</span>
-                                                                    {sub.currency === 'UF' && <Badge variant="outline" className="w-fit text-[10px] mt-0.5 h-4">UF</Badge>}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="flex items-center gap-2 text-muted-foreground">
-                                                                    <Briefcase className="h-3 w-3" />
-                                                                    <span className="truncate max-w-[100px]" title={sub.clientName}>{sub.clientName}</span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {sub.currency === 'UF' ? 'UF ' + sub.amount : '$' + sub.amount.toLocaleString()}
-                                                            </TableCell>
-                                                            <TableCell className="whitespace-nowrap">{formattedDate}</TableCell>
-                                                            <TableCell className="text-right">
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sub)}>
-                                                                        <Edit className="h-4 w-4 text-zinc-500" />
-                                                                    </Button>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleArchive(sub.id)}>
-                                                                        <Archive className="h-4 w-4 text-zinc-500" />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )
-                                                })
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                    const monthlyData = monthNames.map((name, monthIdx) => {
+                                        // Monthly subscriptions contribute to every month
+                                        let monthlyBase = 0;
+                                        let yearlyExtra = 0;
+
+                                        activeSubs.forEach(sub => {
+                                            const amountCLP = sub.currency === 'UF' && ufValue ? sub.amount * ufValue : sub.amount;
+                                            if (sub.frequency === 'monthly') {
+                                                monthlyBase += amountCLP;
+                                            } else {
+                                                // Annual subscriptions only contribute to their billing month
+                                                if (sub.nextBillingDate) {
+                                                    const dateStr = sub.nextBillingDate;
+                                                    const dateObj = dateStr.includes('T') || dateStr.includes(' ')
+                                                        ? new Date(dateStr)
+                                                        : new Date(dateStr + 'T00:00:00');
+                                                    if (dateObj.getMonth() === monthIdx) {
+                                                        yearlyExtra += amountCLP;
+                                                    }
+                                                }
+                                            }
+                                        });
+
+                                        return {
+                                            name,
+                                            monthlyBase: Math.round(monthlyBase),
+                                            yearlyExtra: Math.round(yearlyExtra),
+                                            total: Math.round(monthlyBase + yearlyExtra),
+                                            isCurrent: monthIdx === currentMonth,
+                                            isPast: monthIdx < currentMonth,
+                                        };
+                                    });
+
+                                    const maxVal = Math.max(...monthlyData.map(d => d.total), 1);
+
+                                    return (
+                                        <div className="flex flex-col gap-4">
+                                            {/* Bar Chart */}
+                                            <div className="h-[220px]">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={monthlyData} barSize={24} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                                                        <defs>
+                                                            <linearGradient id="summaryBarGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                                                                <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.8} />
+                                                            </linearGradient>
+                                                            <linearGradient id="summaryBarGradientHigh" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#34d399" stopOpacity={1} />
+                                                                <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                                                            </linearGradient>
+                                                            <linearGradient id="summaryBarGradientPast" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.6} />
+                                                                <stop offset="100%" stopColor="#64748b" stopOpacity={0.4} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <XAxis
+                                                            dataKey="name"
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                                                            dy={8}
+                                                        />
+                                                        <YAxis
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+                                                            tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : `${(val / 1000).toFixed(0)}k`}
+                                                        />
+                                                        <Tooltip
+                                                            cursor={{ fill: 'hsl(var(--muted)/0.2)', radius: 4 }}
+                                                            content={({ active, payload }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    const item = payload[0].payload;
+                                                                    return (
+                                                                        <div className="bg-popover/95 backdrop-blur border border-border rounded-xl shadow-xl p-3 text-xs min-w-[160px]">
+                                                                            <p className="font-bold mb-1 text-muted-foreground">{item.name} {currentYear}</p>
+                                                                            <p className="text-lg font-bold text-blue-400">${item.total.toLocaleString()}</p>
+                                                                            <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-blue-400">Base mensual:</span>
+                                                                                    <span className="font-mono">${item.monthlyBase.toLocaleString()}</span>
+                                                                                </div>
+                                                                                {item.yearlyExtra > 0 && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span className="text-emerald-400">Cobros anuales:</span>
+                                                                                        <span className="font-mono">${item.yearlyExtra.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
+                                                        />
+                                                        <Bar dataKey="total" radius={[5, 5, 5, 5]} animationDuration={800}>
+                                                            {monthlyData.map((entry, index) => (
+                                                                <Cell
+                                                                    key={`cell-${index}`}
+                                                                    fill={entry.isPast
+                                                                        ? "url(#summaryBarGradientPast)"
+                                                                        : entry.yearlyExtra > 0
+                                                                            ? "url(#summaryBarGradientHigh)"
+                                                                            : "url(#summaryBarGradient)"
+                                                                    }
+                                                                />
+                                                            ))}
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+
+                                            {/* Stats Footer */}
+                                            <div className="grid grid-cols-3 gap-3 px-1">
+                                                <div className="bg-muted/30 rounded-xl p-3 text-center">
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mensuales</p>
+                                                    <p className="text-base font-bold text-emerald-500">{activeSubs.filter(s => s.frequency === 'monthly').length}</p>
+                                                    <p className="text-[10px] font-mono text-muted-foreground">${Math.round(totalMonthlyServicesAmount).toLocaleString()}/mes</p>
+                                                </div>
+                                                <div className="bg-muted/30 rounded-xl p-3 text-center">
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Anuales</p>
+                                                    <p className="text-base font-bold text-blue-500">{activeSubs.filter(s => s.frequency === 'yearly').length}</p>
+                                                    <p className="text-[10px] font-mono text-muted-foreground">${Math.round(totalAnnualServicesAmount).toLocaleString()}/año</p>
+                                                </div>
+                                                <div className="bg-muted/30 rounded-xl p-3 text-center">
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Total Anual</p>
+                                                    <p className="text-base font-bold text-foreground">${Math.round(totalAnnual).toLocaleString()}</p>
+                                                    <p className="text-[10px] font-mono text-muted-foreground">${Math.round(totalAnnual / 365).toLocaleString()}/día</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </CardContent>
                         </Card>
                     </div>
@@ -949,6 +1072,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                             onRevertPayment={handleRevertPayment}
                             onViewPaymentDetails={handleViewPaymentDetails}
                             onViewClient={handleViewClient}
+                            onOpenDetail={(sub) => {
+                                setSelectedServiceForDetail(sub);
+                                setDetailPanelOpen(true);
+                            }}
                             onShowHistory={(sub) => {
                                 setSelectedSubscriptionForDetail(sub);
                                 setHistoryDialogOpen(true);
@@ -972,6 +1099,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                             onRevertPayment={handleRevertPayment}
                             onViewPaymentDetails={handleViewPaymentDetails}
                             onViewClient={handleViewClient}
+                            onOpenDetail={(sub) => {
+                                setSelectedServiceForDetail(sub);
+                                setDetailPanelOpen(true);
+                            }}
                             onShowHistory={(sub) => {
                                 setSelectedSubscriptionForDetail(sub);
                                 setHistoryDialogOpen(true);
@@ -1175,6 +1306,29 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 onOpenChange={setArchiveDialogOpen}
                 subscription={subscriptionToArchive}
                 onConfirm={handleArchiveConfirm}
+            />
+
+            {/* Service Detail Panel */}
+            <ServiceDetailPanel
+                subscription={selectedServiceForDetail}
+                open={detailPanelOpen}
+                onOpenChange={setDetailPanelOpen}
+                ufValue={ufValue}
+                onEdit={handleEdit}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+                onViewClient={handleViewClient}
+                onMarkPaid={onMarkPaid}
+                onPartialPayment={onPartialPayment}
+                onRevertPayment={handleRevertPayment}
+                onDeletePayment={handleDeletePayment}
+                onRefresh={loadData}
+                onUpdateSubscription={(updated) => {
+                    setSelectedServiceForDetail(updated);
+                    setSubscriptions(prev =>
+                        prev.map(s => s.id === updated.id ? updated : s)
+                    );
+                }}
             />
 
             {/* Floating Bottom Menu */}

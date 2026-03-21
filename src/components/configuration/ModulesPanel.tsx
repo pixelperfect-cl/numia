@@ -1,4 +1,4 @@
-﻿import { Switch } from '@/components/ui/switch';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ interface ModulesPanelProps {
 export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
     const [loading, setLoading] = useState(false);
     const [erpEnabled, setErpEnabled] = useState(entity.settings?.erpEnabled || false);
-    const [smtpEnabled, setSmtpEnabled] = useState(entity.settings?.smtpEnabled || false);
 
     const handleSave = async () => {
         setLoading(true);
@@ -24,13 +23,11 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                 settings: {
                     ...entity.settings,
                     erpEnabled: erpEnabled,
-                    smtpEnabled: smtpEnabled
                 }
             });
             if (onUpdate) {
                 onUpdate();
             }
-            // Show success notification (optional, maybe toast later)
         } catch (error) {
             console.error('Error updating modules:', error);
         } finally {
@@ -42,7 +39,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>MÃ³dulos Avanzados</CardTitle>
+                    <CardTitle>Módulos Avanzados</CardTitle>
                     <CardDescription>Activa funcionalidades extras para esta entidad</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -50,7 +47,7 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                         <div className="space-y-0.5">
                             <Label className="text-base">ERP Agencia</Label>
                             <p className="text-sm text-muted-foreground">
-                                Habilita funciones de CRM, GestiÃ³n de Proyectos y Cobros Recurrentes.
+                                Habilita funciones de CRM, Gestión de Proyectos y Cobros Recurrentes.
                             </p>
                         </div>
                         <Switch
@@ -60,26 +57,12 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
                         />
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label className="text-base">SMTP / Notificaciones por Email</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Permite enviar notificaciones y cÃ³digos de confirmaciÃ³n por correo electrÃ³nico.
-                            </p>
-                        </div>
-                        <Switch
-                            checked={smtpEnabled}
-                            onCheckedChange={setSmtpEnabled}
-                            disabled={loading}
-                        />
-                    </div>
-
                     {/* Future modules placeholder */}
                     <div className="flex items-center justify-between rounded-lg border p-4 opacity-50">
                         <div className="space-y-0.5">
                             <Label className="text-base">Inventario</Label>
                             <p className="text-sm text-muted-foreground">
-                                GestiÃ³n de stock y productos (PrÃ³ximamente)
+                                Gestión de stock y productos (Próximamente)
                             </p>
                         </div>
                         <Switch disabled />
@@ -87,9 +70,9 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
 
                     <div className="flex items-center justify-between rounded-lg border p-4 opacity-50">
                         <div className="space-y-0.5">
-                            <Label className="text-base">NÃ³mina</Label>
+                            <Label className="text-base">Nómina</Label>
                             <p className="text-sm text-muted-foreground">
-                                GestiÃ³n de empleados y pagos (PrÃ³ximamente)
+                                Gestión de empleados y pagos (Próximamente)
                             </p>
                         </div>
                         <Switch disabled />
@@ -106,4 +89,3 @@ export function ModulesPanel({ entity, onUpdate }: ModulesPanelProps) {
         </div>
     );
 }
-

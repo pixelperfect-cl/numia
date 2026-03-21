@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,7 +140,7 @@ export function BoxDialog({ open, onOpenChange, entity, editingBox, onSuccess }:
                         <div className="space-y-0.5">
                             <Label>Caja por defecto</Label>
                             <p className="text-xs text-muted-foreground">
-                                Se seleccionarÃ¡ automÃ¡ticamente al crear movimientos
+                                Se seleccionará automáticamente al crear movimientos
                             </p>
                         </div>
                         <Switch

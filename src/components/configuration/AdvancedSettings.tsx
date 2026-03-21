@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Import Tabs
 
-import { Network, GripVertical, Save, Briefcase, Mail } from 'lucide-react';
-import { ModulesPanel } from './ModulesPanel'; // Import ModulesPanel
-import { SMTPPanel } from './SMTPPanel'; // Import SMTPPanel
-import { Entity } from '@/types'; // Import Entity type
+import { Network, GripVertical, Save, Briefcase } from 'lucide-react';
+import { ModulesPanel } from './ModulesPanel';
+import { SMTPPanel } from './SMTPPanel';
+import { Entity } from '@/types';
 import { useData } from '@/contexts/DataContext';
 
 import {
@@ -226,13 +226,15 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
                     <Briefcase className="h-4 w-4" />
                     Módulos
                 </TabsTrigger>
-                <TabsTrigger value="smtp" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    SMTP
-                </TabsTrigger>
+
             </TabsList>
 
             <TabsContent value="connections" className="space-y-8">
+                {/* SMTP Configuration */}
+                {entity && (
+                    <SMTPPanel entity={entity} />
+                )}
+
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -284,7 +286,6 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
                     </CardFooter>
                 </Card>
 
-
             </TabsContent>
 
             <TabsContent value="modules">
@@ -295,13 +296,7 @@ export function AdvancedSettings({ entity, onUpdate }: AdvancedSettingsProps) {
                 )}
             </TabsContent>
 
-            <TabsContent value="smtp">
-                {entity ? (
-                    <SMTPPanel entity={entity} />
-                ) : (
-                    <div className="text-muted-foreground p-4">Cargando SMTP...</div>
-                )}
-            </TabsContent>
+
         </Tabs>
     );
 }

@@ -3,6 +3,8 @@
  */
 
 export type NotificationType = 'info' | 'warning' | 'success';
+export type NotificationCategory = 'service' | 'project' | 'billing' | 'scheduled' | 'general';
+export type NotificationAudience = 'client' | 'admin' | 'all';
 
 export interface Notification {
   id: string;
@@ -12,6 +14,8 @@ export interface Notification {
   read: boolean;
   date: string; // ISO date string
   type: NotificationType;
+  category?: NotificationCategory;
+  targetAudience?: NotificationAudience;
   createdAt: Date;
 }
 

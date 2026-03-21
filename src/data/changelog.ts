@@ -8,12 +8,60 @@ export interface ChangeLogEntry {
 }
 
 export const appStats = {
-    loc: 38000, // Líneas de código estimadas al 16/03/2026
-    devHours: 600, // Estimación de horas de desarrollo
-    lastUpdated: '2026-03-16'
+    loc: 42000, // Líneas de código estimadas al 21/03/2026
+    devHours: 650, // Estimación de horas de desarrollo
+    lastUpdated: '2026-03-21'
 };
 
 export const changelog: ChangeLogEntry[] = [
+    {
+        version: '1.0.2',
+        date: '2026-03-21',
+        changes: [
+            // ─── Sistema de Notificaciones ───
+            { type: 'added', description: 'Sistema de triggers de notificación: service_due, project_status, billing_generated con configuración por tipo' },
+            { type: 'added', description: 'Wizard de creación de notificaciones paso a paso (NotificationCreationWizard)' },
+            { type: 'added', description: 'Panel de templates de email personalizables (EmailTemplatesPanel)' },
+            { type: 'added', description: 'Categorías de notificación: service, project, billing, scheduled, general' },
+            { type: 'added', description: 'Audiencia objetivo de notificaciones: client, admin, all' },
+            { type: 'changed', description: 'Refactorización completa de NotificationSettings con 2 pestañas: triggers activos y gestión' },
+
+            // ─── SMTP ───
+            { type: 'added', description: 'Botón "Test Connection" en panel SMTP para verificar conectividad antes de guardar' },
+            { type: 'changed', description: 'Panel SMTP mejorado con iconos de estado (éxito/error) y feedback visual del test' },
+
+            // ─── Panel de Detalle de Servicios ───
+            { type: 'added', description: 'Panel lateral de detalle de servicio (ServiceDetailPanel) con pestañas: General, Finanzas, Checklists, Documentos, Notas' },
+            { type: 'added', description: 'Checklists de tareas por servicio con ítems completables (ServiceChecklistTab)' },
+            { type: 'added', description: 'Pestaña de finanzas por servicio con historial de pagos (ServiceFinanceTab)' },
+            { type: 'added', description: 'Pestaña de documentos adjuntos por servicio (ServiceDocumentsTab)' },
+            { type: 'added', description: 'Pestaña de notas y actividad por servicio (ServiceNotesTab)' },
+            { type: 'added', description: 'Tipos ServiceChecklist, ServiceChecklistItem y ServiceActivityEntry en el modelo de datos' },
+
+            // ─── ERP: Servicios ───
+            { type: 'changed', description: 'Rediseño del resumen de servicios: gráfico Donut de distribución reemplaza vistas anteriores' },
+            { type: 'changed', description: 'Gráfico de barras de servicios con colores por celda (Cell component de Recharts)' },
+            { type: 'removed', description: 'Pestaña "Configuración" eliminada de Servicios (ahora centralizada en Configuración global)' },
+            { type: 'removed', description: 'ServiceSettingsPanel eliminado de la vista de servicios' },
+
+            // ─── Navegación y Configuración ───
+            { type: 'added', description: 'Sidebar de configuración interna (ConfigSidebar) para navegación entre secciones' },
+            { type: 'added', description: 'Pestaña "Notificaciones" añadida al menú de Configuración en sidebar principal' },
+            { type: 'changed', description: 'Configuración de entidad refactorizada: navegación por sidebar lateral en vez de tabs' },
+            { type: 'changed', description: 'Título de página de configuración muestra la sección activa (ej: "Entidad — Notificaciones")' },
+            { type: 'removed', description: 'Sub-ítems "Configuración" eliminados de menús de Servicios y Proyectos en sidebar' },
+
+            // ─── ERP: Proyectos ───
+            { type: 'removed', description: 'Pestaña "Configuración" eliminada de Proyectos (centralizada en Configuración global)' },
+
+            // ─── Fixes ───
+            { type: 'fixed', description: 'Diálogo de eliminación de subcategorías mejorado con mejor manejo de estado' },
+            { type: 'fixed', description: 'Módulos panel: toggle refactorizado para mejor UX' },
+            { type: 'fixed', description: 'Corrección en selección de cliente: ClientSelectionDialog y ClientSelectionStep actualizados' },
+            { type: 'fixed', description: 'ProjectFinanceCard: corrección de cálculos financieros' },
+            { type: 'fixed', description: 'BoxDialog y EntityForm: ajustes menores de comportamiento' },
+        ]
+    },
     {
         version: '1.0.1',
         date: '2026-03-17',

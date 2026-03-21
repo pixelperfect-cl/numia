@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header';
 import { QuickActions } from '@/components/layout/QuickActions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AccountSettings } from '@/components/configuration/AccountSettings';
+import { ConfigSidebar } from '@/components/configuration/ConfigSidebar';
 import { TransferDialog } from '@/components/TransferDialog';
 import { AIAssistant } from '@/components/ai/AIAssistant';
 import { ClientDialog } from '@/components/erp/ClientDialog';
@@ -136,7 +137,7 @@ export function AppLayout({ selectedEntityId, onEntityChange }: AppLayoutProps) 
     };
 
     return (
-        <div className="h-screen bg-background font-sans antialiased flex flex-col overflow-hidden">
+        <div className="bg-background font-sans antialiased flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
             <Header
                 selectedEntityId={selectedEntityId}
                 onEntityChange={onEntityChange}
@@ -145,10 +146,12 @@ export function AppLayout({ selectedEntityId, onEntityChange }: AppLayoutProps) 
                 onMobileMenuOpenChange={setMobileMenuOpen}
             />
 
-            <div className="flex flex-1 h-[calc(100vh-4rem)]">
+            <div className="flex flex-1 min-h-0 overflow-hidden">
                 <Sidebar
                     selectedEntityId={selectedEntityId}
                 />
+
+                {location.pathname === '/configuration' && <ConfigSidebar />}
 
                 <main ref={mainRef} className="flex-1 overflow-y-auto bg-muted/10 p-4 pb-14 md:p-6 lg:p-8 no-scrollbar">
                     <div className="mx-auto max-w-screen-2xl space-y-6">

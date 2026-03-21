@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -54,7 +54,7 @@ export function SubcategoryDeleteDialog({
             onOpenChange(false);
         } catch (error) {
             console.error('Error deleting subcategory:', error);
-            alert('Error al eliminar subcategorÃ­a');
+            alert('Error al eliminar subcategoría');
         } finally {
             setLoading(false);
         }
@@ -70,10 +70,10 @@ export function SubcategoryDeleteDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-5 w-5 text-orange-500" />
-                        Eliminar SubcategorÃ­a
+                        Eliminar Subcategoría
                     </DialogTitle>
                     <DialogDescription>
-                        EstÃ¡s a punto de eliminar la subcategorÃ­a "{subName}" de "{category.name}"
+                        Estás a punto de eliminar la subcategoría "{subName}" de "{category.name}"
                     </DialogDescription>
                 </DialogHeader>
 
@@ -82,20 +82,20 @@ export function SubcategoryDeleteDialog({
                         <>
                             <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-4">
                                 <p className="text-sm text-orange-800 dark:text-orange-200">
-                                    Esta subcategorÃ­a tiene <strong>{movementCount} movimiento{movementCount !== 1 ? 's' : ''}</strong> asociado{movementCount !== 1 ? 's' : ''}.
+                                    Esta subcategoría tiene <strong>{movementCount} movimiento{movementCount !== 1 ? 's' : ''}</strong> asociado{movementCount !== 1 ? 's' : ''}.
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>AcciÃ³n para los movimientos existentes:</Label>
+                                <Label>Acción para los movimientos existentes:</Label>
                                 <Select value={targetSubcategory} onValueChange={setTargetSubcategory}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Selecciona una acciÃ³n" />
+                                        <SelectValue placeholder="Selecciona una acción" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="__remove__">
                                             <span className="text-red-600 dark:text-red-400">
-                                                Solo quitar etiqueta (quedarÃ¡n sin subcategorÃ­a)
+                                                Solo quitar etiqueta (quedarán sin subcategoría)
                                             </span>
                                         </SelectItem>
                                         {otherSubcategories.length > 0 && (
@@ -117,7 +117,7 @@ export function SubcategoryDeleteDialog({
                     ) : (
                         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
                             <p className="text-sm text-blue-800 dark:text-blue-200">
-                                Esta subcategorÃ­a no tiene movimientos. Se eliminarÃ¡ inmediatamente.
+                                Esta subcategoría no tiene movimientos. Se eliminará inmediatamente.
                             </p>
                         </div>
                     )}

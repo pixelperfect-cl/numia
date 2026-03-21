@@ -26,6 +26,7 @@ interface ServiceKanbanBoardProps {
     onViewPaymentDetails: (sub: EnhancedSubscription) => void;
     onShowHistory: (sub: EnhancedSubscription) => void;
     onViewClient: (sub: EnhancedSubscription) => void;
+    onOpenDetail?: (sub: EnhancedSubscription) => void;
     mode: 'monthly' | 'annual';
 }
 
@@ -64,6 +65,7 @@ export function ServiceKanbanBoard({
     onViewPaymentDetails,
     onShowHistory,
     onViewClient,
+    onOpenDetail,
     mode
 }: ServiceKanbanBoardProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -236,9 +238,10 @@ export function ServiceKanbanBoard({
             <div
                 key={sub.id}
                 className={cn(
-                    "group relative flex flex-col gap-1 rounded-lg bg-white dark:bg-zinc-800 p-3 shadow-sm border border-zinc-200 dark:border-white/5 transition-all hover:shadow-md",
+                    "group relative flex flex-col gap-1 rounded-lg bg-white dark:bg-zinc-800 p-3 shadow-sm border border-zinc-200 dark:border-white/5 transition-all hover:shadow-md cursor-pointer",
                     mode === 'monthly' ? "h-full" : "h-auto"
                 )}
+                onClick={() => onOpenDetail?.(sub)}
             >
                 <div className="absolute top-2 right-2 z-10 flex gap-1">
                     <Button

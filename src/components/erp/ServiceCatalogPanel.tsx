@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -66,7 +66,7 @@ export function ServiceCatalogPanel() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Â¿EstÃ¡s seguro de eliminar este servicio del catÃ¡logo? No afectarÃ¡ a las suscripciones ya asignadas.')) return;
+        if (!confirm('¿Estás seguro de eliminar este servicio del catálogo? No afectará a las suscripciones ya asignadas.')) return;
         try {
             await deleteServiceDefinition(id);
             loadData();
@@ -84,9 +84,9 @@ export function ServiceCatalogPanel() {
             <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg border">
                 <div>
                     <h3 className="text-lg font-medium flex items-center gap-2">
-                        <Package className="h-5 w-5" /> CatÃ¡logo de Servicios
+                        <Package className="h-5 w-5" /> Catálogo de Servicios
                     </h3>
-                    <p className="text-sm text-muted-foreground">Define tus servicios estÃ¡ndar para asignarlos rÃ¡pidamente.</p>
+                    <p className="text-sm text-muted-foreground">Define tus servicios estándar para asignarlos rápidamente.</p>
                 </div>
                 <Button onClick={handleCreate} size="sm">
                     <Plus className="mr-2 h-4 w-4" /> Nuevo Servicio
@@ -105,7 +105,7 @@ export function ServiceCatalogPanel() {
                         <div className="relative w-64">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Buscar en catÃ¡logo..."
+                                placeholder="Buscar en catálogo..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-8 h-9"
@@ -129,12 +129,12 @@ export function ServiceCatalogPanel() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8">Cargando catÃ¡logo...</TableCell>
+                                        <TableCell colSpan={6} className="text-center py-8">Cargando catálogo...</TableCell>
                                     </TableRow>
                                 ) : filteredDefinitions.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                            No hay servicios definidos aÃºn.
+                                            No hay servicios definidos aún.
                                         </TableCell>
                                     </TableRow>
                                 ) : (

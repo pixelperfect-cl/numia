@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -80,7 +80,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
             // Note: In a future refactor, this logic should probably move to the backend or DataContext
             const defaultCategories = [
                 { name: 'Sueldo', type: 'income', icon: 'Wallet', color: '#22c55e' },
-                { name: 'AlimentaciÃ³n', type: 'expense', icon: 'ShoppingCart', color: '#ef4444' },
+                { name: 'Alimentación', type: 'expense', icon: 'ShoppingCart', color: '#ef4444' },
                 { name: 'Transporte', type: 'expense', icon: 'Car', color: '#f97316' },
                 { name: 'Vivienda', type: 'expense', icon: 'Home', color: '#3b82f6' },
                 { name: 'Servicios', type: 'expense', icon: 'Zap', color: '#eab308' },
@@ -140,7 +140,7 @@ export function EntityForm({ onSuccess }: EntityFormProps) {
                         onChange={handleLogoUpload}
                     />
                     <p className="text-xs text-muted-foreground">
-                        200x100 pÃ­xeles (JPG, PNG o WebP)
+                        200x100 píxeles (JPG, PNG o WebP)
                     </p>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-﻿
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -147,7 +147,7 @@ export function ProjectFinanceCard({ project }: ProjectFinanceCardProps) {
     };
 
     const handleDelete = async (movementId: string) => {
-        if (!confirm('Â¿EstÃ¡s seguro de eliminar este pago? Esta acciÃ³n no se puede deshacer.')) return;
+        if (!confirm('¿Estás seguro de eliminar este pago? Esta acción no se puede deshacer.')) return;
 
         try {
             await deleteMovement(movementId);
@@ -295,7 +295,7 @@ export function ProjectFinanceCard({ project }: ProjectFinanceCardProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>DescripciÃ³n (Opcional)</Label>
+                                    <Label>Descripción (Opcional)</Label>
                                     <Textarea
                                         value={description}
                                         onChange={e => setDescription(e.target.value)}
