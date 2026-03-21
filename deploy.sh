@@ -1,12 +1,11 @@
 # deploy.sh — Despliegue rápido de Numia desde el servidor vía SSH
-# Uso: ssh root@149.28.200.205 'bash /applications/zcmwujkamy/numia/deploy.sh'
-# O directamente en el servidor: bash /applications/zcmwujkamy/numia/deploy.sh
+# Uso: bash ~/repos/numia/deploy.sh
 
 set -e
 
 # ─── Configuración ───
-APP_DIR="/applications/zcmwujkamy/numia"
-PUBLIC_DIR="/applications/zcmwujkamy/public_html"
+APP_DIR="$HOME/repos/numia"
+PUBLIC_DIR="/home/1279051.cloudwaysapps.com/zcmwujkamy/public_html"
 
 echo "🚀 Iniciando deploy de Numia..."
 
