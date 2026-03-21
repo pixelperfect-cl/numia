@@ -8,12 +8,24 @@ export interface ChangeLogEntry {
 }
 
 export const appStats = {
-    loc: 42000, // Líneas de código estimadas al 21/03/2026
-    devHours: 650, // Estimación de horas de desarrollo
+    loc: 42250, // Líneas de código estimadas al 21/03/2026
+    devHours: 655, // Estimación de horas de desarrollo
     lastUpdated: '2026-03-21'
 };
 
 export const changelog: ChangeLogEntry[] = [
+    {
+        version: '1.0.4',
+        date: '2026-03-21',
+        changes: [
+            // ─── UI/UX y Dashboard ───
+            { type: 'changed', description: 'Aplicación de estilos y animaciones del dashboard a las tarjetas de la vista de Movimientos' },
+            { type: 'added', description: 'Gráficos tipo Sparkline añadidos a la tarjeta de "Servicios Activos"' },
+            
+            // ─── Módulo de Movimientos ───
+            { type: 'fixed', description: 'Sincronización de todos los gráficos ("Ingresos vs Gastos", "Actividad de Movimientos", etc.) con el selector de rango de fechas global' }
+        ]
+    },
     {
         version: '1.0.3',
         date: '2026-03-21',
