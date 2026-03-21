@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, addPeriodToDateString } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getClients, getSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/supabase/database';
+import { getClients, getAllSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/supabase/database';
 import { checkAndGenerateSubscriptionMovements } from '@/lib/erp/billing';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -113,6 +113,10 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [subscriptions, setSubscriptions] = useState<EnhancedSubscription[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Cache to avoid refetching on re-mount
+    const cacheRef = useRef<{ subscriptions: EnhancedSubscription[]; clients: Client[]; timestamp: number } | null>(null);
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     const [searchParams, setSearchParams] = useSearchParams();
     const searchTerm = searchParams.get('search') || '';
     const [generating, setGenerating] = useState(false);
@@ -153,35 +157,47 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const [detailPanelOpen, setDetailPanelOpen] = useState(false);
     const [selectedServiceForDetail, setSelectedServiceForDetail] = useState<EnhancedSubscription | null>(null);
 
-    const loadData = async () => {
+    const loadData = useCallback(async (forceRefresh = false) => {
         if (!user) return;
-        setLoading(true);
+
+        // If we have valid cache, show it immediately (no loading spinner)
+        const now = Date.now();
+        if (!forceRefresh && cacheRef.current && (now - cacheRef.current.timestamp) < CACHE_TTL) {
+            setClients(cacheRef.current.clients);
+            setSubscriptions(cacheRef.current.subscriptions);
+            setLoading(false);
+            return;
+        }
+
+        // Only show loading spinner if we have no cached data
+        if (!cacheRef.current) {
+            setLoading(true);
+        }
+
         try {
-            // 1. Fetch Clients
-            const clientsData = await getClients(user.uid);
+            // Fetch clients and ALL subscriptions in parallel (2 queries instead of N+1)
+            const [clientsData, allSubs] = await Promise.all([
+                getClients(user.uid),
+                getAllSubscriptions(user.uid),
+            ]);
 
             // Filter clients by entity if provided
             const filteredClients = entityId
                 ? clientsData.filter(c => c.entityId === entityId)
                 : clientsData;
 
+            // Build client lookup map for O(1) access
+            const clientMap = new Map(filteredClients.map(c => [c.id, c]));
+
+            // Match subscriptions to their clients in memory
+            const flatSubs = allSubs
+                .filter(sub => clientMap.has(sub.clientId))
+                .map(sub => processSubscription(sub, clientMap.get(sub.clientId)!, user.uid));
+
+            // Update cache
+            cacheRef.current = { subscriptions: flatSubs, clients: filteredClients, timestamp: Date.now() };
+
             setClients(filteredClients);
-
-            // 2. Fetch recent movements for payment calculation (last 1 year to be safe)
-            const globalStartDate = format(subYears(new Date(), 1), 'yyyy-MM-dd');
-            const recentMovements = await getMovements(user.uid, {
-                entityId: entityId || undefined,
-                startDate: globalStartDate
-            });
-
-            // 3. Fetch Subscriptions for each filtered client
-            const subsPromises = filteredClients.map(async (client) => {
-                const clientSubs = await getSubscriptions(client.id, user.uid);
-                return clientSubs.map(sub => processSubscription(sub, client, user.uid));
-            });
-
-            const results = await Promise.all(subsPromises);
-            const flatSubs = results.flat();
             setSubscriptions(flatSubs);
 
         } catch (error) {
@@ -189,7 +205,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         } finally {
             setLoading(false);
         }
-    };
+    }, [user, entityId]);
 
     useEffect(() => {
         loadData();
@@ -281,7 +297,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 }
             }
 
-            await loadData();
+            await loadData(true);
         } catch (error) {
             console.error("Error reverting payment:", error);
             alert("Error al deshacer el pago.");
@@ -322,7 +338,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         if (!confirm('¿Estás seguro de eliminar permanentemente este servicio? Esta acción no se puede deshacer.')) return;
         try {
             await deleteSubscription(subscriptionId);
-            loadData();
+            loadData(true);
         } catch (error) {
             console.error("Error deleting subscription:", error);
         }
@@ -345,7 +361,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 archiveNotes: notes || null,
                 archivedAt: format(new Date(), 'yyyy-MM-dd')
             });
-            loadData();
+            loadData(true);
         } catch (error) {
             console.error("Error archiving subscription:", error);
             throw error;
@@ -355,7 +371,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const handleRestore = async (subscriptionId: string) => {
         try {
             await updateSubscription(subscriptionId, { status: 'active' });
-            loadData();
+            loadData(true);
         } catch (error) {
             console.error("Error restoring subscription:", error);
         }
@@ -407,7 +423,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     };
 
     const handleClientSave = () => {
-        loadData(); // Refresh clients and services (names might change)
+        loadData(true); // Refresh clients and services (names might change)
         setClientDialogOpen(false);
         // If we were viewing details, reopen details? No, usually generic save closes everything.
         // User workflow: View -> Edit -> Save -> Done.
@@ -484,7 +500,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 clientId: selectedSubscriptionForPayment.clientId
             });
 
-            loadData();
+            loadData(true);
         } catch (error) {
             console.error("Error processing payment:", error);
             alert("Error al procesar el pago");
@@ -544,7 +560,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             setSelectedSubscriptionForDetail(updatedSubProcessed);
 
             // Background refresh to ensure sync
-            loadData();
+            loadData(true);
 
         } catch (error) {
             console.error("Error deleting payment:", error);
@@ -569,7 +585,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
             });
 
             // Refresh
-            await loadData();
+            await loadData(true);
 
             // Update local state for immediate feedback
             setSelectedSubscriptionForDetail(prev => {
@@ -1254,9 +1270,9 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 }}
                 subscription={editingSubscription}
                 clients={clients}
-                onSuccess={loadData}
+                onSuccess={() => loadData(true)}
                 preselectedDefinition={preselectedDefinition}
-                onRefreshClients={loadData}
+                onRefreshClients={() => loadData(true)}
                 entityId={entityId || entities[0]?.id}
                 defaultClientId={selectedClientForService?.id}
                 defaultFrequency={creationContext?.frequency}
@@ -1322,7 +1338,7 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 onPartialPayment={onPartialPayment}
                 onRevertPayment={handleRevertPayment}
                 onDeletePayment={handleDeletePayment}
-                onRefresh={loadData}
+                onRefresh={() => loadData(true)}
                 onUpdateSubscription={(updated) => {
                     setSelectedServiceForDetail(updated);
                     setSubscriptions(prev =>

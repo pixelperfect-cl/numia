@@ -24,8 +24,8 @@ export function useConnectionStatus() {
 
             if (isOnline) {
                 try {
-                    // Lightweight ping to Supabase
-                    const { error } = await supabase.from('entities').select('count', { count: 'exact', head: true });
+                    // Lightweight ping to Supabase using auth check (no table permissions needed)
+                    const { error } = await supabase.auth.getSession();
                     if (!error) {
                         supabaseOk = true;
                     }

@@ -70,6 +70,7 @@ export function ServiceKanbanBoard({
 }: ServiceKanbanBoardProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [hasDragged, setHasDragged] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
     const { isBalanceHidden } = usePrivacy();
@@ -455,6 +456,7 @@ export function ServiceKanbanBoard({
     const onMouseDown = (e: React.MouseEvent) => {
         if (!scrollContainerRef.current) return;
         setIsDragging(true);
+        setHasDragged(false);
         setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
         setScrollLeft(scrollContainerRef.current.scrollLeft);
     };
@@ -469,10 +471,22 @@ export function ServiceKanbanBoard({
 
     const onMouseMove = (e: React.MouseEvent) => {
         if (!isDragging || !scrollContainerRef.current) return;
-        e.preventDefault();
         const x = e.pageX - scrollContainerRef.current.offsetLeft;
         const walk = (x - startX) * 2;
-        scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+        // Only treat as a drag if mouse moved more than 5px
+        if (Math.abs(x - startX) > 5) {
+            setHasDragged(true);
+            e.preventDefault();
+            scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+        }
+    };
+
+    const onContainerClick = (e: React.MouseEvent) => {
+        // If the user was dragging, prevent card clicks
+        if (hasDragged) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
     };
 
     const monthlyColumn = columns[0] || [];
@@ -515,6 +529,7 @@ export function ServiceKanbanBoard({
                         onMouseLeave={onMouseLeave}
                         onMouseUp={onMouseUp}
                         onMouseMove={onMouseMove}
+                        onClickCapture={onContainerClick}
                     >
                         <div className="flex flex-row gap-4 pb-4 h-full min-w-max px-1 items-start">
                             {timelineMonths.map((monthName, i) => {

@@ -15,6 +15,21 @@ export const appStats = {
 
 export const changelog: ChangeLogEntry[] = [
     {
+        version: '1.0.3',
+        date: '2026-03-21',
+        changes: [
+            // ─── Rendimiento ───
+            { type: 'changed', description: 'Optimización de carga de servicios: consulta única (getAllSubscriptions) reemplaza patrón N+1 por cliente' },
+            { type: 'added', description: 'Cache en memoria (5 min TTL) para servicios: navegación instantánea sin spinner al volver a la sección' },
+            { type: 'changed', description: 'Eliminación de fetch innecesario de movimientos (getMovements) en la carga inicial de servicios' },
+
+            // ─── Fixes ───
+            { type: 'fixed', description: 'ServiceDetailPanel: unificación de dos componentes Tabs de Radix separados en un único root para correcto renderizado de contenido' },
+            { type: 'fixed', description: 'ServiceKanbanBoard: drag-to-scroll en vista anual ya no consume eventos click en tarjetas de servicio (umbral de 5px)' },
+            { type: 'fixed', description: 'useConnectionStatus: reemplazo de health-check con HEAD a entities (que fallaba) por supabase.auth.getSession()' },
+        ]
+    },
+    {
         version: '1.0.2',
         date: '2026-03-21',
         changes: [

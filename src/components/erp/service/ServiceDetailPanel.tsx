@@ -82,40 +82,40 @@ export function ServiceDetailPanel({
                 side="right"
                 className="w-full sm:max-w-[540px] p-0 flex flex-col"
             >
-                {/* Header */}
-                <div className="shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                    <SheetHeader className="p-5 pb-3">
-                        <div className="flex items-center gap-3 pr-8">
-                            <div className={cn("h-1.5 w-6 rounded-full", getLabelColor(subscription.name))} />
-                            <div className="flex-1 min-w-0">
-                                <SheetTitle className="text-lg truncate">
-                                    {subscription.clientName}
-                                </SheetTitle>
-                                <SheetDescription className="flex items-center gap-2 mt-0.5">
-                                    <span className="truncate">{subscription.name}</span>
-                                    {subscription.clientWebsite && (
-                                        <>
-                                            <span className="text-muted-foreground/30">•</span>
-                                            <a
-                                                href={subscription.clientWebsite.startsWith('http') ? subscription.clientWebsite : `https://${subscription.clientWebsite}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1 hover:text-foreground transition-colors"
-                                            >
-                                                <Globe className="h-3 w-3" />
-                                                <span className="truncate max-w-[120px]">
-                                                    {subscription.clientWebsite.replace(/^https?:\/\//, '').replace(/^www\./, '')}
-                                                </span>
-                                            </a>
-                                        </>
-                                    )}
-                                </SheetDescription>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+                    {/* Header */}
+                    <div className="shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                        <SheetHeader className="p-5 pb-3">
+                            <div className="flex items-center gap-3 pr-8">
+                                <div className={cn("h-1.5 w-6 rounded-full", getLabelColor(subscription.name))} />
+                                <div className="flex-1 min-w-0">
+                                    <SheetTitle className="text-lg truncate">
+                                        {subscription.clientName}
+                                    </SheetTitle>
+                                    <SheetDescription className="flex items-center gap-2 mt-0.5">
+                                        <span className="truncate">{subscription.name}</span>
+                                        {subscription.clientWebsite && (
+                                            <>
+                                                <span className="text-muted-foreground/30">•</span>
+                                                <a
+                                                    href={subscription.clientWebsite.startsWith('http') ? subscription.clientWebsite : `https://${subscription.clientWebsite}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-1 hover:text-foreground transition-colors"
+                                                >
+                                                    <Globe className="h-3 w-3" />
+                                                    <span className="truncate max-w-[120px]">
+                                                        {subscription.clientWebsite.replace(/^https?:\/\//, '').replace(/^www\./, '')}
+                                                    </span>
+                                                </a>
+                                            </>
+                                        )}
+                                    </SheetDescription>
+                                </div>
                             </div>
-                        </div>
-                    </SheetHeader>
+                        </SheetHeader>
 
-                    {/* Tabs */}
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        {/* Tab Triggers */}
                         <div className="px-5">
                             <TabsList className="w-full h-9 bg-muted/50 p-0.5">
                                 {tabs.map(tab => {
@@ -133,12 +133,10 @@ export function ServiceDetailPanel({
                                 })}
                             </TabsList>
                         </div>
-                    </Tabs>
-                </div>
+                    </div>
 
-                {/* Tab Content */}
-                <div className="flex-1 overflow-y-auto p-5">
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    {/* Tab Content */}
+                    <div className="flex-1 overflow-y-auto p-5">
                         <TabsContent value="general" className="mt-0 focus-visible:ring-0 focus-visible:ring-offset-0">
                             <ServiceGeneralTab
                                 subscription={subscription}
@@ -200,8 +198,8 @@ export function ServiceDetailPanel({
                         <TabsContent value="documents" className="mt-0 focus-visible:ring-0 focus-visible:ring-offset-0">
                             <ServiceDocumentsTab />
                         </TabsContent>
-                    </Tabs>
-                </div>
+                    </div>
+                </Tabs>
             </SheetContent>
         </Sheet>
     );
