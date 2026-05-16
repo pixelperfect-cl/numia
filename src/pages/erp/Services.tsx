@@ -1339,36 +1339,38 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                 }}
             />
 
-            {/* Floating Bottom Menu */}
-            <div className="fixed bottom-12 w-full z-50 flex justify-center pointer-events-none md:bottom-6 md:w-auto md:pointer-events-auto md:left-1/2 md:-translate-x-1/2 md:justify-start">
-                <div className="bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md shadow-lg border border-white/10 p-1.5 rounded-full flex items-center gap-1 pointer-events-auto mr-20 md:mr-0">
-                    <button
-                        onClick={() => handleTabChange('monthly')}
-                        className={cn(
-                            "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
-                            activeTab === 'monthly'
-                                ? "bg-zinc-100 text-zinc-900 shadow-sm"
-                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-                        )}
-                    >
-                        <LayoutGrid className="h-4 w-4" />
-                        <span>Mensuales</span>
-                    </button>
-                    <div className="w-px h-6 bg-white/10 mx-1" />
-                    <button
-                        onClick={() => handleTabChange('annual')}
-                        className={cn(
-                            "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
-                            activeTab === 'annual'
-                                ? "bg-zinc-100 text-zinc-900 shadow-sm"
-                                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-                        )}
-                    >
-                        <CalendarRange className="h-4 w-4" />
-                        <span>Anuales</span>
-                    </button>
+            {/* Floating Bottom Menu — solo en vistas de servicios activos (mensual/anual) */}
+            {(activeTab === 'monthly' || activeTab === 'annual') && (
+                <div className="fixed bottom-12 w-full z-50 flex justify-center pointer-events-none md:bottom-6 md:w-auto md:pointer-events-auto md:left-1/2 md:-translate-x-1/2 md:justify-start">
+                    <div className="bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md shadow-lg border border-white/10 p-1.5 rounded-full flex items-center gap-1 pointer-events-auto mr-20 md:mr-0">
+                        <button
+                            onClick={() => handleTabChange('monthly')}
+                            className={cn(
+                                "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                                activeTab === 'monthly'
+                                    ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                            )}
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                            <span>Mensuales</span>
+                        </button>
+                        <div className="w-px h-6 bg-white/10 mx-1" />
+                        <button
+                            onClick={() => handleTabChange('annual')}
+                            className={cn(
+                                "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                                activeTab === 'annual'
+                                    ? "bg-zinc-100 text-zinc-900 shadow-sm"
+                                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                            )}
+                        >
+                            <CalendarRange className="h-4 w-4" />
+                            <span>Anuales</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div >
     );
 }
