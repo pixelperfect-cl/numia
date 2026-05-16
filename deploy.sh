@@ -31,8 +31,13 @@ echo "📄 Creando 404.html fallback para SPA..."
 cp dist/index.html dist/404.html
 
 # ─── 5. Sincronizar con public_html ───
+# Cloudways no permite modificar ownership/group/timestamps de directorios
+# pre-existentes (Operation not permitted en utime). Por eso usamos -rltDv
+# en lugar de -a y desactivamos perms/owner/group + omit-dir-times.
 echo "📂 Sincronizando dist → public_html..."
-rsync -av --delete --exclude='.htaccess' dist/ "$PUBLIC_DIR/"
+rsync -rltDv --delete --exclude='.htaccess' \
+    --no-perms --no-owner --no-group --omit-dir-times \
+    dist/ "$PUBLIC_DIR/"
 
 # ─── 6. Copiar .htaccess si existe ───
 if [ -f ".htaccess" ]; then
