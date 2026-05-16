@@ -49,17 +49,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
     loadNotifications();
 
-    // Optional: Add Realtime subscription here if needed
-    if (!user) return;
-
-    // Initial fetch
-    getNotifications(user.uid).then(setNotifications).catch(console.error);
-
-    // Subscribe to changes
     const channel = supabase
-      .channel('public:notifications')
+      .channel(`notifications:${user.uid}`)
       .on(
         'postgres_changes',
         {
@@ -68,8 +67,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           table: 'notifications',
           filter: `user_id=eq.${user.uid}`
         },
-        (payload) => {
-          // Simple refresh on any change for now
+        () => {
           loadNotifications();
         }
       )

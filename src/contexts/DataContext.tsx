@@ -2,7 +2,7 @@
  * Numia v1.0 - Data Context
  */
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import type { Entity, Movement, Loan, Projection, Category, DateFilter, EntitySubscription } from '@/types';
 import * as db from '@/lib/supabase/database';
@@ -537,47 +537,46 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refreshData();
   };
 
-  return (
-    <DataContext.Provider
-      value={{
-        entities,
-        movements,
-        loans,
-        projections,
-        categories,
-        entitySubscriptions,
-        dateFilter,
-        loading,
-        error,
-        setDateFilter,
-        refreshData,
-        createEntity,
-        updateEntity,
-        deleteEntity,
-        createMovement,
-        updateMovement,
-        deleteMovement,
-        createBatchMovements,
-        getExistingBankTransactionIds,
-        createTransfer,
-        createLoan,
-        updateLoan,
-        deleteLoan,
-        createCategory,
-        updateCategory,
-        updateCategoryOrder,
-        deleteCategory,
-        createProjection,
-        updateProjection,
-        deleteProjection,
-        createEntitySubscription,
-        updateEntitySubscription,
-        deleteEntitySubscription,
-      }}
-    >
-      {children}
-    </DataContext.Provider>
+  const value = useMemo(
+    () => ({
+      entities,
+      movements,
+      loans,
+      projections,
+      categories,
+      entitySubscriptions,
+      dateFilter,
+      loading,
+      error,
+      setDateFilter,
+      refreshData,
+      createEntity,
+      updateEntity,
+      deleteEntity,
+      createMovement,
+      updateMovement,
+      deleteMovement,
+      createBatchMovements,
+      getExistingBankTransactionIds,
+      createTransfer,
+      createLoan,
+      updateLoan,
+      deleteLoan,
+      createCategory,
+      updateCategory,
+      updateCategoryOrder,
+      deleteCategory,
+      createProjection,
+      updateProjection,
+      deleteProjection,
+      createEntitySubscription,
+      updateEntitySubscription,
+      deleteEntitySubscription,
+    }),
+    [entities, movements, loans, projections, categories, entitySubscriptions, dateFilter, loading, error]
   );
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 
 export function useData() {

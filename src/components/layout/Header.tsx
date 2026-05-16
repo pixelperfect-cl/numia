@@ -182,6 +182,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                             src={user.photoURL}
                             alt={user.displayName || 'User'}
                             className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
                         />
                     ) : (
                         <User className="h-5 w-5" />
@@ -427,7 +428,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                             </div>
                             <div className="w-full flex items-center gap-3">
                                 {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="User" className="h-9 w-9 rounded-full" />
+                                    <img src={user.photoURL} alt="User" className="h-9 w-9 rounded-full" referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className="h-9 w-9 bg-muted rounded-full flex items-center justify-center">
                                         <User className="h-5 w-5" />
@@ -445,7 +446,7 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
 
                 {/* Logo (Visible on Mobile & Desktop) */}
                 <div
-                    className="flex items-center gap-1 md:gap-2 font-semibold md:text-lg cursor-pointer flex-1 md:flex-none min-w-0"
+                    className="flex items-center gap-1 md:gap-2 font-semibold md:text-lg cursor-pointer shrink-0"
                     onClick={() => navigate(selectedEntityId ? '/dashboard' : '/entity-selection')}
                 >
                     <img src="/logo.png" alt="[E]ntity" className="h-6 md:h-8 flex-shrink-0 object-contain" />
@@ -471,7 +472,12 @@ export function Header({ selectedEntityId, onEntityChange, onQuickAction, mobile
                 </div>
 
                 {/* Dynamic Contextual Header (Center) */}
-                <div className="flex-1 flex justify-center min-w-0 px-4">
+                <div className="hidden md:flex flex-1 justify-center min-w-0 px-4">
+                    <ContextualHeader selectedEntityId={selectedEntityId} />
+                </div>
+
+                {/* Mobile Date Selector - shown inline to avoid overlap */}
+                <div className="flex md:hidden flex-1 justify-end min-w-0">
                     <ContextualHeader selectedEntityId={selectedEntityId} />
                 </div>
 

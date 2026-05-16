@@ -149,7 +149,9 @@ export function ServiceKanbanBoard({
         let totalAmount = sub.amount;
         if (sub.currency === 'UF' && ufValue) totalAmount = Math.round(sub.amount * ufValue);
 
-        const isFullyPaidByAmount = totalAmount > 0 && paidAmount >= (totalAmount - 10);
+        // Dynamic tolerance: 1% for UF services (absorbs UF value fluctuations), $10 for CLP
+        const paymentTolerance = sub.currency === 'UF' ? Math.max(10, Math.round(totalAmount * 0.01)) : 10;
+        const isFullyPaidByAmount = totalAmount > 0 && paidAmount >= (totalAmount - paymentTolerance);
         let isWithinNoticePeriod = false;
         if (sub.frequency === 'yearly') {
             isWithinNoticePeriod = differenceInCalendarMonths(date, today) <= 1;
@@ -157,7 +159,9 @@ export function ServiceKanbanBoard({
             isWithinNoticePeriod = daysUntilDue <= 7;
         }
 
-        const isPaidStatus = !isWithinNoticePeriod;
+        // If overdue, NEVER show as paid — if it were truly paid the nextBillingDate
+        // would have advanced to a future date. Overdue = unpaid by definition.
+        const isPaidStatus = isOverdue ? false : (isFullyPaidByAmount || !isWithinNoticePeriod);
 
         // Calculate overdue months and total debt
         let overdueMonths = 0;
@@ -232,8 +236,10 @@ export function ServiceKanbanBoard({
             targetCLP = Math.round(sub.amount * ufValue);
         }
 
-        const progress = targetCLP > 0 ? Math.min(100, (paidCLP / targetCLP) * 100) : 0;
-        const isFullyPaid = targetCLP > 0 && paidCLP >= (targetCLP - 10);
+        // Dynamic tolerance: 1% for UF services (absorbs UF value fluctuations), $10 for CLP
+        const cardTolerance = sub.currency === 'UF' ? Math.max(10, Math.round(targetCLP * 0.01)) : 10;
+        const isFullyPaid = targetCLP > 0 && paidCLP >= (targetCLP - cardTolerance);
+        const progress = isFullyPaid ? 100 : (targetCLP > 0 ? Math.min(100, (paidCLP / targetCLP) * 100) : 0);
 
         return (
             <div
@@ -340,7 +346,7 @@ export function ServiceKanbanBoard({
                         </div>
                     </div>
 
-                    {progress > 0 && progress < 100 && (
+                    {progress > 0 && !isFullyPaid && (
                         <div className="mb-2 space-y-1">
                             <div className="flex justify-between text-[10px]">
                                 <span className="text-zinc-500">Abonado</span>
@@ -356,7 +362,7 @@ export function ServiceKanbanBoard({
                             </div>
                             <div className="flex justify-between text-[9px] text-muted-foreground pt-0.5">
                                 <span>{Math.round(progress)}%</span>
-                                <span>{isBalanceHidden ? '****' : formatCurrency(targetCLP - paidCLP)} pendientes</span>
+                                <span>{isBalanceHidden ? '****' : formatCurrency(Math.max(0, targetCLP - paidCLP))} pendientes</span>
                             </div>
                         </div>
                     )}

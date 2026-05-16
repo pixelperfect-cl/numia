@@ -15,12 +15,13 @@ export function TimeTrackingWidget({ project, onUpdate }: TimeTrackingWidgetProp
         if (!date) return;
         const isoDate = date.toISOString();
 
-        // Optimistic update if needed or just wait for parent
         try {
             await updateProject(project.id, { dueDate: isoDate });
             if (onUpdate) {
                 onUpdate({ ...project, dueDate: isoDate });
             }
+            // Notify header and other listeners that project data changed
+            window.dispatchEvent(new CustomEvent('project-updated', { detail: { projectId: project.id } }));
         } catch (error) {
             console.error("Failed to update due date", error);
         }
@@ -63,7 +64,7 @@ export function TimeTrackingWidget({ project, onUpdate }: TimeTrackingWidgetProp
         );
     }
 
-    const startDate = project.createdAt ? parseISO(project.createdAt.toString()) : new Date();
+    const startDate = project.startDate ? parseISO(project.startDate) : (project.createdAt ? parseISO(project.createdAt.toString()) : new Date());
     const dueDate = parseISO(project.dueDate);
     const today = new Date();
 

@@ -1,36 +1,31 @@
 # [E]ntity v1.0
 
-Aplicación de gestión financiera personal y empresarial construida con React, TypeScript, Shadcn UI y Supabase.
+Aplicación de gestión financiera personal y empresarial + ERP de clientes/servicios, construida con React 19, TypeScript, Shadcn UI y Supabase.
 
 ## 🚀 Tecnologías
 
-- **React 18** - UI Framework
-- **TypeScript** - Type Safety
-- **Vite** - Build Tool
-- **Shadcn UI** - Component System
-- **Tailwind CSS** - Styling
-- **Firebase** - Backend + Auth + Database
+- **React 19** + **TypeScript**
+- **Vite** (build)
+- **Shadcn UI** + **Tailwind CSS v4**
+- **Supabase** (auth, base de datos Postgres, storage, realtime, edge functions)
+- **Anthropic Claude** vía Supabase Edge Function (asistente IA)
+- **ElasticEmail** vía Supabase Edge Function (envío de cobros)
 
 ## 📦 Características
 
 > [!IMPORTANT]
-> **Para Desarrolladores y Agentes AI**: Antes de realizar cambios en la base de datos, por favor lee [DATABASE_GUIDELINES.md](DATABASE_GUIDELINES.md).
+> **Para Desarrolladores y Agentes AI**: antes de cambiar la base de datos lee [DATABASE_GUIDELINES.md](DATABASE_GUIDELINES.md).
 
-- ✅ Autenticación con Google
-- ✅ Gestión de entidades (personal/empresarial)
-- ✅ Sistema de cajas (cuentas bancarias, efectivo, etc.)
-- ✅ Movimientos (ingresos y gastos)
-- ✅ Préstamos (debo/me deben)
-- ✅ Proyección financiera
-- ✅ Modo oscuro/claro
-- ✅ Responsive design
+- Auth con Google + email/password (Supabase)
+- Multi-entidad (personal/empresarial) con cajas, movimientos, préstamos, proyecciones, suscripciones-gasto
+- ERP: clientes, servicios recurrentes (CLP / UF, mensual / anual), proyectos con kanban
+- Asistente IA con tool calling (Anthropic)
+- Notificaciones por email automatizadas (ElasticEmail)
+- Modo oscuro/claro, responsive
 
-## 🔄 Versionado y Changelog
+## 🔄 Versionado
 
-Manajamos un estricto control de versiones siguiendo **Semantic Versioning**.
-Para más detalles sobre el flujo de trabajo de versiones y cómo registrar cambios:
-
-👉 **[Ver Guía de Versionado](./VERSIONING_GUIDE.md)**
+Semantic Versioning. Ver [VERSIONING_GUIDE.md](./VERSIONING_GUIDE.md).
 
 ## 🛠️ Setup
 
@@ -40,82 +35,55 @@ Para más detalles sobre el flujo de trabajo de versiones y cómo registrar camb
 npm install
 ```
 
-### 2. Configurar Firebase
+### 2. Configurar Supabase
 
-1. Crear un nuevo proyecto en [Firebase Console](https://console.firebase.google.com/)
-2. Habilitar Authentication → Google Sign-in
-3. Crear base de datos Firestore
-4. Copiar las credenciales de configuración
+1. Crear proyecto en [Supabase](https://app.supabase.com).
+2. Habilitar provider Google en Authentication.
+3. Aplicar las migraciones en `supabase/migrations/` (Dashboard → SQL Editor).
+4. Configurar RLS según `supabase/migrations/*_rls.sql`.
 
-### 3. Variables de entorno
-
-Crear archivo `.env` basado en `.env.example`:
+### 3. Variables de entorno (frontend)
 
 ```bash
 cp .env.example .env
 ```
 
-Completar con tus credenciales de Firebase:
+Completar:
 
 ```env
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain_here
-VITE_FIREBASE_PROJECT_ID=your_project_id_here
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket_here
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id_here
-VITE_FIREBASE_APP_ID=your_app_id_here
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-### 4. Configurar Firestore Security Rules
+### 4. Secrets de servidor (edge functions)
 
-En Firebase Console → Firestore → Rules, copiar el contenido de `firestore.rules`
+Los siguientes secretos NO se exponen al cliente; configurarlos vía Supabase CLI:
 
-### 5. Ejecutar en desarrollo
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase secrets set ELASTICEMAIL_API_KEY=...
+```
+
+### 5. Desplegar edge functions
+
+```bash
+supabase functions deploy ai-chat
+supabase functions deploy send-billing-email
+supabase functions deploy test-elasticemail
+```
+
+### 6. Ejecutar en desarrollo
 
 ```bash
 npm run dev
 ```
 
-Abrir [http://localhost:5173](http://localhost:5173)
-
-## 📁 Estructura del Proyecto
-
-```
-entity/
-├── src/
-│   ├── components/
-│   │   ├── ui/              # Shadcn components
-│   │   ├── theme-provider.tsx
-│   │   └── ...
-│   ├── contexts/
-│   │   └── AuthContext.tsx  # Authentication context
-│   ├── lib/
-│   │   ├── firebase/        # Firebase config + functions
-│   │   │   ├── config.ts
-│   │   │   ├── auth.ts
-│   │   │   └── database.ts
-│   │   └── utils.ts         # Utility functions
-│   ├── pages/
-│   │   ├── Login.tsx
-│   │   └── Dashboard.tsx
-│   ├── types/
-│   │   └── index.ts         # TypeScript types
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
-├── .env.example
-├── firestore.rules
-├── package.json
-└── README.md
-```
-
 ## 🔒 Seguridad
 
-- Autenticación requerida para todas las operaciones
-- Datos aislados por usuario (userId)
-- Security rules de Firestore por usuario
-- Variables de entorno no incluidas en el repositorio
+- Todas las tablas tienen RLS activa por `user_id = auth.uid()` (ver `supabase/migrations`).
+- API keys de terceros (Anthropic, ElasticEmail) viven en secretos del servidor.
+- Variables `VITE_*` son las únicas que el bundle expone al navegador.
 
 ## 📝 Licencia
 
-Proyecto personal - Todos los derechos reservados
+Proyecto personal — Todos los derechos reservados.

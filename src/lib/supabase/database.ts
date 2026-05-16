@@ -220,9 +220,27 @@ export const createBatchMovements = async (
 };
 
 /**
- * Get existing bank transaction IDs for a user+entity pair.
- * Used by the UI to pre-mark duplicates before import.
+ * Idempotency check: does a movement already exist for this subscription + billing period?
+ * Used by billing automation to avoid duplicate charges if the job runs twice.
  */
+export const findMovementBySubscriptionPeriod = async (
+    userId: string,
+    subscriptionId: string,
+    billingPeriod: string
+): Promise<{ id: string } | null> => {
+    const { data, error } = await supabase
+        .from('movements')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('subscription_id', subscriptionId)
+        .eq('billing_period', billingPeriod)
+        .limit(1)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data ? { id: data.id } : null;
+};
+
 export const getExistingBankTransactionIds = async (
     userId: string,
     entityId: string

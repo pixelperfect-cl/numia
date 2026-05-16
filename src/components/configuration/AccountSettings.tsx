@@ -142,6 +142,7 @@ export function AccountSettings() {
                       src={photoPreview || user.photoURL || ''}
                       alt="Preview"
                       className="h-24 w-24 rounded-full object-cover border-2 border-border"
+                      referrerPolicy="no-referrer"
                     />
                     {photoPreview && (
                       <Button

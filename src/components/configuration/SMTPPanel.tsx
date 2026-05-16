@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useData } from '@/contexts/DataContext';
-import { Loader2, Mail, Send, CheckCircle2, XCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { Loader2, Mail, Send, CheckCircle2, XCircle, ShieldAlert } from 'lucide-react';
 import type { Entity } from '@/types';
 
 interface SMTPPanelProps {
@@ -18,7 +19,6 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [formData, setFormData] = useState({
-        apiKey: entity.settings?.smtpConfig?.apiKey || '',
         fromEmail: entity.settings?.smtpConfig?.fromEmail || '',
         billingNotificationsEnabled: entity.settings?.smtpConfig?.billingNotificationsEnabled || false,
     });
@@ -26,19 +26,19 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
     const handleSave = async () => {
         setLoading(true);
         try {
+            const nextSmtp: { fromEmail: string; billingNotificationsEnabled: boolean } = {
+                fromEmail: formData.fromEmail,
+                billingNotificationsEnabled: formData.billingNotificationsEnabled,
+            };
             await updateEntity(entity.id, {
                 settings: {
                     ...entity.settings,
                     erpEnabled: entity.settings?.erpEnabled || false,
                     smtpEnabled: true,
-                    smtpConfig: {
-                        apiKey: formData.apiKey,
-                        fromEmail: formData.fromEmail,
-                        billingNotificationsEnabled: formData.billingNotificationsEnabled,
-                    },
+                    smtpConfig: nextSmtp,
                 },
             });
-            setTestResult(null); // Reset test result after save
+            setTestResult(null);
         } catch (error) {
             console.error('Error saving SMTP config:', error);
         } finally {
@@ -47,50 +47,24 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
     };
 
     const handleTestConnection = async () => {
-        if (!formData.apiKey || !formData.fromEmail) {
-            setTestResult({ success: false, message: 'Completa la API Key y el Email de envío primero.' });
-            return;
-        }
-
         setTesting(true);
         setTestResult(null);
-
         try {
-            // Use the Elastic Email API to verify the API key
-            const response = await fetch('https://api.elasticemail.com/v2/account/load', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            // Use query param approach since Elastic Email v2 uses query params
-            const verifyResponse = await fetch(
-                `https://api.elasticemail.com/v2/account/load?apikey=${encodeURIComponent(formData.apiKey)}`
-            );
-
-            const data = await verifyResponse.json();
-
-            if (data.success) {
-                setTestResult({
-                    success: true,
-                    message: `✓ Conexión exitosa. Cuenta: ${data.data?.email || formData.fromEmail}`,
-                });
+            const { data, error } = await supabase.functions.invoke('test-elasticemail', { body: {} });
+            if (error) throw error;
+            if (data?.ok) {
+                setTestResult({ success: true, message: `Conexión OK${data.email ? ` · cuenta ${data.email}` : ''}` });
             } else {
-                setTestResult({
-                    success: false,
-                    message: `Error: ${data.error || 'API Key inválida o sin permisos.'}`,
-                });
+                setTestResult({ success: false, message: `Error: ${data?.error || 'no se pudo verificar la API key'}` });
             }
         } catch (error: any) {
-            setTestResult({
-                success: false,
-                message: `Error de conexión: ${error.message || 'No se pudo conectar con Elastic Email.'}`,
-            });
+            setTestResult({ success: false, message: `Error de conexión: ${error.message || 'fallo al llamar la edge function'}` });
         } finally {
             setTesting(false);
         }
     };
+
+    const legacyKeyPresent = !!(entity.settings?.smtpConfig as any)?.apiKey;
 
     return (
         <Card>
@@ -99,22 +73,25 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
                     <Mail className="h-5 w-5 text-primary" />
                     <CardTitle>Configuración SMTP (Elastic Email)</CardTitle>
                 </div>
-                <CardDescription>Configura el envío de correos y notificaciones automáticas.</CardDescription>
+                <CardDescription>
+                    El envío usa una API key almacenada en el servidor (Supabase Edge Function).
+                    Configúrala con <code className="text-xs">supabase secrets set ELASTICEMAIL_API_KEY=…</code>
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+                {legacyKeyPresent && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-sm text-amber-700 dark:text-amber-300">
+                        <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>
+                            Detectamos una API key antigua guardada en esta entidad. Será removida en cuanto guardes esta configuración.
+                            Recuerda configurar la nueva key en los <strong>secrets</strong> de Supabase.
+                        </span>
+                    </div>
+                )}
+
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
-                        <Label htmlFor="apiKey">API Key</Label>
-                        <Input
-                            id="apiKey"
-                            type="password"
-                            value={formData.apiKey}
-                            onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                            placeholder="Elastic Email API Key"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="fromEmail">Email de Envío</Label>
+                        <Label htmlFor="fromEmail">Email de envío (verificado en ElasticEmail)</Label>
                         <Input
                             id="fromEmail"
                             type="email"
@@ -139,7 +116,6 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
                     </div>
                 </div>
 
-                {/* Test Result */}
                 {testResult && (
                     <div className={`flex items-start gap-2 p-3 rounded-lg border text-sm ${
                         testResult.success
@@ -155,22 +131,8 @@ export function SMTPPanel({ entity }: SMTPPanelProps) {
                 )}
             </CardContent>
             <CardFooter className="flex justify-between border-t pt-6">
-                <Button
-                    variant="outline"
-                    onClick={handleTestConnection}
-                    disabled={testing || !formData.apiKey}
-                >
-                    {testing ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Probando...
-                        </>
-                    ) : (
-                        <>
-                            <Send className="mr-2 h-4 w-4" />
-                            Probar Conexión
-                        </>
-                    )}
+                <Button variant="outline" onClick={handleTestConnection} disabled={testing}>
+                    {testing ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Probando...</>) : (<><Send className="mr-2 h-4 w-4" />Probar Conexión</>)}
                 </Button>
                 <Button onClick={handleSave} disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -40,12 +40,17 @@ const PageLoading = () => (
 function App() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => localStorage.getItem('entity-entity-id'));
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => {
+    try { return localStorage.getItem('entity-entity-id'); } catch { return null; }
+  });
 
-  // Persist entity selection
   useEffect(() => {
-    if (selectedEntityId) localStorage.setItem('entity-entity-id', selectedEntityId);
-    else localStorage.removeItem('entity-entity-id');
+    try {
+      if (selectedEntityId) localStorage.setItem('entity-entity-id', selectedEntityId);
+      else localStorage.removeItem('entity-entity-id');
+    } catch {
+      // ignore: storage disabled
+    }
   }, [selectedEntityId]);
 
   if (loading) {

@@ -2,7 +2,7 @@
  * Numia v1.0 - Income/Expense Bar Chart
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,6 +15,7 @@ import type { Movement, DateFilter as DateFilterType } from '@/types';
 import { formatCurrency, getDateRangeFromType, parseLocalDate } from '@/lib/utils';
 import { DateFilter } from '@/components/DateFilter';
 import { usePrivacy } from '@/contexts/PrivacyContext';
+import { useData } from '@/contexts/DataContext';
 
 interface IncomeExpenseChartProps {
   movements: Movement[];
@@ -33,7 +34,13 @@ const chartConfig = {
 
 export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
   const { isBalanceHidden } = usePrivacy();
-  const [dateFilter, setDateFilter] = useState<DateFilterType>({ type: 'THIS_MONTH' });
+  const { dateFilter: globalDateFilter } = useData();
+  const [dateFilter, setDateFilter] = useState<DateFilterType>(globalDateFilter);
+
+  useEffect(() => {
+    setDateFilter(globalDateFilter);
+  }, [globalDateFilter]);
+
   const { startDate, endDate } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
 
   // Calculate the date range in days
@@ -129,7 +136,7 @@ export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <Card>
+      <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
         <CardHeader>
           <CardTitle>Ingresos vs Gastos</CardTitle>
           <CardDescription>No hay datos para mostrar en este período</CardDescription>
@@ -144,7 +151,7 @@ export function IncomeExpenseChart({ movements }: IncomeExpenseChartProps) {
   }
 
   return (
-    <Card>
+    <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
       <CardHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-row items-center justify-between">

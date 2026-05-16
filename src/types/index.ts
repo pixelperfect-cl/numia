@@ -24,7 +24,6 @@ export interface Entity {
     erpEnabled: boolean;
     smtpEnabled?: boolean;
     smtpConfig?: {
-      apiKey: string;
       fromEmail: string;
       billingNotificationsEnabled: boolean;
     };
@@ -36,6 +35,8 @@ export interface Entity {
         subject: string;
         body: string;
         enabled: boolean;
+        recipientMode?: 'all' | 'specific';
+        recipientClientIds?: string[];
       }[];
     };
     projectSettings?: {
@@ -44,6 +45,30 @@ export interface Entity {
         subject: string;
         body: string;
         enabled: boolean;
+        recipientMode?: 'all' | 'specific';
+        recipientClientIds?: string[];
+      }[];
+    };
+    notificationSettings?: {
+      scheduledTemplates?: {
+        id: string;
+        schedule: string;
+        date?: string;
+        dayOfWeek?: number;
+        dayOfMonth?: number;
+        subject: string;
+        body: string;
+        enabled: boolean;
+        recipientMode?: 'all' | 'specific';
+        recipientClientIds?: string[];
+      }[];
+      billingTemplates?: {
+        id: string;
+        subject: string;
+        body: string;
+        enabled: boolean;
+        recipientMode?: 'all' | 'specific';
+        recipientClientIds?: string[];
       }[];
     };
   };
@@ -284,6 +309,10 @@ export interface PaymentRecord {
   notes?: string;
   isFinancial: boolean; // True if it created a movement
   movementId?: string; // ID of the related financial movement
+  billingPeriod?: string; // The subscription period this payment covers (YYYY-MM-DD), enables dedup
+  isPartial?: boolean; // True if this payment did not advance the next billing date
+  amountUF?: number; // Original UF amount when the subscription is denominated in UF
+  ufRateAtPayment?: number; // UF→CLP rate used when the payment was registered
 }
 
 export interface ServiceChecklistItem {
@@ -411,6 +440,16 @@ export interface ProjectChecklist {
   items: ChecklistItem[];
 }
 
+export interface ProjectBillingInstallment {
+  id: string;
+  date: string; // ISO date when the cobro should be generated
+  amount: number; // Amount in project currency
+  label?: string; // e.g., "Anticipo 30%", "Entrega beta"
+  generated?: boolean; // True once the cron generated the movement
+  movementId?: string; // The generated movement id
+  generatedAt?: string; // ISO date when generated
+}
+
 export interface Project {
   id: string;
   userId: string;
@@ -429,6 +468,7 @@ export interface Project {
   archived?: boolean;
   archiveReason?: string;
   archiveDate?: string; // ISO date
+  billingInstallments?: ProjectBillingInstallment[]; // Scheduled cobros during development
   createdAt: Date;
   updatedAt: Date;
   // Enhanced Fields

@@ -35,8 +35,10 @@ export function ServiceGeneralTab({
     const paidAmount = sub.paidAmount || 0;
     let totalAmount = sub.amount;
     if (sub.currency === 'UF' && ufValue) totalAmount = Math.round(sub.amount * ufValue);
-    const progress = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
-    const isFullyPaid = totalAmount > 0 && paidAmount >= (totalAmount - 10);
+    // Dynamic tolerance: 1% for UF services (absorbs UF value fluctuations), $10 for CLP
+    const paymentTolerance = sub.currency === 'UF' ? Math.max(10, Math.round(totalAmount * 0.01)) : 10;
+    const isFullyPaid = totalAmount > 0 && paidAmount >= (totalAmount - paymentTolerance);
+    const progress = isFullyPaid ? 100 : (totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0);
 
     const startDate = parseLocalDateString(sub.startDate);
 
@@ -75,15 +77,15 @@ export function ServiceGeneralTab({
 
                     <div className="space-y-1">
                         <span className="text-xs text-muted-foreground uppercase tracking-wider">Estado del pago</span>
-                        {isFullyPaid ? (
-                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                                <CheckCircle2 className="h-5 w-5" />
-                                <span className="font-semibold">Al día</span>
-                            </div>
-                        ) : isOverdue ? (
+                        {isOverdue ? (
                             <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                                 <AlertTriangle className="h-5 w-5" />
                                 <span className="font-semibold">Atrasado</span>
+                            </div>
+                        ) : isFullyPaid ? (
+                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-5 w-5" />
+                                <span className="font-semibold">Al día</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
@@ -95,7 +97,7 @@ export function ServiceGeneralTab({
                 </div>
 
                 {/* Payment Progress */}
-                {progress > 0 && progress < 100 && (
+                {progress > 0 && !isFullyPaid && (
                     <div className="space-y-2 pt-2 border-t">
                         <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Abonado este periodo</span>
@@ -111,7 +113,7 @@ export function ServiceGeneralTab({
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground">
                             <span>{Math.round(progress)}%</span>
-                            <span>{formatCurrency(totalAmount - paidAmount)} pendientes</span>
+                            <span>{formatCurrency(Math.max(0, totalAmount - paidAmount))} pendientes</span>
                         </div>
                     </div>
                 )}

@@ -225,22 +225,25 @@ export const mapProject = (userId: string | undefined, data: Partial<Project>) =
     obj.entityId = safeStringToUuid(obj.entityId);
     obj.clientId = safeStringToUuid(obj.clientId);
 
-    delete obj.amount;
     delete obj.archived; // No 'archived' column in DB - archival is determined by archive_date presence
 
     // Ensure nulls for empty date strings
     if (obj.dueDate === '') obj.dueDate = null;
     if (obj.archiveDate === '') obj.archiveDate = null;
     if (obj.archiveReason === '') obj.archiveReason = null;
+    if (obj.startDate === '') obj.startDate = null;
 
     return mapObject(obj, {
         userId: 'user_id',
         entityId: 'entity_id',
         clientId: 'client_id',
         logoUrl: 'logo_url',
+        startDate: 'start_date',
         dueDate: 'due_date',
         archiveDate: 'archive_date',
         archiveReason: 'archive_reason',
+        billingInstallments: 'billing_installments',
+        techDetails: 'tech_details',
         createdAt: 'created_at',
         updatedAt: 'updated_at'
     });

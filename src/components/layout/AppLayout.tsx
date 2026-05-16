@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useAI } from '@/contexts/AIContext';
 import { FullScreenQuickActions } from '@/components/layout/FullScreenQuickActions';
+import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
     selectedEntityId: string;
@@ -153,8 +154,11 @@ export function AppLayout({ selectedEntityId, onEntityChange }: AppLayoutProps) 
 
                 {location.pathname === '/configuration' && <ConfigSidebar />}
 
-                <main ref={mainRef} className="flex-1 overflow-y-auto bg-muted/10 p-4 pb-14 md:p-6 lg:p-8 no-scrollbar">
-                    <div className="mx-auto max-w-screen-2xl space-y-6">
+                <main ref={mainRef} className="flex-1 overflow-y-auto bg-muted/10 no-scrollbar">
+                    <div className={cn(
+                        "mx-auto max-w-screen-2xl space-y-6 p-4 pb-14 md:p-6 lg:p-8",
+                        location.pathname.includes('/projects/') ? "pt-0 md:pt-0 lg:pt-0" : "pt-4 md:pt-6 lg:pt-8"
+                    )}>
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <Outlet />
                         </div>

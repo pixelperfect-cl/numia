@@ -52,8 +52,10 @@ export function ServiceFinanceTab({
     const paidAmount = sub.paidAmount || 0;
     let totalAmount = sub.amount;
     if (sub.currency === 'UF' && ufValue) totalAmount = Math.round(sub.amount * ufValue);
-    const progress = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
-    const isFullyPaid = totalAmount > 0 && paidAmount >= (totalAmount - 10);
+    // Dynamic tolerance: 1% for UF services (absorbs UF value fluctuations), $10 for CLP
+    const paymentTolerance = sub.currency === 'UF' ? Math.max(10, Math.round(totalAmount * 0.01)) : 10;
+    const isFullyPaid = totalAmount > 0 && paidAmount >= (totalAmount - paymentTolerance);
+    const progress = isFullyPaid ? 100 : (totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0);
 
     // All payments sorted by date desc
     const allPayments = [...(sub.allPayments || [])].sort((a, b) =>

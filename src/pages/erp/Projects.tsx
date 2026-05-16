@@ -3,9 +3,11 @@ import * as React from 'react';
 import { CustomScrollbar } from '@/components/ui/CustomScrollbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Archive, RotateCcw, Trash2, SquareKanban } from 'lucide-react';
+import { Plus, Search, Archive, RotateCcw, Trash2, SquareKanban, Bell } from 'lucide-react';
+import { NotificationSettings } from '@/components/configuration/NotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjects, getClients, deleteProject, updateProject } from '@/lib/supabase/database';
+import { sendTriggerEmail } from '@/lib/notifications/triggers';
 import type { Project, ProjectStatus, ProjectList } from '@/types';
 import { ProjectDialog } from '@/components/erp/ProjectDialog';
 import {
@@ -48,7 +50,9 @@ export function Projects({ entityId }: ProjectsProps = {}) {
     const location = useLocation();
     const navigate = useNavigate();
     const searchParams = new URLSearchParams(location.search);
-    const currentTab = searchParams.get('tab') || 'active'; // 'summary' | 'active' | 'archived'
+    const currentTab = searchParams.get('tab') || 'active'; // 'summary' | 'active' | 'archived' | 'notifications'
+
+    const activeEntity = entities.find(e => e.id === (entityId || entities[0]?.id));
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Record<string, string>>({}); // Map id -> name
@@ -223,6 +227,7 @@ export function Projects({ entityId }: ProjectsProps = {}) {
         if (over && active.id !== over.id) {
             const projectId = active.id as string;
             const newStatus = over.id as ProjectStatus;
+            const prevProject = projects.find(p => p.id === projectId);
 
             // Optimistic update
             setProjects(projects.map(p =>
@@ -231,6 +236,14 @@ export function Projects({ entityId }: ProjectsProps = {}) {
 
             try {
                 await updateProject(projectId, { status: newStatus });
+                if (prevProject && prevProject.status !== newStatus) {
+                    // Fire-and-forget project_status email (no await — UI mustn't block on email).
+                    void sendTriggerEmail({
+                        projectId,
+                        statusId: newStatus,
+                        triggerType: 'project_status',
+                    });
+                }
             } catch (error) {
                 console.error("Error updating project status:", error);
                 // Revert on error - reloading data is easiest
@@ -274,14 +287,16 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                         {currentTab === 'summary' && 'Resumen de Proyectos'}
                         {currentTab === 'active' && 'Tablero de Proyectos'}
                         {currentTab === 'archived' && 'Proyectos Archivados'}
+                        {currentTab === 'notifications' && 'Plantillas de Email'}
                     </h1>
                     <p className="text-muted-foreground">
                         {currentTab === 'summary' && 'Vista general del estado de tus proyectos'}
                         {currentTab === 'active' && 'Gestiona tus proyectos activos y flujo de trabajo'}
                         {currentTab === 'archived' && 'Historial de proyectos finalizados o cancelados'}
+                        {currentTab === 'notifications' && 'Correos automáticos al cambiar de estado'}
                     </p>
                 </div>
-                {currentTab !== 'summary' && (
+                {currentTab !== 'summary' && currentTab !== 'notifications' && (
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-64">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -496,6 +511,16 @@ export function Projects({ entityId }: ProjectsProps = {}) {
                 </Card>
             )}
 
+            {currentTab === 'notifications' && (
+                activeEntity ? (
+                    <NotificationSettings entity={activeEntity} scope="projects" />
+                ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                        <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                        <p>Selecciona una entidad para configurar plantillas.</p>
+                    </div>
+                )
+            )}
 
         </div >
     );

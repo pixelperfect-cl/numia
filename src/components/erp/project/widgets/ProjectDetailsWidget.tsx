@@ -51,6 +51,8 @@ export function ProjectDetailsWidget({ project, client, onUpdate, onClientChange
         try {
             await updateProject(project.id, { [field]: isoDate });
             onUpdate({ ...project, [field]: isoDate });
+            // Notify header and other listeners that project data changed
+            window.dispatchEvent(new CustomEvent('project-updated', { detail: { projectId: project.id } }));
         } catch (error) {
             console.error(`Failed to update ${field}`, error);
         }

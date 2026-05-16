@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getClients, getAllSubscriptions, deleteSubscription, updateSubscription, createMovement, deleteMovement, getMovements } from '@/lib/supabase/database';
-import { checkAndGenerateSubscriptionMovements } from '@/lib/erp/billing';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { ServiceDialog } from '@/components/erp/ServiceDialog';
@@ -28,7 +27,8 @@ import { ClientDetailsDialog } from '@/components/erp/ClientDetailsDialog';
 import { ClientDialog } from '@/components/erp/ClientDialog';
 import { ServiceDetailPanel } from '@/components/erp/service/ServiceDetailPanel';
 import { fetchIndicators } from '@/lib/indicators';
-import { Loader2, Plus, Search, Edit, Trash2, RefreshCw, Briefcase, List as ListIcon, TrendingUp, Users, DollarSign, Archive, RotateCcw, LayoutGrid, FileText, CalendarRange, Activity } from 'lucide-react';
+import { Loader2, Search, Trash2, Briefcase, TrendingUp, DollarSign, RotateCcw, LayoutGrid, FileText, CalendarRange, Activity, Bell } from 'lucide-react';
+import { NotificationSettings } from '@/components/configuration/NotificationSettings';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import type { Client, Subscription, ServiceDefinition, Movement, PaymentRecord, EnhancedSubscription } from '@/types';
 import { format, addMonths, addYears, subMonths, subYears, parseISO, isAfter } from 'date-fns';
@@ -119,7 +119,6 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     const [searchParams, setSearchParams] = useSearchParams();
     const searchTerm = searchParams.get('search') || '';
-    const [generating, setGenerating] = useState(false);
     const [ufValue, setUfValue] = useState<number | null>(null);
 
     // Dialog State
@@ -377,24 +376,6 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
         }
     };
 
-    const handleGenerateBilling = async () => {
-        if (!user) return;
-        setGenerating(true);
-        try {
-            const result = await checkAndGenerateSubscriptionMovements(user.uid);
-            if (result.created > 0) {
-                alert(`Se han generado ${result.created} movimientos pendientes.`);
-            } else {
-                alert("No hay suscripciones pendientes de cobro para hoy.");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Error al generar cobros.");
-        } finally {
-            setGenerating(false);
-        }
-    };
-
     // Payment Handlers
     const onMarkPaid = (sub: EnhancedSubscription) => {
         setSelectedSubscriptionForPayment(sub);
@@ -432,72 +413,73 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
     const handlePaymentConfirm = async (amount: number, date: Date, notes: string, registerMovement: boolean) => {
         if (!user || !selectedSubscriptionForPayment) return;
 
-        try {
-            // Find context for movement
-            const client = clients.find(c => c.id === selectedSubscriptionForPayment.clientId);
-            const targetEntityId = client?.entityId || entityId || entities[0]?.id;
+        const sub = selectedSubscriptionForPayment;
+        const billingPeriod = sub.nextBillingDate;
 
+        if (paymentMode === 'full') {
+            const existingFullForPeriod = (sub.payments || []).some(p => p.billingPeriod === billingPeriod && !p.isPartial);
+            if (existingFullForPeriod) {
+                alert(`Ya existe un pago completo registrado para el período ${billingPeriod}. Si necesitas registrar otro, usa pago parcial o revierte el anterior primero.`);
+                return;
+            }
+        }
+
+        try {
+            const client = clients.find(c => c.id === sub.clientId);
+            const targetEntityId = client?.entityId || entityId || entities[0]?.id;
             if (!targetEntityId) throw new Error("No entity found for payment");
 
             const entity = entities.find(e => e.id === targetEntityId);
             const defaultBoxKey = entity ? (Object.keys(entity.boxes).find(key => entity.boxes[key].isDefault) || Object.keys(entity.boxes)[0]) : 'general';
 
-            // Find category
             const incomeCategory = categories.find(c => c.type === 'income' && c.name.toLowerCase().includes('servicios'))
                 || categories.find(c => c.type === 'income');
-
             if (!incomeCategory) throw new Error("No income category found");
 
             let movementId: string | undefined;
 
             if (registerMovement) {
-                // Create Movement
                 movementId = await createMovement(user.uid, {
                     entityId: targetEntityId,
-                    amount: amount,
+                    amount,
                     type: 'income',
                     description: notes,
                     categoryId: incomeCategory.id,
                     box: defaultBoxKey,
                     date: format(date, 'yyyy-MM-dd'),
-                    status: 'paid', // Mark as paid directly since it's a manual entry
-                    clientId: selectedSubscriptionForPayment.clientId,
-                    subscriptionId: selectedSubscriptionForPayment.id, // Link to subscription
-                    billingPeriod: selectedSubscriptionForPayment.nextBillingDate // Important: Tag with the target billing period
+                    status: 'paid',
+                    clientId: sub.clientId,
+                    subscriptionId: sub.id,
+                    billingPeriod,
                 });
             }
 
-            // Create Payment Record (Internal)
-            // Ensure no undefined values are passed to Firestore
             const newPaymentDetail: PaymentRecord = {
                 id: crypto.randomUUID(),
-                amount: amount,
+                amount,
                 date: format(date, 'yyyy-MM-dd'),
-                notes: notes,
+                notes,
                 isFinancial: registerMovement,
+                billingPeriod,
+                isPartial: paymentMode !== 'full',
+                ...(sub.currency === 'UF' && ufValue ? {
+                    amountUF: sub.amount,
+                    ufRateAtPayment: ufValue,
+                } : {}),
                 ...(movementId ? { movementId } : {})
             };
 
-            // Update Subscription (Add payment + Update Date if Full)
-            const currentPayments = selectedSubscriptionForPayment.payments || [];
-
-            // Check if full payment to advance date
-            let updatePayload: any = {
-                payments: [...currentPayments, newPaymentDetail]
-            };
+            const currentPayments = sub.payments || [];
+            const updatePayload: any = { payments: [...currentPayments, newPaymentDetail] };
 
             if (paymentMode === 'full') {
-                updatePayload.nextBillingDate = addPeriodToDateString(
-                    selectedSubscriptionForPayment.nextBillingDate,
-                    selectedSubscriptionForPayment.frequency,
-                    1
-                );
+                updatePayload.nextBillingDate = addPeriodToDateString(billingPeriod, sub.frequency, 1);
             }
 
-            await updateSubscription(selectedSubscriptionForPayment.id, {
+            await updateSubscription(sub.id, {
                 ...updatePayload,
                 userId: user.uid,
-                clientId: selectedSubscriptionForPayment.clientId
+                clientId: sub.clientId,
             });
 
             loadData(true);
@@ -659,12 +641,14 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
 
     // const [searchParams, setSearchParams] = useSearchParams(); // Already defined above
     const tabParam = searchParams.get('tab');
-    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog' => {
-        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived' || tab === 'catalog';
+    const isValidTab = (tab: string | null): tab is 'summary' | 'monthly' | 'annual' | 'archived' | 'catalog' | 'notifications' => {
+        return tab === 'summary' || tab === 'monthly' || tab === 'annual' || tab === 'archived' || tab === 'catalog' || tab === 'notifications';
     };
     const activeTab = isValidTab(tabParam)
         ? tabParam
         : (defaultTab === 'monthly' || defaultTab === 'annual' ? defaultTab : 'monthly');
+
+    const activeEntity = entities.find(e => e.id === (entityId || entities[0]?.id));
 
     const handleTabChange = (val: string) => {
         setSearchParams(prev => {
@@ -1240,8 +1224,16 @@ export function Services({ entityId, defaultTab = 'summary', onTabChange }: Serv
                     </Card>
                 </TabsContent>
 
-
-
+                <TabsContent value="notifications" className="h-full overflow-y-auto">
+                    {activeEntity ? (
+                        <NotificationSettings entity={activeEntity} scope="services" />
+                    ) : (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                            <p>Selecciona una entidad para configurar plantillas.</p>
+                        </div>
+                    )}
+                </TabsContent>
 
             </Tabs>
 

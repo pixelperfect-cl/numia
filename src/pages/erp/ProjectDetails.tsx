@@ -61,7 +61,7 @@ export function ProjectDetails() {
     return (
         <ProjectLayout project={project} clientName={client?.name || 'Cliente Desconocido'}>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-30 bg-background py-3 border-b border-border/50 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
                     <TabsList className="bg-muted/50 p-1 rounded-lg hidden md:flex w-full justify-start">
                         <TabsTrigger value="overview" className="px-4 flex-1">General</TabsTrigger>
                         <TabsTrigger value="finance" className="px-4 flex-1">Finanzas</TabsTrigger>
@@ -98,7 +98,7 @@ export function ProjectDetails() {
                     </TabsContent>
 
                     <TabsContent value="finance" className="outline-none data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-left-2">
-                        <ProjectFinanceTab project={project} />
+                        <ProjectFinanceTab project={project} onProjectUpdate={handleProjectUpdate} />
                     </TabsContent>
 
                     <TabsContent value="tasks" className="outline-none mt-8">

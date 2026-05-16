@@ -2,7 +2,7 @@
  * Numia v1.0 - Category Distribution Pie Chart
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Pie, PieChart, Cell, Sector } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -11,10 +11,11 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
-import type { Movement, MovementType, DateFilter as DateFilterType, Category } from '@/types';
+import type { Movement, MovementType, Category, DateFilter as DateFilterType } from '@/types';
 import { formatCurrency, getDateRangeFromType, parseLocalDate } from '@/lib/utils';
 import { DateFilter } from '@/components/DateFilter';
 import { usePrivacy } from '@/contexts/PrivacyContext';
+import { useData } from '@/contexts/DataContext';
 
 interface CategoryPieChartProps {
   movements: Movement[];
@@ -60,7 +61,13 @@ const renderActiveShape = (props: any) => {
 
 export function CategoryPieChart({ movements, categories, type }: CategoryPieChartProps) {
   const { isBalanceHidden } = usePrivacy();
-  const [dateFilter, setDateFilter] = useState<DateFilterType>({ type: 'THIS_MONTH' });
+  const { dateFilter: globalDateFilter } = useData();
+  const [dateFilter, setDateFilter] = useState<DateFilterType>(globalDateFilter);
+
+  useEffect(() => {
+    setDateFilter(globalDateFilter);
+  }, [globalDateFilter]);
+
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const { startDate, endDate } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
 
@@ -124,7 +131,7 @@ export function CategoryPieChart({ movements, categories, type }: CategoryPieCha
 
   if (chartData.length === 0) {
     return (
-      <Card>
+      <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
         <CardHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-row items-center justify-between">
@@ -146,7 +153,7 @@ export function CategoryPieChart({ movements, categories, type }: CategoryPieCha
   }
 
   return (
-    <Card>
+    <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
       <CardHeader>
         <div className="flex flex-col gap-3">
           <div className="flex flex-row items-center justify-between">

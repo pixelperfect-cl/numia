@@ -140,7 +140,7 @@ export function InteractiveCashFlowChart({ movements }: InteractiveCashFlowChart
   ];
 
   return (
-    <Card>
+    <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
       <CardHeader>
         <div className="flex items-start justify-between">
           <CardTitle>Flujo de Caja</CardTitle>

@@ -80,7 +80,7 @@ export function EntityPanel({ entityId }: EntityPanelProps) {
   const ufValue = indicators.find(i => i.codigo === 'uf')?.valor || 39730;
 
   // Active Services Breakdown & Trend
-  const { activeServicesCount, activeBreakdown, servicesTrend } = useMemo(() => {
+  const { activeServicesCount, activeBreakdown, servicesTrend, serviceCountHistory } = useMemo(() => {
     const now = new Date();
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
@@ -115,10 +115,26 @@ export function EntityPanel({ entityId }: EntityPanelProps) {
 
     const netTrend = newServices - lostServices;
 
+    // Monthly active service count for sparkline (last 12 months)
+    const countHistory = Array.from({ length: 12 }, (_, i) => {
+      const monthDate = startOfMonth(subMonths(now, 11 - i));
+      const count = subscriptions.filter(sub => {
+        const created = sub.createdAt ? new Date(sub.createdAt) : parseISO(sub.startDate);
+        if (created > monthDate) return false;
+        if (sub.status !== 'active' && sub.archivedAt) {
+          const archived = parseISO(sub.archivedAt);
+          if (archived < monthDate) return false;
+        }
+        return true;
+      }).length;
+      return { value: count };
+    });
+
     return {
       activeServicesCount: monthly + yearly,
       activeBreakdown: { monthly, yearly },
-      servicesTrend: netTrend
+      servicesTrend: netTrend,
+      serviceCountHistory: countHistory
     };
   }, [subscriptions]);
 
@@ -368,15 +384,16 @@ export function EntityPanel({ entityId }: EntityPanelProps) {
       {/* DASHBOARD GRID */}
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-[1600px] mx-auto">
 
-        {/* 1. Active Services */}
+        {/* 1. Active Services - with monthly count sparkline */}
         <div className="col-span-1 h-32">
-          <PulseCard
+          <MetricChartCard
             label="Servicios Activos"
             value={`${activeServicesCount}`}
             subtext={`${activeBreakdown.yearly} Anuales · ${activeBreakdown.monthly} Mensuales`}
-            type="standard"
-            trend={servicesTrend === 0 ? undefined : (servicesTrend > 0 ? 'up' : 'down')}
-            trendValue={servicesTrend === 0 ? undefined : `${servicesTrend > 0 ? '+' : ''}${servicesTrend}`}
+            data={serviceCountHistory}
+            color="cyan"
+            trend={servicesTrend !== 0 ? Math.abs(servicesTrend) : undefined}
+            trendDirection={servicesTrend === 0 ? 'neutral' : (servicesTrend > 0 ? 'up' : 'down')}
           />
         </div>
 

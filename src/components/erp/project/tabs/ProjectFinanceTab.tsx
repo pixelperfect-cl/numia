@@ -5,12 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProjectProfitability } from "../widgets/ProjectProfitability";
 import { ProjectIncomeCard } from "../widgets/ProjectIncomeCard";
 import { ProjectExpensesCard } from "../widgets/ProjectExpensesCard";
+import { BillingScheduleCard } from "../widgets/BillingScheduleCard";
 
 interface ProjectFinanceTabProps {
     project: Project;
+    onProjectUpdate?: () => void;
 }
 
-export function ProjectFinanceTab({ project }: ProjectFinanceTabProps) {
+export function ProjectFinanceTab({ project, onProjectUpdate }: ProjectFinanceTabProps) {
     const { user } = useAuth();
     const [movements, setMovements] = useState<Movement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -63,6 +65,15 @@ export function ProjectFinanceTab({ project }: ProjectFinanceTabProps) {
                     onUpdate={fetchMovements}
                 />
             </div>
+
+            {/* Billing Schedule */}
+            <BillingScheduleCard
+                project={project}
+                onUpdate={() => {
+                    fetchMovements();
+                    onProjectUpdate?.();
+                }}
+            />
         </div>
     );
 }

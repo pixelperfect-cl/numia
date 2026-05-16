@@ -44,10 +44,7 @@ export function PaymentDialog({
                     initialAmount = subscription.amount;
                 }
 
-                // Subtract already paid amount (if any)
-                if (subscription.paidAmount) {
-                    initialAmount = Math.max(0, initialAmount - subscription.paidAmount);
-                }
+                // Full payment = total value (no subtraction of partial payments)
             }
             setAmount(initialAmount > 0 ? initialAmount.toString() : '');
             setNotes(mode === 'full' ? `Pago mensualidad: ${subscription.name}` : `Abono: ${subscription.name}`);

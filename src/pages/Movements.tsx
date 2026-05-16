@@ -17,11 +17,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType } from '@/lib/utils';
 import type { Movement, MovementType, MovementHistoryEntry } from '@/types';
-import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addMonths, subMonths, subDays, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,8 @@ import { InteractiveCashFlowChart } from '@/components/InteractiveCashFlowChart'
 import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
 import { MovementsAreaChart } from '@/components/MovementsAreaChart';
 import { CategoryPieChart } from '@/components/CategoryPieChart';
+import { MetricChartCard } from '@/components/dashboard/MetricChartCard';
+import { PulseCard } from '@/components/dashboard/PulseCard';
 
 interface MovementsProps {
   entityId?: string;
@@ -468,7 +470,6 @@ export function Movements({ entityId }: MovementsProps = {}) {
   }, [filteredMovements]);
 
   // Global Balance (All Time)
-  // Global Balance (All Time)
   const globalBalance = useMemo(() => {
     const totalIncome = movementsForChart
       .filter(m => m.type === 'income')
@@ -478,6 +479,95 @@ export function Movements({ entityId }: MovementsProps = {}) {
       .reduce((sum, m) => sum + Math.abs(m.amount), 0);
     return totalIncome - totalExpense;
   }, [movementsForChart]);
+
+  // Sparkline data for stat cards (reactive to date range)
+  const { incomeHistory, expensesHistory, balanceHistory, incomeTrend, expensesTrend, movementsCountHistory, movementsTrend } = useMemo(() => {
+    const { startDate: rangeStart, endDate: rangeEnd } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
+
+    // Calculate the number of days in the selected range
+    const rangeDays = Math.max(1, Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    // Previous period of equal length (for trend calculation)
+    const prevEnd = new Date(rangeStart);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - rangeDays + 1);
+
+    let currentIncome = 0, prevIncome = 0, currentExp = 0, prevExp = 0;
+    let currentCount = 0, prevCount = 0;
+    const incomeMap = new Map<string, number>();
+    const expenseMap = new Map<string, number>();
+    const countMap = new Map<string, number>();
+
+    // Process ALL movements to get both current and previous period data
+    movements.forEach(m => {
+      if (m.isFinancial === false) return;
+      const mDate = parseLocalDate(m.date);
+      const dayStr = format(mDate, 'yyyy-MM-dd');
+      const amount = Math.abs(m.amount);
+
+      // Current period
+      if (mDate >= rangeStart && mDate <= rangeEnd) {
+        countMap.set(dayStr, (countMap.get(dayStr) || 0) + 1);
+        currentCount++;
+        if (m.type === 'income') {
+          incomeMap.set(dayStr, (incomeMap.get(dayStr) || 0) + amount);
+          currentIncome += amount;
+        } else {
+          expenseMap.set(dayStr, (expenseMap.get(dayStr) || 0) + amount);
+          currentExp += amount;
+        }
+      }
+      // Previous period (for trends)
+      else if (mDate >= prevStart && mDate <= prevEnd) {
+        prevCount++;
+        if (m.type === 'income') prevIncome += amount;
+        else prevExp += amount;
+      }
+    });
+
+    // Build daily history arrays within the selected range
+    // Cap data points at ~60 for readability; if range is larger, group by larger intervals
+    const maxPoints = 60;
+    const step = Math.max(1, Math.floor(rangeDays / maxPoints));
+    const incHistory: { value: number }[] = [];
+    const expHistory: { value: number }[] = [];
+    const balHistory: { balance: number }[] = [];
+    const cntHistory: { value: number }[] = [];
+    let runningBal = 0;
+
+    for (let i = 0; i < rangeDays; i += step) {
+      let incVal = 0, expVal = 0, cntVal = 0;
+      // Aggregate over 'step' days
+      for (let j = 0; j < step && (i + j) < rangeDays; j++) {
+        const date = new Date(rangeStart);
+        date.setDate(date.getDate() + i + j);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        incVal += incomeMap.get(dateStr) || 0;
+        expVal += expenseMap.get(dateStr) || 0;
+        cntVal += countMap.get(dateStr) || 0;
+      }
+      runningBal += incVal - expVal;
+      incHistory.push({ value: incVal });
+      expHistory.push({ value: expVal });
+      balHistory.push({ balance: runningBal });
+      cntHistory.push({ value: cntVal });
+    }
+
+    const iTrend = prevIncome > 0 ? ((currentIncome - prevIncome) / prevIncome) * 100 : (currentIncome > 0 ? 100 : 0);
+    const eTrend = prevExp > 0 ? ((currentExp - prevExp) / prevExp) * 100 : (currentExp > 0 ? 100 : 0);
+    const mTrend = prevCount > 0 ? ((currentCount - prevCount) / prevCount) * 100 : (currentCount > 0 ? 100 : 0);
+
+    return {
+      incomeHistory: incHistory,
+      expensesHistory: expHistory,
+      balanceHistory: balHistory,
+      incomeTrend: iTrend,
+      expensesTrend: eTrend,
+      movementsCountHistory: cntHistory,
+      movementsTrend: mTrend
+    };
+  }, [movements, dateFilter]);
 
   // Get boxes from selected entity
   const selectedEntity = entities.find(e => e.id === formData.entityId);
@@ -769,47 +859,50 @@ export function Movements({ entityId }: MovementsProps = {}) {
         </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - Dashboard Style with Sparklines */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Movimientos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.count}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-500">
-              {isBalanceHidden ? '****' : formatCurrency(stats.income)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Gastos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-500">
-              {isBalanceHidden ? '****' : formatCurrency(stats.expense)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${globalBalance >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>
-              {isBalanceHidden ? '****' : formatCurrency(globalBalance)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Balance total historico</p>
-          </CardContent>
-        </Card>
+        <div className="col-span-1 h-32">
+          <MetricChartCard
+            label="Total Movimientos"
+            value={`${stats.count}`}
+            subtext={`${filteredMovements.filter(m => m.type === 'income').length} ingresos · ${filteredMovements.filter(m => m.type === 'expense').length} gastos`}
+            data={movementsCountHistory}
+            color="blue"
+            trend={parseFloat(movementsTrend.toFixed(1))}
+            trendDirection={movementsTrend >= 0 ? 'up' : 'down'}
+          />
+        </div>
+        <div className="col-span-1 h-32">
+          <MetricChartCard
+            label="Ingresos"
+            value={isBalanceHidden ? '****' : formatCurrency(stats.income)}
+            data={incomeHistory}
+            color="emerald"
+            trend={parseFloat(incomeTrend.toFixed(1))}
+            trendDirection={incomeTrend >= 0 ? 'up' : 'down'}
+          />
+        </div>
+        <div className="col-span-1 h-32">
+          <MetricChartCard
+            label="Gastos"
+            value={isBalanceHidden ? '****' : formatCurrency(stats.expense)}
+            data={expensesHistory}
+            color="rose"
+            trend={parseFloat(expensesTrend.toFixed(1))}
+            trendDirection={expensesTrend > 0 ? 'up' : 'down'}
+          />
+        </div>
+        <div className="col-span-1 h-32">
+          <MetricChartCard
+            label="Evolución Balance"
+            value={isBalanceHidden ? '****' : formatCurrency(globalBalance)}
+            data={balanceHistory}
+            dataKey="balance"
+            color="cyan"
+            trend={balanceHistory.length >= 2 ? parseFloat((((balanceHistory[balanceHistory.length - 1]?.balance - balanceHistory[0]?.balance) / (Math.abs(balanceHistory[0]?.balance) || 1)) * 100).toFixed(1)) : 0}
+            trendDirection={balanceHistory.length >= 2 && balanceHistory[balanceHistory.length - 1]?.balance >= balanceHistory[0]?.balance ? 'up' : 'down'}
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -833,7 +926,7 @@ export function Movements({ entityId }: MovementsProps = {}) {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="!bg-card/40 backdrop-blur-sm !border-white/10 overflow-hidden transition-all duration-300 hover:border-white/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Filtros y Búsqueda</CardTitle>
@@ -950,15 +1043,57 @@ export function Movements({ entityId }: MovementsProps = {}) {
         <div>Cargando...</div>
       ) : filteredMovements.length === 0 ? (
         <Card>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="capitalize">
+                  {currentMonthLabel}
+                </CardTitle>
+                <Badge variant="outline" className="ml-2">
+                  0 movimientos
+                </Badge>
+              </div>
+
+              {/* Month Navigator - Always visible */}
+              <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMonthChange('prev')}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <Select value={currentMonthValue} onValueChange={handleMonthSelect}>
+                  <SelectTrigger className="h-8 border-0 bg-transparent focus:ring-0 w-[180px] text-center font-medium capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value} className="capitalize">
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMonthChange('next')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-6xl mb-4">💸</div>
             <h3 className="text-lg font-semibold mb-2">No hay movimientos</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              {movements.length === 0 ? 'Registra tu primer ingreso o gasto' : 'No se encontraron resultados con los filtros aplicados'}
+              {movements.length === 0 ? 'Registra tu primer ingreso o gasto' : 'No se encontraron movimientos en este período. Usa las flechas ← → para navegar entre meses.'}
             </p>
-            {movements.length === 0 && (
+            {movements.length === 0 ? (
               <Button onClick={() => setIsOpen(true)} disabled={entities.length === 0}>
                 {entities.length === 0 ? 'Crea una entidad primero' : '+ Nuevo Movimiento'}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => handleMonthChange('prev')}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Ir al mes anterior
               </Button>
             )}
           </CardContent>

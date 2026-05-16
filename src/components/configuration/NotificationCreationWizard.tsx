@@ -244,18 +244,24 @@ function TriggerTypeStep({
   onSelect,
   projectLists,
   onChange,
+  restrictTypes,
 }: {
   data: WizardData;
   onSelect: (type: TriggerType) => void;
   projectLists: ProjectList[];
   onChange: (field: keyof WizardData, value: any) => void;
+  restrictTypes?: TriggerType[];
 }) {
+  const options = restrictTypes && restrictTypes.length > 0
+    ? TRIGGER_OPTIONS.filter(o => restrictTypes.includes(o.value))
+    : TRIGGER_OPTIONS;
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">¿Qué evento dispara esta notificación?</p>
 
       <div className="grid gap-3">
-        {TRIGGER_OPTIONS.map(option => {
+        {options.map(option => {
           const Icon = option.icon;
           const isSelected = data.triggerType === option.value;
           return (
@@ -366,24 +372,29 @@ interface NotificationCreationWizardProps {
   projectLists: ProjectList[];
   clients: Client[];
   initialTriggerType?: TriggerType;
+  restrictTypes?: TriggerType[];
 }
 
-export function NotificationCreationWizard({ open, onOpenChange, onCreated, projectLists, clients, initialTriggerType }: NotificationCreationWizardProps) {
+export function NotificationCreationWizard({ open, onOpenChange, onCreated, projectLists, clients, initialTriggerType, restrictTypes }: NotificationCreationWizardProps) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<WizardData>({ ...INITIAL_WIZARD_DATA });
   const [loading, setLoading] = useState(false);
 
-  // Reset on close
+  // Reset on close. Si el caller restringe a un único trigger, pre-selecciónalo.
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
         setStep(1);
         setData({ ...INITIAL_WIZARD_DATA });
       }, 200);
-    } else if (initialTriggerType) {
-      setData(prev => ({ ...prev, triggerType: initialTriggerType }));
+    } else {
+      const preselected = initialTriggerType
+        ?? (restrictTypes && restrictTypes.length === 1 ? restrictTypes[0] : undefined);
+      if (preselected) {
+        setData(prev => ({ ...prev, triggerType: preselected }));
+      }
     }
-  }, [open, initialTriggerType]);
+  }, [open, initialTriggerType, restrictTypes]);
 
   const updateField = (field: keyof WizardData, value: any) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -446,6 +457,7 @@ export function NotificationCreationWizard({ open, onOpenChange, onCreated, proj
               onSelect={(type) => updateField('triggerType', type)}
               projectLists={projectLists}
               onChange={updateField}
+              restrictTypes={restrictTypes}
             />
           )}
           {step === 3 && (

@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { Subscription } from '@/types';
 import { useIndicators } from '@/hooks/useIndicators';
 import { useMemo } from 'react';
+import { MetricChartCard } from '@/components/dashboard/MetricChartCard';
+import { subMonths, startOfMonth, parseISO } from 'date-fns';
 
 interface MetricsOverviewProps {
     balance: number;
@@ -160,14 +162,43 @@ export function MetricsOverview({
                 positive={true}
             />
 
-            <MetricCard
-                title="Servicios Activos"
-                value={`${activeServicesCount}`}
-                change={0}
-                icon={<Zap className="h-5 w-5" />}
-                variant="default"
-                subtitle={`MRR: UF ${activeServicesValueUF.toFixed(1)}`}
-            />
+            {/* Servicios Activos - with monthly count sparkline */}
+            <div className="h-32">
+            {(() => {
+                // Compute active service count per month for the last 12 months
+                const now = new Date();
+                const serviceCountHistory = Array.from({ length: 12 }, (_, i) => {
+                    const monthDate = startOfMonth(subMonths(now, 11 - i));
+                    // Count services that existed (were created) by this month and weren't archived before it
+                    const count = subscriptions.filter(sub => {
+                        const created = sub.createdAt ? new Date(sub.createdAt) : parseISO(sub.startDate);
+                        if (created > monthDate) return false;
+                        // If archived before this month, don't count
+                        if (sub.status !== 'active' && sub.archivedAt) {
+                            const archived = parseISO(sub.archivedAt);
+                            if (archived < monthDate) return false;
+                        }
+                        return true;
+                    }).length;
+                    return { value: count };
+                });
+                const prevCount = serviceCountHistory[10]?.value || 0;
+                const currentCount = serviceCountHistory[11]?.value || 0;
+                const countTrend = prevCount > 0 ? ((currentCount - prevCount) / prevCount) * 100 : 0;
+
+                return (
+                    <MetricChartCard
+                        label="Servicios Activos"
+                        value={`${activeServicesCount}`}
+                        subtext={`MRR: UF ${activeServicesValueUF.toFixed(1)}`}
+                        data={serviceCountHistory}
+                        color="cyan"
+                        trend={parseFloat(countTrend.toFixed(1))}
+                        trendDirection={countTrend >= 0 ? 'up' : 'down'}
+                    />
+                );
+            })()}
+            </div>
 
             <MetricCard
                 title="Cobros Pendientes"

@@ -9,7 +9,6 @@ import {
   Building2,
   CreditCard,
   LayoutGrid,
-  Bell,
   Settings,
   Info,
   type LucideIcon
@@ -26,7 +25,6 @@ const configNavItems: ConfigNavItem[] = [
   { id: 'config-general', label: 'General', icon: Building2, tab: 'general' },
   { id: 'config-boxes', label: 'Cajas', icon: CreditCard, tab: 'boxes' },
   { id: 'config-categories', label: 'Categorías', icon: LayoutGrid, tab: 'categories' },
-  { id: 'config-notifications', label: 'Notificaciones', icon: Bell, tab: 'notifications' },
   { id: 'config-advanced', label: 'Avanzado', icon: Settings, tab: 'advanced' },
   { id: 'config-changelog', label: 'Versión y Cambios', icon: Info, tab: 'changelog' },
 ];

@@ -14,6 +14,8 @@ import { NotificationProvider } from '@/contexts/NotificationContext'
 import { AIProvider } from '@/contexts/AIContext'
 import { PrivacyProvider } from '@/contexts/PrivacyContext'
 
+console.log('App version 1.0.4 - Cache Busted');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider defaultTheme="dark" storageKey="entity-ui-theme">

@@ -1,13 +1,13 @@
-# Guía de Gestión de Base de Datos (Firebase Firestore)
+# Guía de Gestión de Base de Datos (Supabase Postgres)
 
 Este documento sirve como referencia para cualquier agente o desarrollador que necesite realizar cambios en la estructura de la base de datos o añadir nuevas funcionalidades que requieran persistencia de datos.
 
 ## Principios Fundamentales
 
 1.  **Multi-tenancy por Defecto**:
-    *   Todos los documentos raíz *deben* tener un campo `userId` que corresponda al UID del usuario autenticado.
-    *   Las reglas de seguridad (`firestore.rules`) se basan en este campo para permitir el acceso (`isOwner(resource.data.userId)`).
-    *   *Nunca* confíes en filtros del lado del cliente para la seguridad; la seguridad debe estar en las reglas.
+    *   Todas las tablas raíz *deben* tener una columna `user_id uuid` que referencie `auth.users(id)`.
+    *   Las políticas RLS (ver `supabase/migrations/*_rls.sql`) usan `auth.uid() = user_id` para autorizar.
+    *   *Nunca* confíes en filtros del lado del cliente para la seguridad; la seguridad debe estar en las policies de Postgres.
 
 2.  **Schema Implícito (TypeScript)**:
     *   Aunque Firestore es NoSQL, tratamos la base de datos como si tuviera un esquema estricto definido por los tipos en `src/types/index.ts`.

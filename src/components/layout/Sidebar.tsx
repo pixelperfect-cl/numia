@@ -142,6 +142,12 @@ export const menuItems: MenuItem[] = [
         label: 'Archivados',
         icon: Archive,
         path: '/erp/services?tab=archived'
+      },
+      {
+        id: 'services-notifications',
+        label: 'Plantillas de Email',
+        icon: Bell,
+        path: '/erp/services?tab=notifications'
       }
     ]
   },
@@ -169,6 +175,12 @@ export const menuItems: MenuItem[] = [
         label: 'Archivados',
         icon: Archive,
         path: '/erp/projects?tab=archived'
+      },
+      {
+        id: 'projects-notifications',
+        label: 'Plantillas de Email',
+        icon: Bell,
+        path: '/erp/projects?tab=notifications'
       }
     ]
   },
@@ -195,12 +207,6 @@ export const menuItems: MenuItem[] = [
         label: 'Categorías',
         icon: LayoutGrid,
         path: '/configuration?tab=categories'
-      },
-      {
-        id: 'config-notifications',
-        label: 'Notificaciones',
-        icon: Bell,
-        path: '/configuration?tab=notifications'
       },
       {
         id: 'config-advanced',

@@ -2,7 +2,7 @@
  * Numia v1.0 - AI Assistant Context
  */
 
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { AIMessage, AIConversation } from '@/types';
 import { useData } from './DataContext';
 import { useAuth } from './AuthContext';
@@ -35,6 +35,9 @@ export function AIProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentConversation, setCurrentConversation] = useState<AIConversation | null>(null);
+
+  const messagesRef = useRef<AIMessage[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   const openAssistant = useCallback(() => {
     setIsOpen(true);
@@ -329,10 +332,9 @@ export function AIProvider({ children }: { children: ReactNode }) {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Enviar a la AI
       const response = await sendMessageToAI({
         message: messageText,
-        conversationHistory: messages,
+        conversationHistory: messagesRef.current,
         entities,
         categories,
         movements,
@@ -404,26 +406,25 @@ export function AIProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing, messages, entities, categories, movements, executeFunction]);
+  }, [isProcessing, entities, categories, movements, executeFunction, createNotification]);
 
-  return (
-    <AIContext.Provider
-      value={{
-        isOpen,
-        isProcessing,
-        currentConversation,
-        messages,
-        error,
-        openAssistant,
-        closeAssistant,
-        sendMessage,
-        clearConversation,
-        executeFunction,
-      }}
-    >
-      {children}
-    </AIContext.Provider>
+  const value = useMemo(
+    () => ({
+      isOpen,
+      isProcessing,
+      currentConversation,
+      messages,
+      error,
+      openAssistant,
+      closeAssistant,
+      sendMessage,
+      clearConversation,
+      executeFunction,
+    }),
+    [isOpen, isProcessing, currentConversation, messages, error, openAssistant, closeAssistant, sendMessage, clearConversation, executeFunction]
   );
+
+  return <AIContext.Provider value={value}>{children}</AIContext.Provider>;
 }
 
 export function useAI() {

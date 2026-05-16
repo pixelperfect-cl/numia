@@ -12,7 +12,7 @@ import {
     TrendingUp, TrendingDown, DollarSign, Loader2, Briefcase, Users, UserCheck,
     UserX, SquareKanban, Archive, Activity, Wallet, HandCoins, PiggyBank, Receipt,
     LayoutDashboard, FileBarChart, PieChart, ChevronRight, CheckSquare, ChevronDown, Search, Clock,
-    Upload, ImageIcon
+    Upload, ImageIcon, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -88,35 +88,70 @@ function HeaderDateSelector() {
         { value: 'LAST_MONTH', label: 'Mes Pasado' },
         { value: 'THIS_YEAR', label: 'Este Año' },
         { value: 'LAST_YEAR', label: 'Año Pasado' },
-        { value: 'ALL', label: 'Todo' }, // Added for 'All time'
+        { value: 'ALL', label: 'Todo' },
         { value: 'CUSTOM', label: 'Personalizado' },
     ];
 
+    const currentLabel = periodOptions.find(o => o.value === dateFilter.type)?.label || 'Filtro';
+
     return (
         <div className="flex items-center gap-2">
-            <Select
-                value={dateFilter.type}
-                onValueChange={(val: DateFilterType | 'ALL') => {
-                    if (val === 'CUSTOM') {
-                        // Keep custom open or handle logic needed?
-                        // Usually we switch mode and let user pick dates
-                        setDateFilter({ type: 'CUSTOM', startDate: undefined, endDate: undefined });
-                    } else {
-                        setDateFilter({ type: val });
-                    }
-                }}
-            >
-                <SelectTrigger className="w-[140px] h-8 text-xs bg-muted/40 border-border/40">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {periodOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            {/* Mobile: compact icon-only dropdown */}
+            <div className="md:hidden">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/40 border border-border/40">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[180px]">
+                        {periodOptions.map((option) => (
+                            <DropdownMenuItem
+                                key={option.value}
+                                onSelect={() => {
+                                    if (option.value === 'CUSTOM') {
+                                        setDateFilter({ type: 'CUSTOM', startDate: undefined, endDate: undefined });
+                                    } else {
+                                        setDateFilter({ type: option.value });
+                                    }
+                                }}
+                                className={cn(
+                                    "flex items-center justify-between text-sm",
+                                    dateFilter.type === option.value && "font-semibold"
+                                )}
+                            >
+                                {option.label}
+                                {dateFilter.type === option.value && <Check className="h-3.5 w-3.5 text-primary" />}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+
+            {/* Desktop: full select */}
+            <div className="hidden md:block">
+                <Select
+                    value={dateFilter.type}
+                    onValueChange={(val: DateFilterType | 'ALL') => {
+                        if (val === 'CUSTOM') {
+                            setDateFilter({ type: 'CUSTOM', startDate: undefined, endDate: undefined });
+                        } else {
+                            setDateFilter({ type: val });
+                        }
+                    }}
+                >
+                    <SelectTrigger className="w-[140px] h-8 text-xs bg-muted/40 border-border/40">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {periodOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
 
             {dateFilter.type === 'CUSTOM' && (
                 <Popover>
@@ -154,7 +189,6 @@ function HeaderDateSelector() {
                                         endDate: range.to ? range.to.toISOString().split('T')[0] : undefined
                                     });
                                 } else {
-                                    // Clear
                                     setDateFilter({ type: 'CUSTOM', startDate: undefined, endDate: undefined });
                                 }
                             }}
@@ -329,6 +363,13 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
     const navigate = useNavigate();
     const logoInputRef = useRef<HTMLInputElement>(null);
     const [logoUploading, setLogoUploading] = useState(false);
+    const [, setTick] = useState(0); // Force re-render for live time updates
+
+    // Live time bar: re-render every 60 seconds
+    useEffect(() => {
+        const interval = setInterval(() => setTick(t => t + 1), 60_000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (projectId && user) {
@@ -344,6 +385,22 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
             return () => unsubscribe();
         }
     }, [projectId, user]);
+
+    // Listen for project-updated events (fired when dates/fields change from detail widgets)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail?.projectId === projectId) {
+                import('@/lib/supabase/database').then(({ getProject }) => {
+                    getProject(projectId).then((p) => {
+                        if (p) setProject(p);
+                    });
+                });
+            }
+        };
+        window.addEventListener('project-updated', handler);
+        return () => window.removeEventListener('project-updated', handler);
+    }, [projectId]);
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -372,6 +429,14 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
         try {
             const { updateProject } = await import('@/lib/supabase/database');
             await updateProject(project.id, { status: newStatusId });
+            if (previousProject.status !== newStatusId) {
+                const { sendTriggerEmail } = await import('@/lib/notifications/triggers');
+                void sendTriggerEmail({
+                    projectId: project.id,
+                    statusId: newStatusId,
+                    triggerType: 'project_status',
+                });
+            }
         } catch (error) {
             console.error("Failed to update status", error);
             // Revert on failure
@@ -380,17 +445,17 @@ function SingleProjectHeaderContent({ projectId }: { projectId: string }) {
         }
     };
 
-    // Time Progress Logic
+    // Time Progress Logic — uses startDate (falls back to createdAt)
     const calculateTimeProgress = () => {
-        if (!project?.createdAt || !project?.dueDate) return 0;
-        const start = new Date(project.createdAt);
+        if (!project?.dueDate) return 0;
+        const startRef = project.startDate || project.createdAt;
+        if (!startRef) return 0;
+        const start = new Date(startRef);
         const end = new Date(project.dueDate);
         const now = new Date();
         const totalDuration = end.getTime() - start.getTime();
-        const elapsed = now.getTime() - start.getTime();
-
         if (totalDuration <= 0) return 100;
-
+        const elapsed = now.getTime() - start.getTime();
         const progress = (elapsed / totalDuration) * 100;
         return Math.min(Math.max(progress, 0), 100);
     };

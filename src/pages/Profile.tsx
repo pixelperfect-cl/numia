@@ -34,6 +34,7 @@ export function Profile() {
                   src={user.photoURL}
                   alt={user.displayName || 'User'}
                   className="h-20 w-20 rounded-full"
+                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">

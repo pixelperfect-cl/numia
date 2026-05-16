@@ -1,10 +1,9 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Calendar, User, CheckSquare, Eye } from 'lucide-react';
 import type { Project } from '@/types';
-import { format, isPast, parseISO, differenceInDays } from 'date-fns';
+import { format, isPast, parseISO } from 'date-fns';
 
 interface ProjectCardProps {
     project: Project;
@@ -15,11 +14,28 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCardProps) {
     const isOverdue = project.dueDate && isPast(parseISO(project.dueDate)) && project.status !== 'completed';
-    const progressColor = project.status === 'completed' ? 'bg-green-500' : 'bg-primary';
 
-    // Calculate checklist progress
+    // Calculate checklist progress dynamically
     const totalChecklistItems = project.checklists?.reduce((acc, list) => acc + list.items.length, 0) || 0;
     const completedChecklistItems = project.checklists?.reduce((acc, list) => acc + list.items.filter(i => i.completed).length, 0) || 0;
+    const checklistProgress = totalChecklistItems > 0
+        ? Math.round((completedChecklistItems / totalChecklistItems) * 100)
+        : project.progress;
+
+    // Calculate time progress using startDate (fallback to createdAt)
+    const calculateTimeProgress = () => {
+        if (!project.dueDate) return 0;
+        const startRef = project.startDate || (project.createdAt ? project.createdAt.toString() : null);
+        if (!startRef) return 0;
+        const start = new Date(startRef);
+        const end = parseISO(project.dueDate);
+        const now = new Date();
+        const totalDuration = end.getTime() - start.getTime();
+        if (totalDuration <= 0) return 100;
+        const elapsed = now.getTime() - start.getTime();
+        return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+    };
+    const timeProgress = calculateTimeProgress();
 
     return (
         <Card
@@ -84,10 +100,10 @@ export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCa
                     <div className="space-y-1">
                         <div className="flex justify-between text-[10px]">
                             <span className="text-muted-foreground">Progreso</span>
-                            <span className="font-medium">{project.progress}%</span>
+                            <span className="font-medium">{checklistProgress}%</span>
                         </div>
                         <Progress
-                            value={project.progress}
+                            value={checklistProgress}
                             className="h-1"
                             indicatorClassName="bg-[#008bff] shadow-[0_0_8px_#008bff]"
                         />
@@ -118,8 +134,8 @@ export function ProjectCard({ project, clientName, onEdit, onDelete }: ProjectCa
                     <div className="pt-1">
                         <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
                             <div
-                                className={`h-full ${isOverdue ? 'bg-destructive' : 'bg-blue-400/70'}`}
-                                style={{ width: `${Math.min(Math.max((differenceInDays(new Date(), project.createdAt ? parseISO(project.createdAt.toString()) : new Date()) / differenceInDays(parseISO(project.dueDate), project.createdAt ? parseISO(project.createdAt.toString()) : new Date())) * 100, 0), 100)}%` }}
+                                className={`h-full transition-all ${isOverdue ? 'bg-destructive' : 'bg-blue-400/70'}`}
+                                style={{ width: `${timeProgress}%` }}
                             />
                         </div>
                     </div>

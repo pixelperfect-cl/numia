@@ -6,7 +6,6 @@ import { BoxesPanel } from '@/components/configuration/BoxesPanel';
 import { CategoriesPanel } from '@/components/configuration/CategoriesPanel';
 import { AdvancedSettings } from '@/components/configuration/AdvancedSettings';
 import { NotificationSettings } from '@/components/configuration/NotificationSettings';
-import { EmailTemplatesPanel } from '@/components/configuration/EmailTemplatesPanel';
 import { ChangelogPanel } from '@/components/configuration/ChangelogPanel';
 
 interface EntityConfigurationProps {
