@@ -8,12 +8,91 @@ export interface ChangeLogEntry {
 }
 
 export const appStats = {
-    loc: 42250, // Líneas de código estimadas al 21/03/2026
-    devHours: 655, // Estimación de horas de desarrollo
-    lastUpdated: '2026-03-21'
+    loc: 42932, // Líneas de código al 16/05/2026
+    devHours: 752, // Estimación de horas de desarrollo
+    lastUpdated: '2026-05-16'
 };
 
 export const changelog: ChangeLogEntry[] = [
+    {
+        version: '1.1.0',
+        date: '2026-05-16',
+        changes: [
+            // ─── Infraestructura: Migración Firebase → Supabase ───
+            { type: 'changed', description: 'Migración completa de Firebase/Firestore a Supabase: removidas dependencias firebase y firebase-tools' },
+            { type: 'removed', description: 'Eliminados artefactos legacy: firebase.json, firestore.rules, firestore.indexes.json, storage.rules, FIREBASE_STORAGE_SETUP.md, carpeta .firebase' },
+            { type: 'added', description: 'Migraciones SQL versionadas en supabase/migrations: RLS por user_id en 12 tablas, email_log, cron_billing, remove_legacy_smtp_apikey' },
+            { type: 'added', description: 'Edge functions Deno en supabase/functions: ai-chat, send-billing-email, run-billing-for-user, test-elasticemail, módulo _shared con cors y auth' },
+            { type: 'added', description: 'Cron diario (pg_cron + pg_net) que dispara run-billing-for-user a las 12:00 UTC para fan-out de cobros por usuario' },
+
+            // ─── AI: Migración OpenAI → Claude (Sonnet 4.6) ───
+            { type: 'changed', description: 'AI Assistant migrado de OpenAI a Anthropic Claude (claude-sonnet-4-6) vía edge function ai-chat — la API key ya no se expone al navegador' },
+            { type: 'changed', description: 'AIContext.sendMessage refactorizado con messagesRef para evitar recreaciones por mensaje; value del Provider memoizado' },
+            { type: 'removed', description: 'Eliminado dangerouslyAllowBrowser: AI ya no se ejecuta client-side con credenciales expuestas' },
+
+            // ─── SMTP: ElasticEmail seguro ───
+            { type: 'added', description: 'Edge function test-elasticemail valida la API key sin exponerla en el cliente; SMTPPanel ya no acepta apiKey en su formulario' },
+            { type: 'removed', description: 'Campo apiKey legacy borrado del JSON entities.settings.smtpConfig (migración remove_legacy_smtp_apikey)' },
+            { type: 'added', description: 'Warning en SMTPPanel si detecta apiKey legacy en config existente' },
+
+            // ─── Sistema de Notificaciones: triggers cableados end-to-end ───
+            { type: 'added', description: 'Trigger service_due ahora dispara desde el cron diario: X días antes del próximo cobro envía email recordatorio al cliente (configurable por reminder)' },
+            { type: 'added', description: 'Trigger project_status ahora dispara desde el frontend: al cambiar el estado de un proyecto (drag-end en Kanban o dropdown del header) se envía email automático según la plantilla configurada para esa columna' },
+            { type: 'added', description: 'Trigger billing_generated dispara desde el cron al generar movimientos de suscripción Y de proyecto, iterando todas las plantillas habilitadas que aplican al cliente' },
+            { type: 'added', description: 'Selección granular de destinatarios por trigger: recipientMode "all" o "specific" con lista de clientIds; persistida y respetada al enviar' },
+            { type: 'added', description: 'Edición in-place de destinatarios desde la tarjeta del trigger (sin volver al wizard); badge rojo "⚠ Sin destinatarios" cuando un trigger activo no envía a nadie' },
+            { type: 'added', description: 'Iteración de TODAS las plantillas habilitadas: si configuras 2 plantillas billing_generated, el cron envía ambas (con dedup por template_id)' },
+            { type: 'added', description: 'Plantillas por defecto cargables con 1 click ("Cargar plantillas de ejemplo"), distintas según scope (services usa {{service_name}}, projects usa {{project_name}} + {{installment_label}})' },
+            { type: 'added', description: 'email_log con índices únicos parciales: dedup por (subscription_id, billing_period, template_id, trigger_type) ó (project_id, installment_id, template_id, trigger_type) — incluir trigger_type evita que service_due bloquee al billing_generated posterior' },
+            { type: 'added', description: 'Variables UI de la tarjeta de trigger ahora son scope-aware: en Proyectos billing_generated muestra {{project_name}} y {{installment_label}}' },
+
+            // ─── ERP: Proyectos — Cobros Programados ───
+            { type: 'added', description: 'Cobros programados por proyecto (Project.billingInstallments): cada installment tiene fecha, monto y etiqueta opcional; el cron genera el movement automáticamente cuando la fecha llega' },
+            { type: 'added', description: 'BillingScheduleCard en pestaña Finanzas del proyecto: CRUD de cobros programados con estado generado/pendiente; los generados son inmutables' },
+            { type: 'added', description: 'Cron Phase 3 procesa installments: insert idempotente del movement con project_id + billing_period, marca generated=true con movementId, envía billing_generated emails' },
+            { type: 'added', description: 'send-billing-email acepta projectId/installmentId además de subscriptionId; renderiza {{project_name}}, {{installment_label}} y {{item_name}}' },
+            { type: 'added', description: 'Tab "Plantillas de Email" dentro del panel de Proyectos (scope="projects") muestra project_status + billing_generated' },
+            { type: 'added', description: 'Migración 20260517_project_billing_and_email_log.sql: columnas amount/currency/start_date/billing_installments en projects, project_id/installment_id en email_log' },
+            { type: 'fixed', description: 'mapper.mapProject ya no descarta el campo amount al persistir; ahora también mapea billingInstallments, techDetails y startDate' },
+
+            // ─── ERP: Servicios — Pagos y UF ───
+            { type: 'added', description: 'PaymentRecord ampliado con billingPeriod, isPartial, amountUF y ufRateAtPayment para snapshot del tipo de cambio al momento del pago' },
+            { type: 'fixed', description: 'Bloqueo de pago "completo" duplicado para mismo billingPeriod en suscripciones (alerta el conflicto y sugiere usar pago parcial o revertir)' },
+            { type: 'added', description: 'Generación automática de cobros (run-billing-for-user) ahora resuelve la entidad por cliente (no asigna todo a entities[0]) y la box default correcta de cada entidad' },
+            { type: 'changed', description: 'billing.ts local refactorizado: dedup vía findMovementBySubscriptionPeriod, orden update→insert con rollback, snapshot UF, stats detalladas (created, skippedDuplicate, skippedZombie, failed, failures)' },
+            { type: 'removed', description: 'handleGenerateBilling de Services.tsx eliminado: era código muerto que además no disparaba emails (solo el cron lo hace)' },
+
+            // ─── Performance / Estabilidad de React ───
+            { type: 'fixed', description: 'DataContext: value del Provider memoizado para evitar re-renders en cascada' },
+            { type: 'fixed', description: 'PrivacyContext: try/catch en localStorage + value memoizado (evita crashes en navegación privada)' },
+            { type: 'fixed', description: 'NotificationContext: fetch duplicado eliminado y channel de Realtime scope-eado por usuario (notifications:${user.uid})' },
+            { type: 'fixed', description: 'App.tsx localStorage envuelto en try/catch (mismo motivo de PrivacyContext)' },
+
+            // ─── Limpieza / Refactor ───
+            { type: 'removed', description: 'EmailTemplatesPanel.tsx eliminado: componente legacy duplicado de NotificationSettings con un tipo "scheduled" no expuesto' },
+            { type: 'fixed', description: 'NotificationSettings.handleLoadDefaults ya no duplica plantillas service_due al click repetido (chequea hasService antes de inyectar)' },
+            { type: 'fixed', description: 'send-billing-email retorna respuestas con array de resultados por plantilla (sent/failed/alreadySent), no solo la primera' },
+            { type: 'fixed', description: 'email_log insert en el cron ahora se awaitea y loggea errores en stats (antes podía duplicar emails si el log fallaba silenciosamente)' },
+            { type: 'changed', description: 'README, DATABASE_GUIDELINES y .env.example actualizados al stack actual (Supabase + Anthropic + ElasticEmail)' },
+            { type: 'added', description: 'useConnectionStatus reescrito con health-check directo a Supabase (sin firebase imports)' },
+        ]
+    },
+    {
+        version: '1.0.5',
+        date: '2026-04-02',
+        changes: [
+            // ─── Módulo ERP: Servicios ───
+            { type: 'fixed', description: 'Corrección de montos pendientes fantasma en tarjetas de servicio: servicios marcados como "Pagado" ya no muestran pequeñas deudas residuales causadas por la fluctuación del valor de la UF' },
+            { type: 'changed', description: 'Tolerancia de pago dinámica: margen del 1% del monto total para servicios en UF (reemplaza umbral fijo de $10 CLP) para absorber variaciones de tipo de cambio' },
+            { type: 'fixed', description: 'Barra de progreso de pagos parciales ahora se oculta correctamente cuando el servicio está completamente pagado (clamping a 100%)' },
+            { type: 'fixed', description: 'Status "Pagado" en vista Kanban ahora considera correctamente el margen de tolerancia además del período de facturación' },
+            { type: 'fixed', description: 'Montos pendientes negativos prevenidos con Math.max(0, ...) en cálculos de deuda residual' },
+
+            // ─── Módulo de Movimientos ───
+            { type: 'fixed', description: 'Navegador de meses (← →) ahora siempre visible en la página de Movimientos, incluso cuando no hay registros en el período seleccionado' },
+            { type: 'changed', description: 'Estado vacío de movimientos mejorado: muestra controles de navegación temporal y botón "Ir al mes anterior" para facilitar la exploración' },
+        ]
+    },
     {
         version: '1.0.4',
         date: '2026-03-21',
