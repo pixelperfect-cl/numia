@@ -9,7 +9,7 @@ import { BillingScheduleCard } from "../widgets/BillingScheduleCard";
 
 interface ProjectFinanceTabProps {
     project: Project;
-    onProjectUpdate?: () => void;
+    onProjectUpdate?: (updated?: Project) => void | Promise<void>;
 }
 
 export function ProjectFinanceTab({ project, onProjectUpdate }: ProjectFinanceTabProps) {
