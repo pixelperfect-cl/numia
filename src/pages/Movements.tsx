@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType } from '@/lib/utils';
+import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType, calculateBoxBalances } from '@/lib/utils';
 import type { Movement, MovementType, MovementHistoryEntry } from '@/types';
 import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -480,6 +480,41 @@ export function Movements({ entityId }: MovementsProps = {}) {
     return totalIncome - totalExpense;
   }, [movementsForChart]);
 
+  // Saldo Real por caja (all-time, por entidad, solo financieros).
+  // Ignora a propósito los filtros de fecha/tipo/categoría/búsqueda/caja:
+  // representa el dinero real que queda HOY en cada caja, no un balance relativo.
+  const realBalances = useMemo(() => {
+    const entityMovements = movements.filter(m =>
+      m.isFinancial !== false &&
+      (filterEntity === 'all' || m.entityId === filterEntity)
+    );
+    const byBox = calculateBoxBalances(entityMovements); // Record<boxName, number>
+    const total = Object.values(byBox).reduce((sum, v) => sum + v, 0);
+
+    // Entidad activa (si hay una seleccionada) para ordenar/etiquetar cajas con su config
+    const activeEntity = filterEntity !== 'all'
+      ? entities.find(e => e.id === filterEntity)
+      : undefined;
+
+    // Cajas definidas en la entidad (ordenadas) + cajas presentes en movimientos sin definir
+    const definedBoxes = activeEntity?.boxes
+      ? Object.entries(activeEntity.boxes)
+          .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
+          .map(([name, data]) => ({ name, currency: data.currency || 'CLP' }))
+      : [];
+    const definedNames = new Set(definedBoxes.map(b => b.name));
+    const extraBoxes = Object.keys(byBox)
+      .filter(name => !definedNames.has(name))
+      .map(name => ({ name, currency: 'CLP' }));
+
+    const boxes = [...definedBoxes, ...extraBoxes].map(b => ({
+      ...b,
+      balance: byBox[b.name] ?? 0,
+    }));
+
+    return { total, boxes };
+  }, [movements, filterEntity, entities]);
+
   // Sparkline data for stat cards (reactive to date range)
   const { incomeHistory, expensesHistory, balanceHistory, incomeTrend, expensesTrend, movementsCountHistory, movementsTrend } = useMemo(() => {
     const { startDate: rangeStart, endDate: rangeEnd } = getDateRangeFromType(dateFilter.type, dateFilter.startDate, dateFilter.endDate);
@@ -856,6 +891,59 @@ export function Movements({ entityId }: MovementsProps = {}) {
               </form>
             </DialogContent>
           </Dialog>
+        </div>
+      </div>
+
+      {/* Saldo Real - Dinero actual por caja (all-time, no relativo al filtro de fecha) */}
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Saldo Real</h2>
+          <span className="text-xs text-muted-foreground">Dinero actual · independiente del filtro de fechas</span>
+        </div>
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-4">
+          {/* Card destacada: saldo total real */}
+          <div className="lg:col-span-1">
+            <PulseCard
+              label="Saldo Total Real"
+              value={isBalanceHidden ? '****' : formatCurrency(realBalances.total)}
+              subtext={`${realBalances.boxes.length} ${realBalances.boxes.length === 1 ? 'caja' : 'cajas'}`}
+              type={realBalances.total < 0 ? 'danger' : 'success'}
+            />
+          </div>
+
+          {/* Mini-cards por caja */}
+          <div className="lg:col-span-3">
+            {realBalances.boxes.length === 0 ? (
+              <div className="h-full flex items-center justify-center rounded-xl border border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
+                No hay cajas con movimientos todavía.
+              </div>
+            ) : (
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {realBalances.boxes.map(box => (
+                  <div
+                    key={box.name}
+                    className="flex flex-col justify-between rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-3 transition-all hover:bg-card/60"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate text-xs font-medium" title={box.name}>{box.name}</span>
+                      </div>
+                      {box.currency !== 'CLP' && (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{box.currency}</span>
+                      )}
+                    </div>
+                    <div className={cn(
+                      "mt-2 text-lg font-light tracking-tight",
+                      box.balance < 0 ? "text-red-400" : "text-foreground"
+                    )}>
+                      {isBalanceHidden ? '****' : formatCurrency(box.balance, box.currency)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
