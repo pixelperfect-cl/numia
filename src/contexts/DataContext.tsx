@@ -28,6 +28,7 @@ interface DataContextType {
   createMovement: (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateMovement: (id: string, data: Partial<Movement>) => Promise<void>;
   deleteMovement: (id: string) => Promise<void>;
+  deleteMovementsBatch: (ids: string[]) => Promise<void>;
   createBatchMovements: (data: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]) => Promise<{ inserted: number; skipped: number }>;
   getExistingBankTransactionIds: (entityId: string) => Promise<Set<string>>;
   // Transfer methods
@@ -254,6 +255,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("Error deleting movement:", error);
       // Revert/Reload if failed
       await refreshData();
+    }
+  };
+
+  const deleteMovementsBatch = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    // Optimistic update: quitamos todos de la UI de una sola vez
+    const idSet = new Set(ids);
+    setMovements(prev => prev.filter(m => !idSet.has(m.id)));
+
+    try {
+      // Un solo DELETE ... IN (...) por chunk en vez de N round-trips secuenciales
+      await db.deleteMovementsBatch(ids);
+      // Una única notificación resumen (no una por movimiento)
+      await createNotification(
+        'Movimientos eliminados',
+        `Se eliminaron ${ids.length} movimientos`,
+        'warning'
+      );
+    } catch (error) {
+      console.error("Error deleting movements batch:", error);
+      // Revert/Reload if failed
+      await refreshData();
+      throw error;
     }
   };
 
@@ -556,6 +580,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createMovement,
       updateMovement,
       deleteMovement,
+      deleteMovementsBatch,
       createBatchMovements,
       getExistingBankTransactionIds,
       createTransfer,

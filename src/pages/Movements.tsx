@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType, calculateBoxBalances } from '@/lib/utils';
+import { formatCurrency, getTodayLocalDateString, parseLocalDate, getDateRangeFromType } from '@/lib/utils';
 import type { Movement, MovementType, MovementHistoryEntry } from '@/types';
 import { Plus, Search, Filter, Download, Trash2, Edit, FileSpreadsheet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Check, X, Calendar as CalendarIcon, Upload, ChevronUp, ChevronDown, Clock, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,7 +31,6 @@ import { IncomeExpenseChart } from '@/components/IncomeExpenseChart';
 import { MovementsAreaChart } from '@/components/MovementsAreaChart';
 import { CategoryPieChart } from '@/components/CategoryPieChart';
 import { MetricChartCard } from '@/components/dashboard/MetricChartCard';
-import { PulseCard } from '@/components/dashboard/PulseCard';
 
 interface MovementsProps {
   entityId?: string;
@@ -41,7 +40,7 @@ type SortField = 'date' | 'amount' | 'description' | 'category';
 type SortDirection = 'asc' | 'desc';
 
 export function Movements({ entityId }: MovementsProps = {}) {
-  const { movements, entities, categories, createMovement, updateMovement, deleteMovement, loading, dateFilter } = useData();
+  const { movements, entities, categories, createMovement, updateMovement, deleteMovement, deleteMovementsBatch, loading, dateFilter } = useData();
   const { user } = useAuth();
   const { isBalanceHidden } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -484,17 +483,32 @@ export function Movements({ entityId }: MovementsProps = {}) {
   // Ignora a propósito los filtros de fecha/tipo/categoría/búsqueda/caja:
   // representa el dinero real que queda HOY en cada caja, no un balance relativo.
   const realBalances = useMemo(() => {
-    const entityMovements = movements.filter(m =>
-      m.isFinancial !== false &&
-      (filterEntity === 'all' || m.entityId === filterEntity)
-    );
-    const byBox = calculateBoxBalances(entityMovements); // Record<boxName, number>
-    const total = Object.values(byBox).reduce((sum, v) => sum + v, 0);
-
     // Entidad activa (si hay una seleccionada) para ordenar/etiquetar cajas con su config
     const activeEntity = filterEntity !== 'all'
       ? entities.find(e => e.id === filterEntity)
       : undefined;
+
+    // Caja por defecto de la entidad: a ella van los movimientos sin caja asignada
+    // (mejor que el viejo fallback hardcodeado 'Efectivo', que ni existe en la entidad).
+    const defaultBoxName = activeEntity?.boxes
+      ? (Object.entries(activeEntity.boxes).find(([, b]) => b.isDefault)?.[0]
+          ?? Object.keys(activeEntity.boxes)[0])
+      : undefined;
+
+    const entityMovements = movements.filter(m =>
+      m.isFinancial !== false &&
+      (filterEntity === 'all' || m.entityId === filterEntity)
+    );
+
+    // Agrupamos por caja efectiva (box real, o la default de la entidad si viene vacío)
+    const byBox: Record<string, number> = {};
+    for (const m of entityMovements) {
+      const key = (m.box && m.box.trim()) || defaultBoxName || 'Sin caja';
+      const amount = Math.abs(m.amount);
+      const signed = m.type === 'income' ? amount : m.type === 'expense' ? -amount : 0;
+      byBox[key] = (byBox[key] ?? 0) + signed;
+    }
+    const total = Object.values(byBox).reduce((sum, v) => sum + v, 0);
 
     // Cajas definidas en la entidad (ordenadas) + cajas presentes en movimientos sin definir
     const definedBoxes = activeEntity?.boxes
@@ -730,32 +744,13 @@ export function Movements({ entityId }: MovementsProps = {}) {
 
     try {
       const movementIds = Array.from(selectedMovements);
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const movementId of movementIds) {
-        try {
-          await deleteMovement(movementId);
-          successCount++;
-        } catch (error) {
-          console.error(`Error deleting movement ${movementId}:`, error);
-          failCount++;
-        }
-      }
+      // Borrado en lote: un solo DELETE ... IN (...) por chunk en vez de N round-trips
+      await deleteMovementsBatch(movementIds);
 
       // Clear selection
       setSelectedMovements(new Set());
 
-      // Show result
-      if (failCount === 0) {
-        alert(`✓ ${successCount} movimiento${successCount > 1 ? 's eliminados' : ' eliminado'} correctamente`);
-      } else {
-        alert(
-          `Eliminación parcial:\n` +
-          `✓ ${successCount} eliminados\n` +
-          `✗ ${failCount} fallaron`
-        );
-      }
+      alert(`✓ ${movementIds.length} movimiento${movementIds.length > 1 ? 's eliminados' : ' eliminado'} correctamente`);
     } catch (error) {
       console.error('Error in batch delete:', error);
       alert('Error al eliminar movimientos');
@@ -896,54 +891,57 @@ export function Movements({ entityId }: MovementsProps = {}) {
 
       {/* Saldo Real - Dinero actual por caja (all-time, no relativo al filtro de fecha) */}
       <div className="space-y-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-wrap items-baseline justify-between gap-1">
           <h2 className="text-lg font-semibold tracking-tight">Saldo Real</h2>
           <span className="text-xs text-muted-foreground">Dinero actual · independiente del filtro de fechas</span>
         </div>
-        <div className="grid gap-3 grid-cols-1 lg:grid-cols-4">
+
+        {/* Grid uniforme: card total destacada + una card por caja, todas misma altura */}
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {/* Card destacada: saldo total real */}
-          <div className="lg:col-span-1">
-            <PulseCard
-              label="Saldo Total Real"
-              value={isBalanceHidden ? '****' : formatCurrency(realBalances.total)}
-              subtext={`${realBalances.boxes.length} ${realBalances.boxes.length === 1 ? 'caja' : 'cajas'}`}
-              type={realBalances.total < 0 ? 'danger' : 'success'}
-            />
+          <div className={cn(
+            "flex h-28 flex-col justify-between rounded-xl border p-4 transition-all",
+            realBalances.total < 0
+              ? "border-red-500/30 bg-red-500/10"
+              : "border-emerald-500/30 bg-emerald-500/10"
+          )}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Saldo Total Real</span>
+            <div>
+              <div className={cn(
+                "text-2xl font-light tracking-tight",
+                realBalances.total < 0 ? "text-red-400" : "text-emerald-400"
+              )}>
+                {isBalanceHidden ? '****' : formatCurrency(realBalances.total)}
+              </div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                {realBalances.boxes.length} {realBalances.boxes.length === 1 ? 'caja' : 'cajas'}
+              </div>
+            </div>
           </div>
 
-          {/* Mini-cards por caja */}
-          <div className="lg:col-span-3">
-            {realBalances.boxes.length === 0 ? (
-              <div className="h-full flex items-center justify-center rounded-xl border border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
-                No hay cajas con movimientos todavía.
+          {/* Una card por caja */}
+          {realBalances.boxes.map(box => (
+            <div
+              key={box.name}
+              className="flex h-28 flex-col justify-between rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm transition-all hover:bg-card/60"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-xs font-medium" title={box.name}>{box.name}</span>
+                </div>
+                {box.currency !== 'CLP' && (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{box.currency}</span>
+                )}
               </div>
-            ) : (
-              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                {realBalances.boxes.map(box => (
-                  <div
-                    key={box.name}
-                    className="flex flex-col justify-between rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-3 transition-all hover:bg-card/60"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-xs font-medium" title={box.name}>{box.name}</span>
-                      </div>
-                      {box.currency !== 'CLP' && (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">{box.currency}</span>
-                      )}
-                    </div>
-                    <div className={cn(
-                      "mt-2 text-lg font-light tracking-tight",
-                      box.balance < 0 ? "text-red-400" : "text-foreground"
-                    )}>
-                      {isBalanceHidden ? '****' : formatCurrency(box.balance, box.currency)}
-                    </div>
-                  </div>
-                ))}
+              <div className={cn(
+                "text-xl font-light tracking-tight",
+                box.balance < 0 ? "text-red-400" : "text-foreground"
+              )}>
+                {isBalanceHidden ? '****' : formatCurrency(box.balance, box.currency)}
               </div>
-            )}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 

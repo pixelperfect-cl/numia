@@ -175,6 +175,20 @@ export const deleteMovement = async (movementId: string): Promise<void> => {
     if (error) throw error;
 };
 
+export const deleteMovementsBatch = async (movementIds: string[]): Promise<void> => {
+    if (movementIds.length === 0) return;
+    // Supabase limita el tamaño del filtro IN; troceamos en chunks como en createBatchMovements.
+    const CHUNK_SIZE = 200;
+    for (let i = 0; i < movementIds.length; i += CHUNK_SIZE) {
+        const chunk = movementIds.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+            .from('movements')
+            .delete()
+            .in('id', chunk);
+        if (error) throw error;
+    }
+};
+
 export const createBatchMovements = async (
     userId: string,
     movements: Omit<Movement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>[]

@@ -261,7 +261,7 @@ export const mapMovement = (userId: string | undefined, data: Partial<Movement>)
     obj.subscriptionId = safeStringToUuid(obj.subscriptionId);
 
     if (obj.category) delete obj.category;
-    delete obj.box;
+    // `box` SÍ se persiste ahora (columna movements.box). No borrar.
     delete obj.history;
     delete obj.subcategory;
     delete obj.subCategory;
@@ -279,7 +279,6 @@ export const mapMovement = (userId: string | undefined, data: Partial<Movement>)
     });
 
     // Validate final object keys to prevents DB errors
-    if ('box' in mapped) delete mapped['box'];
     if ('box_id' in mapped) delete mapped['box_id'];
     if ('history' in mapped) delete mapped['history'];
 
