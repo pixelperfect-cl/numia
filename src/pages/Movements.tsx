@@ -468,17 +468,6 @@ export function Movements({ entityId }: MovementsProps = {}) {
     };
   }, [filteredMovements]);
 
-  // Global Balance (All Time)
-  const globalBalance = useMemo(() => {
-    const totalIncome = movementsForChart
-      .filter(m => m.type === 'income')
-      .reduce((sum, m) => sum + m.amount, 0);
-    const totalExpense = movementsForChart
-      .filter(m => m.type === 'expense')
-      .reduce((sum, m) => sum + Math.abs(m.amount), 0);
-    return totalIncome - totalExpense;
-  }, [movementsForChart]);
-
   // Saldo Real por caja (all-time, por entidad, solo financieros).
   // Ignora a propósito los filtros de fecha/tipo/categoría/búsqueda/caja:
   // representa el dinero real que queda HOY en cada caja, no un balance relativo.
@@ -889,62 +878,6 @@ export function Movements({ entityId }: MovementsProps = {}) {
         </div>
       </div>
 
-      {/* Saldo Real - Dinero actual por caja (all-time, no relativo al filtro de fecha) */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-1">
-          <h2 className="text-lg font-semibold tracking-tight">Saldo Real</h2>
-          <span className="text-xs text-muted-foreground">Dinero actual · independiente del filtro de fechas</span>
-        </div>
-
-        {/* Grid uniforme: card total destacada + una card por caja, todas misma altura */}
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {/* Card destacada: saldo total real */}
-          <div className={cn(
-            "flex h-28 flex-col justify-between rounded-xl border p-4 transition-all",
-            realBalances.total < 0
-              ? "border-red-500/30 bg-red-500/10"
-              : "border-emerald-500/30 bg-emerald-500/10"
-          )}>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Saldo Total Real</span>
-            <div>
-              <div className={cn(
-                "text-2xl font-light tracking-tight",
-                realBalances.total < 0 ? "text-red-400" : "text-emerald-400"
-              )}>
-                {isBalanceHidden ? '****' : formatCurrency(realBalances.total)}
-              </div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground">
-                {realBalances.boxes.length} {realBalances.boxes.length === 1 ? 'caja' : 'cajas'}
-              </div>
-            </div>
-          </div>
-
-          {/* Una card por caja */}
-          {realBalances.boxes.map(box => (
-            <div
-              key={box.name}
-              className="flex h-28 flex-col justify-between rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm transition-all hover:bg-card/60"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-xs font-medium" title={box.name}>{box.name}</span>
-                </div>
-                {box.currency !== 'CLP' && (
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{box.currency}</span>
-                )}
-              </div>
-              <div className={cn(
-                "text-xl font-light tracking-tight",
-                box.balance < 0 ? "text-red-400" : "text-foreground"
-              )}>
-                {isBalanceHidden ? '****' : formatCurrency(box.balance, box.currency)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Statistics Cards - Dashboard Style with Sparklines */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="col-span-1 h-32">
@@ -978,16 +911,42 @@ export function Movements({ entityId }: MovementsProps = {}) {
             trendDirection={expensesTrend > 0 ? 'up' : 'down'}
           />
         </div>
+        {/* Saldo Real: dinero actual total + desglose por caja (all-time, no relativo al filtro) */}
         <div className="col-span-1 h-32">
-          <MetricChartCard
-            label="Evolución Balance"
-            value={isBalanceHidden ? '****' : formatCurrency(globalBalance)}
-            data={balanceHistory}
-            dataKey="balance"
-            color="cyan"
-            trend={balanceHistory.length >= 2 ? parseFloat((((balanceHistory[balanceHistory.length - 1]?.balance - balanceHistory[0]?.balance) / (Math.abs(balanceHistory[0]?.balance) || 1)) * 100).toFixed(1)) : 0}
-            trendDirection={balanceHistory.length >= 2 && balanceHistory[balanceHistory.length - 1]?.balance >= balanceHistory[0]?.balance ? 'up' : 'down'}
-          />
+          <div className={cn(
+            "flex h-full flex-col justify-between rounded-xl border p-4 backdrop-blur-sm transition-all",
+            realBalances.total < 0
+              ? "border-red-500/30 bg-red-500/5"
+              : "border-emerald-500/30 bg-emerald-500/5"
+          )}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Saldo Real</span>
+              <span className="text-[9px] text-muted-foreground">dinero actual</span>
+            </div>
+            <div className={cn(
+              "text-2xl font-light tracking-tight",
+              realBalances.total < 0 ? "text-red-400" : "text-emerald-400"
+            )}>
+              {isBalanceHidden ? '****' : formatCurrency(realBalances.total)}
+            </div>
+            {/* Desglose por caja en chico */}
+            <div className="space-y-0.5 overflow-hidden">
+              {realBalances.boxes.map(box => (
+                <div key={box.name} className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+                    <Wallet className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate" title={box.name}>{box.name}</span>
+                  </span>
+                  <span className={cn(
+                    "shrink-0 font-medium tabular-nums",
+                    box.balance < 0 ? "text-red-400" : "text-foreground/80"
+                  )}>
+                    {isBalanceHidden ? '****' : formatCurrency(box.balance, box.currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
